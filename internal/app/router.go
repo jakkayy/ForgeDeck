@@ -15,6 +15,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/health"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/projects"
+	"github.com/jakkayy/ForgeDeck/internal/servers"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
@@ -24,6 +25,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.
 	authHandler := auth.NewHandler(authService, cfg.CookieSecure)
 	authorizer := authz.New(store.New(pool))
 	projectHandler := projects.NewHandler(projects.NewService(pool, authorizer))
+	serverHandler := servers.NewHandler(servers.NewService(pool, authorizer, time.Now))
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover)
@@ -36,6 +38,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.
 		api.Group(func(signedIn chi.Router) {
 			signedIn.Use(authHandler.RequireUser)
 			projectHandler.Routes(signedIn)
+			serverHandler.Routes(signedIn)
 		})
 	})
 	return router

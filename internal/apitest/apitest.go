@@ -132,6 +132,16 @@ func (c *Client) Do(method, path string, body any) *Response {
 	return &Response{t: c.t, Status: resp.StatusCode, Header: resp.Header, Body: data}
 }
 
+// CreateProject creates a project owned by the client's user and returns its ID.
+func (c *Client) CreateProject(name string) uuid.UUID {
+	c.t.Helper()
+	var p struct {
+		ID uuid.UUID `json:"id"`
+	}
+	c.Do(http.MethodPost, "/api/v1/projects", map[string]string{"name": name}).RequireStatus(http.StatusCreated).Decode(&p)
+	return p.ID
+}
+
 // RequireStatus fails the test unless the response has the given status.
 func (r *Response) RequireStatus(want int) *Response {
 	r.t.Helper()
