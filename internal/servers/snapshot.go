@@ -16,10 +16,9 @@ import (
 )
 
 const (
-	maxSnapshotContainers = 500
-	maxContainerLabels    = 64
-	maxLabelBytes         = 1024
-	maxContainerText      = 512
+	maxContainerLabels = 64
+	maxLabelBytes      = 1024
+	maxContainerText   = 512
 	// clockSkewTolerance is how far ahead of the Control Plane an Agent's
 	// clock may be before observed_at is clamped to the receive time.
 	clockSkewTolerance = 30 * time.Second
@@ -106,8 +105,8 @@ func validateSnapshot(snapshot agentproto.ContainerSnapshot) error {
 	if snapshot.ObservedAt.IsZero() {
 		errs.Add("observed_at", "observed_at is required.")
 	}
-	if len(snapshot.Containers) > maxSnapshotContainers {
-		errs.Add("containers", fmt.Sprintf("At most %d containers per snapshot.", maxSnapshotContainers))
+	if len(snapshot.Containers) > agentproto.MaxSnapshotContainers {
+		errs.Add("containers", fmt.Sprintf("At most %d containers per snapshot.", agentproto.MaxSnapshotContainers))
 		return errs.Err()
 	}
 	seen := make(map[string]bool, len(snapshot.Containers))

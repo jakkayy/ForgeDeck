@@ -58,6 +58,9 @@ type HeartbeatResponse struct {
 	IntervalSeconds int `json:"interval_seconds"`
 }
 
+// MaxSnapshotContainers caps one snapshot; the Control Plane rejects more.
+const MaxSnapshotContainers = 500
+
 // ContainerSnapshot is the full list of containers on the Agent's host at
 // ObservedAt. It replaces the previous snapshot; it is not a diff.
 type ContainerSnapshot struct {

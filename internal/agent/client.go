@@ -125,3 +125,10 @@ func (c *Client) Heartbeat(ctx context.Context, req agentproto.HeartbeatRequest)
 	err := c.do(ctx, requestTimeout, "/api/v1/agent/heartbeat", req, &resp)
 	return resp, err
 }
+
+// Snapshot replaces the server's container list on the Control Plane.
+func (c *Client) Snapshot(ctx context.Context, snapshot agentproto.ContainerSnapshot) (agentproto.SnapshotResponse, error) {
+	var resp agentproto.SnapshotResponse
+	err := c.do(ctx, requestTimeout, "/api/v1/agent/containers/snapshot", snapshot, &resp)
+	return resp, err
+}
