@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/jakkayy/ForgeDeck/internal/agentapi"
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/config"
@@ -25,7 +26,9 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.
 	authHandler := auth.NewHandler(authService, cfg.CookieSecure)
 	authorizer := authz.New(store.New(pool))
 	projectHandler := projects.NewHandler(projects.NewService(pool, authorizer))
-	serverHandler := servers.NewHandler(servers.NewService(pool, authorizer, time.Now))
+	serverService := servers.NewService(pool, authorizer, time.Now)
+	serverHandler := servers.NewHandler(serverService)
+	agentHandler := agentapi.NewHandler(serverService)
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover)
@@ -34,6 +37,7 @@ func NewRouter(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.
 	router.Route("/api/v1", func(api chi.Router) {
 		api.Use(httpx.CSRF)
 		authHandler.Routes(api)
+		agentHandler.Routes(api)
 
 		api.Group(func(signedIn chi.Router) {
 			signedIn.Use(authHandler.RequireUser)

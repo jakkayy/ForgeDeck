@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/app"
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/config"
@@ -89,9 +90,10 @@ func (e *Env) NewUser(email string) (*Client, uuid.UUID) {
 
 // Client is an HTTP client for the test server.
 type Client struct {
-	t    testing.TB
-	base string
-	http *http.Client
+	t      testing.TB
+	base   string
+	http   *http.Client
+	bearer string
 }
 
 // Response is a fully read HTTP response.
@@ -120,6 +122,9 @@ func (c *Client) Do(method, path string, body any) *Response {
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if c.bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+c.bearer)
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		c.t.Fatalf("apitest: %s %s: %v", method, path, err)
@@ -130,6 +135,38 @@ func (c *Client) Do(method, path string, body any) *Response {
 		c.t.Fatalf("apitest: read body: %v", err)
 	}
 	return &Response{t: c.t, Status: resp.StatusCode, Header: resp.Header, Body: data}
+}
+
+// IssueEnrollmentToken creates an enrollment token for a server named name.
+func (c *Client) IssueEnrollmentToken(projectID uuid.UUID, name string) string {
+	c.t.Helper()
+	var token struct {
+		Token string `json:"token"`
+	}
+	c.Do(http.MethodPost, "/api/v1/projects/"+projectID.String()+"/servers/enrollment-tokens",
+		map[string]string{"server_name": name}).RequireStatus(http.StatusCreated).Decode(&token)
+	return token.Token
+}
+
+// Agent is an enrolled Agent with a client that authenticates as it.
+type Agent struct {
+	agentproto.EnrollResponse
+	*Client
+}
+
+// EnrollAgent registers a server named name in projectID, using owner to
+// issue the token, and returns a client authenticated as its Agent.
+func (e *Env) EnrollAgent(owner *Client, projectID uuid.UUID, name string) Agent {
+	e.t.Helper()
+	token := owner.IssueEnrollmentToken(projectID, name)
+	var enrolled agentproto.EnrollResponse
+	e.Anonymous().Do(http.MethodPost, "/api/v1/agent/enroll", agentproto.EnrollRequest{
+		Token: token, AgentVersion: "test", ProtocolVersion: agentproto.ProtocolVersion,
+	}).RequireStatus(http.StatusCreated).Decode(&enrolled)
+
+	client := e.Anonymous()
+	client.bearer = enrolled.Credential
+	return Agent{EnrollResponse: enrolled, Client: client}
 }
 
 // CreateProject creates a project owned by the client's user and returns its ID.

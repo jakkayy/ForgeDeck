@@ -12,6 +12,33 @@ import (
 	"github.com/google/uuid"
 )
 
+const consumeEnrollmentToken = `-- name: ConsumeEnrollmentToken :one
+UPDATE enrollment_tokens
+SET used_at = $1::timestamptz
+WHERE token_hash = $2
+  AND used_at IS NULL
+  AND expires_at > $1::timestamptz
+RETURNING id, project_id, server_name
+`
+
+type ConsumeEnrollmentTokenParams struct {
+	Now       time.Time
+	TokenHash []byte
+}
+
+type ConsumeEnrollmentTokenRow struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	ServerName string
+}
+
+func (q *Queries) ConsumeEnrollmentToken(ctx context.Context, arg ConsumeEnrollmentTokenParams) (ConsumeEnrollmentTokenRow, error) {
+	row := q.db.QueryRow(ctx, consumeEnrollmentToken, arg.Now, arg.TokenHash)
+	var i ConsumeEnrollmentTokenRow
+	err := row.Scan(&i.ID, &i.ProjectID, &i.ServerName)
+	return i, err
+}
+
 const createEnrollmentToken = `-- name: CreateEnrollmentToken :one
 INSERT INTO enrollment_tokens (project_id, server_name, token_hash, created_by, expires_at)
 VALUES ($1, $2, $3, $4, $5)
@@ -47,4 +74,18 @@ func (q *Queries) CreateEnrollmentToken(ctx context.Context, arg CreateEnrollmen
 		&i.ServerID,
 	)
 	return i, err
+}
+
+const setEnrollmentTokenServer = `-- name: SetEnrollmentTokenServer :exec
+UPDATE enrollment_tokens SET server_id = $2 WHERE id = $1
+`
+
+type SetEnrollmentTokenServerParams struct {
+	ID       uuid.UUID
+	ServerID *uuid.UUID
+}
+
+func (q *Queries) SetEnrollmentTokenServer(ctx context.Context, arg SetEnrollmentTokenServerParams) error {
+	_, err := q.db.Exec(ctx, setEnrollmentTokenServer, arg.ID, arg.ServerID)
+	return err
 }
