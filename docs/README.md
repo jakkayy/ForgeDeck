@@ -26,7 +26,7 @@ ForgeDeck คือแพลตฟอร์ม DevOps แบบ Self-hosted ส�
 | [08 — Frontend UX](08-frontend-ux.md) | Navigation, หน้าหลัก, design system, performance |
 | [09 — Development Guide](09-development-guide.md) | Local setup, testing, PR checklist |
 | [10 — Roadmap](10-roadmap.md) | Phases และ acceptance criteria |
-| [AGENTS.md](AGENTS.md) | กฎสำหรับ AI coding agents |
+| [AGENTS.md](../AGENTS.md) | กฎสำหรับ AI coding agents |
 
 ---
 
