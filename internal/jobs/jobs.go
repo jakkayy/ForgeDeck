@@ -90,7 +90,7 @@ func (s *Service) Enqueue(ctx context.Context, job NewJob) (store.Job, error) {
 		if err != nil {
 			return fmt.Errorf("insert job: %w", err)
 		}
-		return q.NotifyJobQueued(ctx, store.NotifyJobQueuedParams{Channel: NotifyChannel, Payload: notifyKey(job)})
+		return q.NotifyWorkers(ctx, store.NotifyWorkersParams{Channel: NotifyChannel, Payload: notifyKey(job)})
 	})
 	return created, err
 }

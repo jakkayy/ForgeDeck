@@ -18,8 +18,8 @@ var errAgentUnauthorized = httpx.Unauthorized("Agent credential is invalid or th
 // and stores the Agent identity in the request context.
 func (h *Handler) RequireAgent(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		credential, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if !ok || credential == "" {
+		credential := bearerCredential(r)
+		if credential == "" {
 			httpx.WriteError(w, r, errAgentUnauthorized)
 			return
 		}
@@ -44,4 +44,14 @@ func IdentityFrom(ctx context.Context) servers.AgentIdentity {
 		panic("agentapi.IdentityFrom called on a route without RequireAgent")
 	}
 	return identity
+}
+
+// bearerCredential returns the token from "Authorization: Bearer <token>",
+// or "" when the header is missing or uses another scheme.
+func bearerCredential(r *http.Request) string {
+	credential, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok {
+		return ""
+	}
+	return credential
 }

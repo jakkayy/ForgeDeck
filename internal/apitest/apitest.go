@@ -40,8 +40,12 @@ func New(t testing.TB) *Env {
 	t.Helper()
 	pool := testdb.New(t)
 	cfg := config.Config{CookieSecure: false}
-	server := httptest.NewServer(app.NewRouter(cfg, pool, slog.New(slog.DiscardHandler)))
-	t.Cleanup(server.Close)
+	ctx, cancel := context.WithCancel(context.Background())
+	server := httptest.NewServer(app.NewRouter(ctx, cfg, pool, slog.New(slog.DiscardHandler)))
+	t.Cleanup(func() {
+		cancel()
+		server.Close()
+	})
 	return &Env{t: t, Pool: pool, Server: server}
 }
 

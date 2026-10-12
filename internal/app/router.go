@@ -2,6 +2,7 @@
 package app
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -15,20 +16,25 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/config"
 	"github.com/jakkayy/ForgeDeck/internal/health"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
+	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/projects"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// NewRouter wires every module and returns the root HTTP handler.
-func NewRouter(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.Handler {
+// NewRouter wires every module and returns the root HTTP handler. It also
+// starts background work (the job notifier) that stops when ctx is cancelled.
+func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.Handler {
 	authService := auth.NewService(store.New(pool), time.Now)
 	authHandler := auth.NewHandler(authService, cfg.CookieSecure)
 	authorizer := authz.New(store.New(pool))
 	projectHandler := projects.NewHandler(projects.NewService(pool, authorizer))
 	serverService := servers.NewService(pool, authorizer, time.Now)
 	serverHandler := servers.NewHandler(serverService)
-	agentHandler := agentapi.NewHandler(serverService)
+	jobService := jobs.NewService(pool, time.Now)
+	notifier := jobs.NewNotifier(pool, logger)
+	go notifier.Run(ctx)
+	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier)
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover)

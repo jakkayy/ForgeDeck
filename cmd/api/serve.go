@@ -21,7 +21,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	return httpserver.Run(ctx, cfg.HTTPAddr, app.NewRouter(cfg, pool, logger), logger)
+	return httpserver.Run(ctx, cfg.HTTPAddr, app.NewRouter(ctx, cfg, pool, logger), logger)
 }
 
 func migrateUp(ctx context.Context, cfg config.Config, logger *slog.Logger) error {

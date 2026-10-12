@@ -1,6 +1,7 @@
 package agentapi_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +25,7 @@ func TestRequireAgent(t *testing.T) {
 
 	svc := servers.NewService(env.Pool, authz.New(store.New(env.Pool)), time.Now)
 	router := chi.NewRouter()
-	router.Use(agentapi.NewHandler(svc).RequireAgent)
+	router.Use(agentapi.NewHandler(context.Background(), svc, nil, nil).RequireAgent)
 	router.Get("/whoami", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(agentapi.IdentityFrom(r.Context()))
 	})

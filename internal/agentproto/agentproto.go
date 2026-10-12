@@ -4,6 +4,7 @@
 package agentproto
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -79,4 +80,25 @@ type Container struct {
 // A snapshot older than the stored one is ignored, not an error.
 type SnapshotResponse struct {
 	Accepted bool `json:"accepted"`
+}
+
+// MaxClaimWaitSeconds caps how long a claim request is held open. It stays
+// below common reverse-proxy idle timeouts (often 30–60 seconds).
+const MaxClaimWaitSeconds = 25
+
+// ClaimRequest asks for the next job targeted at this Agent's server.
+// WaitSeconds (0–MaxClaimWaitSeconds) is how long to hold the request open
+// when nothing is queued; omitted means the maximum.
+type ClaimRequest struct {
+	WaitSeconds *int `json:"wait_seconds,omitempty"`
+}
+
+// Job is a job assigned to the Agent. The response is 204 No Content when
+// no job became available within the wait.
+type Job struct {
+	ID             uuid.UUID       `json:"id"`
+	Type           string          `json:"type"`
+	Attempt        int32           `json:"attempt"`
+	Payload        json.RawMessage `json:"payload"`
+	LeaseExpiresAt time.Time       `json:"lease_expires_at"`
 }

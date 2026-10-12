@@ -148,16 +148,16 @@ func (q *Queries) InsertJobAttempt(ctx context.Context, arg InsertJobAttemptPara
 	return err
 }
 
-const notifyJobQueued = `-- name: NotifyJobQueued :exec
+const notifyWorkers = `-- name: NotifyWorkers :exec
 SELECT pg_notify($1::text, $2::text)
 `
 
-type NotifyJobQueuedParams struct {
+type NotifyWorkersParams struct {
 	Channel string
 	Payload string
 }
 
-func (q *Queries) NotifyJobQueued(ctx context.Context, arg NotifyJobQueuedParams) error {
-	_, err := q.db.Exec(ctx, notifyJobQueued, arg.Channel, arg.Payload)
+func (q *Queries) NotifyWorkers(ctx context.Context, arg NotifyWorkersParams) error {
+	_, err := q.db.Exec(ctx, notifyWorkers, arg.Channel, arg.Payload)
 	return err
 }
