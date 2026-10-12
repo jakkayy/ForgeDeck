@@ -51,3 +51,7 @@ export function requestContainerLogs(serverId: string, containerId: string, tail
     body: { tail_lines: tailLines, timestamps: true },
   });
 }
+
+export function deleteServer(serverId: string) {
+  return api<void>(`/servers/${serverId}`, { method: "DELETE" });
+}

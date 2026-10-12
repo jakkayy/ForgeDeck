@@ -8,6 +8,7 @@ import { ContainerActions } from "../../../components/ContainerActions";
 import { ContainerLogs } from "../../../components/ContainerLogs";
 import { ContainerStateChip } from "../../../components/ContainerStateChip";
 import { QueryError } from "../../../components/QueryError";
+import { RemoveServerDialog } from "../../../components/RemoveServerDialog";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { timeAgo } from "../../../lib/time";
 import { useHasRole } from "../../../lib/useHasRole";
@@ -56,6 +57,7 @@ function ServerPage() {
 }
 
 function ServerSummary({ server }: { server: Server }) {
+  const canManage = useHasRole(server.project_id, "admin");
   const facts: [string, string][] = [
     ["Project", server.project_name],
     ["Last heartbeat", timeAgo(server.last_seen_at)],
@@ -79,6 +81,11 @@ function ServerSummary({ server }: { server: Server }) {
         <div className="mt-1 flex flex-wrap items-center gap-3">
           <h1 className="text-xl font-semibold tracking-tight">{server.name}</h1>
           <ServerStatusChip status={server.status} />
+          {canManage && (
+            <div className="ms-auto">
+              <RemoveServerDialog server={server} />
+            </div>
+          )}
         </div>
       </div>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4 lg:grid-cols-7">
