@@ -55,24 +55,24 @@ func NewClient(baseURL, credential string) *Client {
 // Enroll exchanges a single-use token for this Agent's credential.
 func (c *Client) Enroll(ctx context.Context, token, version string) (agentproto.EnrollResponse, error) {
 	var resp agentproto.EnrollResponse
-	_, err := c.do(ctx, requestTimeout, "/api/v1/agent/enroll", agentproto.EnrollRequest{
+	err := c.do(ctx, requestTimeout, "/api/v1/agent/enroll", agentproto.EnrollRequest{
 		Token: token, AgentVersion: version, ProtocolVersion: agentproto.ProtocolVersion,
 	}, &resp)
 	return resp, err
 }
 
-// do POSTs body as JSON and decodes a JSON response into out (when non-nil
-// and the response has a body). It returns the HTTP status.
-func (c *Client) do(ctx context.Context, timeout time.Duration, path string, body, out any) (int, error) {
+// do POSTs body as JSON and decodes a JSON response into out when non-nil.
+// A response without a body (204) leaves out unchanged.
+func (c *Client) do(ctx context.Context, timeout time.Duration, path string, body, out any) error {
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return 0, fmt.Errorf("encode request: %w", err)
+		return fmt.Errorf("encode request: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(encoded))
 	if err != nil {
-		return 0, fmt.Errorf("build request: %w", err)
+		return fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.credential != "" {
@@ -81,23 +81,23 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, path string, bod
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("POST %s: %w", path, err)
+		return fmt.Errorf("POST %s: %w", path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
-		return resp.StatusCode, fmt.Errorf("read response: %w", err)
+		return fmt.Errorf("read response: %w", err)
 	}
 
 	if resp.StatusCode >= 300 {
-		return resp.StatusCode, apiError(resp.StatusCode, data)
+		return apiError(resp.StatusCode, data)
 	}
 	if out != nil && len(data) > 0 {
 		if err := json.Unmarshal(data, out); err != nil {
-			return resp.StatusCode, fmt.Errorf("decode response: %w", err)
+			return fmt.Errorf("decode response: %w", err)
 		}
 	}
-	return resp.StatusCode, nil
+	return nil
 }
 
 func apiError(status int, body []byte) error {
@@ -117,4 +117,11 @@ func apiError(status int, body []byte) error {
 	default:
 		return apiErr
 	}
+}
+
+// Heartbeat reports liveness and status.
+func (c *Client) Heartbeat(ctx context.Context, req agentproto.HeartbeatRequest) (agentproto.HeartbeatResponse, error) {
+	var resp agentproto.HeartbeatResponse
+	err := c.do(ctx, requestTimeout, "/api/v1/agent/heartbeat", req, &resp)
+	return resp, err
 }
