@@ -36,8 +36,11 @@ type Env struct {
 	Server *httptest.Server
 }
 
+// Option adjusts the configuration of the API under test.
+type Option func(*config.Config)
+
 // New starts the API for one test.
-func New(t testing.TB) *Env {
+func New(t testing.TB, options ...Option) *Env {
 	t.Helper()
 	pool := testdb.New(t)
 	keys, err := keyring.Parse("test:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")
@@ -45,6 +48,9 @@ func New(t testing.TB) *Env {
 		t.Fatal(err)
 	}
 	cfg := config.Config{CookieSecure: false, Keyring: keys}
+	for _, option := range options {
+		option(&cfg)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	server := httptest.NewServer(app.NewRouter(ctx, cfg, pool, slog.New(slog.DiscardHandler)))
 	t.Cleanup(func() {
@@ -78,7 +84,11 @@ func (e *Env) AddMember(projectID, userID uuid.UUID, role string) {
 // Anonymous returns a client without a session.
 func (e *Env) Anonymous() *Client {
 	jar, _ := cookiejar.New(nil)
-	return &Client{t: e.t, base: e.Server.URL, http: &http.Client{Jar: jar}}
+	return &Client{t: e.t, base: e.Server.URL, http: &http.Client{
+		Jar: jar,
+		// Return redirects to the test instead of following them.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}}
 }
 
 // SignIn logs in an existing user and returns a client carrying the session cookie.

@@ -54,12 +54,14 @@ Members are managed by Admin and Owner roles. Nobody can grant or remove a role 
 
 ## 5. Git connections and applications
 
+See [13 — Git Providers](13-git-providers.md) for provider setup.
+
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/git-connections` | List connections available to user |
-| POST | `/git-connections` | Create provider connection |
-| DELETE | `/git-connections/{id}` | Revoke/remove connection |
-| GET | `/git-connections/{id}/repositories` | List accessible repositories |
+| GET | `/projects/{projectID}/git-connections` | List the project's connections |
+| POST | `/projects/{projectID}/git-connections/github` | Start a GitHub App install; returns `install_url` |
+| GET | `/git/github/setup` | GitHub install callback (no session; verified by sealed state and OAuth) |
+| DELETE | `/git-connections/{connectionID}` | Remove a connection and its stored credentials |
 | GET | `/projects/{projectID}/applications` | List applications |
 | POST | `/projects/{projectID}/applications` | Create application |
 | GET | `/applications/{applicationID}` | Get application |

@@ -41,6 +41,7 @@ const (
 	UpdateProject    Permission = "project.update"
 	ManageMembers    Permission = "members.manage"
 	ManageServers    Permission = "servers.manage"
+	ManageGit        Permission = "git.manage"
 	DeleteProject    Permission = "project.delete"
 )
 
@@ -52,6 +53,7 @@ var minimumRole = map[Permission]Role{
 	UpdateProject:    RoleAdmin,
 	ManageMembers:    RoleAdmin,
 	ManageServers:    RoleAdmin,
+	ManageGit:        RoleAdmin,
 	DeleteProject:    RoleOwner,
 }
 

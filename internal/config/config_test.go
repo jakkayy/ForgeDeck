@@ -67,3 +67,23 @@ func TestLoadRequiresDatabaseURL(t *testing.T) {
 		t.Fatalf("expected missing database URL error, got %v", err)
 	}
 }
+
+func TestLoadGitHubAppIsOptionalButComplete(t *testing.T) {
+	base := map[string]string{"FORGEDECK_DATABASE_URL": "postgres://db/f", "FORGEDECK_SECRET_KEYS": testKey}
+
+	cfg, err := Load(envOf(base))
+	if err != nil || cfg.GitHub != nil {
+		t.Fatalf("without App ID: github=%v err=%v", cfg.GitHub, err)
+	}
+
+	partial := map[string]string{"FORGEDECK_GITHUB_APP_ID": "123"}
+	for k, v := range base {
+		partial[k] = v
+	}
+	_, err = Load(envOf(partial))
+	for _, want := range []string{"FORGEDECK_GITHUB_APP_SLUG", "FORGEDECK_GITHUB_CLIENT_SECRET", "FORGEDECK_GITHUB_WEBHOOK_SECRET", "FORGEDECK_GITHUB_APP_PRIVATE_KEY", "FORGEDECK_PUBLIC_URL"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("partial GitHub config: error %v does not mention %s", err, want)
+		}
+	}
+}

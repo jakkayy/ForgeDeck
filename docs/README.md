@@ -28,6 +28,7 @@ ForgeDeck คือแพลตฟอร์ม DevOps แบบ Self-hosted ส�
 | [10 — Roadmap](10-roadmap.md) | Phases และ acceptance criteria |
 | [11 — Implementation Plan](11-implementation-plan.md) | ข้อย่อยของแต่ละ phase และ commit |
 | [12 — Measurements](12-measurements.md) | ผลวัด latency และทรัพยากร |
+| [13 — Git Providers](13-git-providers.md) | ตั้งค่า GitHub App และ GitLab |
 | [AGENTS.md](../AGENTS.md) | กฎสำหรับ AI coding agents |
 
 ---
