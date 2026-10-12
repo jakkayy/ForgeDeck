@@ -112,6 +112,15 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, arg ListProjectsForUs
 	return items, nil
 }
 
+const lockProject = `-- name: LockProject :exec
+SELECT id FROM projects WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockProject(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockProject, id)
+	return err
+}
+
 const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET name = COALESCE($1, name),

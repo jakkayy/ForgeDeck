@@ -27,6 +27,9 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/projects/{projectID}", httpx.Handle(h.get))
 	r.Patch("/projects/{projectID}", httpx.Handle(h.update))
 	r.Delete("/projects/{projectID}", httpx.Handle(h.delete))
+	r.Get("/projects/{projectID}/members", httpx.Handle(h.listMembers))
+	r.Post("/projects/{projectID}/members", httpx.Handle(h.addMember))
+	r.Delete("/projects/{projectID}/members/{userID}", httpx.Handle(h.removeMember))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
@@ -105,6 +108,59 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if err := h.svc.Delete(r.Context(), auth.UserFrom(r.Context()).ID, projectID, req.Confirm); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) error {
+	projectID, err := httpx.UUIDParam(r, "projectID")
+	if err != nil {
+		return err
+	}
+	page, err := httpx.ParsePage(r)
+	if err != nil {
+		return err
+	}
+	members, err := h.svc.ListMembers(r.Context(), auth.UserFrom(r.Context()).ID, projectID, page.Limit, page.Offset)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, httpx.NewList(members, page))
+}
+
+type addMemberRequest struct {
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+func (h *Handler) addMember(w http.ResponseWriter, r *http.Request) error {
+	projectID, err := httpx.UUIDParam(r, "projectID")
+	if err != nil {
+		return err
+	}
+	var req addMemberRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	member, err := h.svc.AddMember(r.Context(), auth.UserFrom(r.Context()).ID, projectID, req.Email, req.Role)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusCreated, member)
+}
+
+func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request) error {
+	projectID, err := httpx.UUIDParam(r, "projectID")
+	if err != nil {
+		return err
+	}
+	memberID, err := httpx.UUIDParam(r, "userID")
+	if err != nil {
+		return err
+	}
+	if err := h.svc.RemoveMember(r.Context(), auth.UserFrom(r.Context()).ID, projectID, memberID); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)

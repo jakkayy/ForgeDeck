@@ -61,6 +61,9 @@ func (r Role) Can(p Permission) bool {
 	return ok && roleRank[r] >= roleRank[minimum]
 }
 
+// Outranks reports whether r is strictly higher than other.
+func (r Role) Outranks(other Role) bool { return roleRank[r] > roleRank[other] }
+
 // ErrProjectNotFound is returned for unknown projects and for projects the
 // user is not a member of, so membership cannot be probed.
 var ErrProjectNotFound = apperr.NotFound("Project not found.")

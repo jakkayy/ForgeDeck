@@ -7,13 +7,15 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
 
-const addProjectMember = `-- name: AddProjectMember :exec
+const addProjectMember = `-- name: AddProjectMember :one
 INSERT INTO project_members (project_id, user_id, role)
 VALUES ($1, $2, $3)
+RETURNING created_at
 `
 
 type AddProjectMemberParams struct {
@@ -22,9 +24,23 @@ type AddProjectMemberParams struct {
 	Role      string
 }
 
-func (q *Queries) AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error {
-	_, err := q.db.Exec(ctx, addProjectMember, arg.ProjectID, arg.UserID, arg.Role)
-	return err
+func (q *Queries) AddProjectMember(ctx context.Context, arg AddProjectMemberParams) (time.Time, error) {
+	row := q.db.QueryRow(ctx, addProjectMember, arg.ProjectID, arg.UserID, arg.Role)
+	var created_at time.Time
+	err := row.Scan(&created_at)
+	return created_at, err
+}
+
+const countProjectOwners = `-- name: CountProjectOwners :one
+SELECT count(*) FROM project_members
+WHERE project_id = $1 AND role = 'owner'
+`
+
+func (q *Queries) CountProjectOwners(ctx context.Context, projectID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countProjectOwners, projectID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const getMemberRole = `-- name: GetMemberRole :one
@@ -42,4 +58,66 @@ func (q *Queries) GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (s
 	var role string
 	err := row.Scan(&role)
 	return role, err
+}
+
+const listProjectMembers = `-- name: ListProjectMembers :many
+SELECT project_members.user_id, users.email, project_members.role, project_members.created_at
+FROM project_members
+JOIN users ON users.id = project_members.user_id
+WHERE project_members.project_id = $1
+ORDER BY users.email
+LIMIT $3 OFFSET $2
+`
+
+type ListProjectMembersParams struct {
+	ProjectID  uuid.UUID
+	PageOffset int32
+	PageLimit  int32
+}
+
+type ListProjectMembersRow struct {
+	UserID    uuid.UUID
+	Email     string
+	Role      string
+	CreatedAt time.Time
+}
+
+func (q *Queries) ListProjectMembers(ctx context.Context, arg ListProjectMembersParams) ([]ListProjectMembersRow, error) {
+	rows, err := q.db.Query(ctx, listProjectMembers, arg.ProjectID, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectMembersRow{}
+	for rows.Next() {
+		var i ListProjectMembersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Email,
+			&i.Role,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const removeProjectMember = `-- name: RemoveProjectMember :exec
+DELETE FROM project_members
+WHERE project_id = $1 AND user_id = $2
+`
+
+type RemoveProjectMemberParams struct {
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+}
+
+func (q *Queries) RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) error {
+	_, err := q.db.Exec(ctx, removeProjectMember, arg.ProjectID, arg.UserID)
+	return err
 }

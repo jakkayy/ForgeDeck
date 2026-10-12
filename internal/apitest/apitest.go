@@ -57,7 +57,7 @@ func (e *Env) CreateUser(email string) uuid.UUID {
 // AddMember gives userID a role in projectID directly in the database.
 func (e *Env) AddMember(projectID, userID uuid.UUID, role string) {
 	e.t.Helper()
-	err := store.New(e.Pool).AddProjectMember(context.Background(), store.AddProjectMemberParams{
+	_, err := store.New(e.Pool).AddProjectMember(context.Background(), store.AddProjectMemberParams{
 		ProjectID: projectID, UserID: userID, Role: role,
 	})
 	if err != nil {

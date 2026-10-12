@@ -47,7 +47,10 @@ Use CSRF protection appropriate to the chosen cookie/session approach. Cookies s
 | PATCH | `/projects/{projectID}` | Update project |
 | DELETE | `/projects/{projectID}` | Delete project after safeguards |
 | GET | `/projects/{projectID}/members` | List members |
-| POST | `/projects/{projectID}/members` | Add member |
+| POST | `/projects/{projectID}/members` | Add an existing user by email with a role |
+| DELETE | `/projects/{projectID}/members/{userID}` | Remove member (cannot remove a higher role or the last owner) |
+
+Members are managed by Admin and Owner roles. Nobody can grant or remove a role higher than their own, and any member may remove themselves unless they are the last owner.
 
 ## 5. Git connections and applications
 

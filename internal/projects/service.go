@@ -77,9 +77,10 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in CreateInput) 
 		if err != nil {
 			return err
 		}
-		return q.AddProjectMember(ctx, store.AddProjectMemberParams{
+		_, err = q.AddProjectMember(ctx, store.AddProjectMemberParams{
 			ProjectID: created.ID, UserID: userID, Role: string(authz.RoleOwner),
 		})
+		return err
 	})
 	if database.IsUniqueViolation(err) {
 		return Project{}, errSlugTaken
