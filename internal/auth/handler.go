@@ -25,6 +25,7 @@ func NewHandler(svc *Service, secureCookies bool) *Handler {
 // Routes mounts the auth endpoints on r.
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/auth/login", httpx.Handle(h.login))
+	r.Post("/auth/logout", httpx.Handle(h.logout))
 }
 
 type loginRequest struct {
@@ -52,6 +53,19 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
+// logout ends the current session, if any, and clears the cookie. It succeeds
+// even without a valid session so the client can always reach a signed-out state.
+func (h *Handler) logout(w http.ResponseWriter, r *http.Request) error {
+	if token, ok := h.cookie.read(r); ok {
+		if err := h.svc.EndSession(r.Context(), token); err != nil {
+			return err
+		}
+	}
+	h.cookie.clear(w)
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
 // cookieConfig names and scopes the session cookie. Over HTTPS the __Host-
 // prefix pins the cookie to this exact origin.
 type cookieConfig struct {
@@ -72,6 +86,26 @@ func (c cookieConfig) set(w http.ResponseWriter, token string) {
 		Value:    token,
 		Path:     "/",
 		MaxAge:   int(sessionMaxLifetime / time.Second),
+		HttpOnly: true,
+		Secure:   c.secure,
+		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+func (c cookieConfig) read(r *http.Request) (string, bool) {
+	cookie, err := r.Cookie(c.name)
+	if err != nil || cookie.Value == "" {
+		return "", false
+	}
+	return cookie.Value, true
+}
+
+func (c cookieConfig) clear(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     c.name,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   c.secure,
 		SameSite: http.SameSiteStrictMode,

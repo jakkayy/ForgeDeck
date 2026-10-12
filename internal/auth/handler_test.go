@@ -105,3 +105,30 @@ func TestLoginRejectsBadCredentialsIdentically(t *testing.T) {
 		t.Errorf("messages differ: %q vs %q", a["error"]["message"], b["error"]["message"])
 	}
 }
+
+func TestLogoutEndsSessionAndClearsCookie(t *testing.T) {
+	api := newAuthAPI(t, true)
+	cookie := sessionCookie(t, api.do(loginRequest("dev@example.com", "long-enough-password")))
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
+	req.AddCookie(cookie)
+	rec := api.do(req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if cleared := sessionCookie(t, rec); cleared.MaxAge >= 0 || cleared.Value != "" {
+		t.Fatalf("cookie not cleared: %+v", cleared)
+	}
+	if _, err := api.svc.Authenticate(context.Background(), cookie.Value); err == nil {
+		t.Fatal("session still valid after logout")
+	}
+}
+
+func TestLogoutWithoutSessionSucceeds(t *testing.T) {
+	api := newAuthAPI(t, true)
+	rec := api.do(httptest.NewRequest(http.MethodPost, "/auth/logout", nil))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status %d", rec.Code)
+	}
+}
