@@ -113,3 +113,32 @@ type LeaseRequest struct {
 type LeaseResponse struct {
 	LeaseExpiresAt time.Time `json:"lease_expires_at"`
 }
+
+// Log streams accepted in job events.
+const (
+	StreamStdout = "stdout"
+	StreamStderr = "stderr"
+	StreamSystem = "system"
+)
+
+// Batch limits for job events.
+const (
+	MaxEventsPerBatch = 500
+	MaxEventBytes     = 16 * 1024
+)
+
+// EventsRequest appends log lines for a job attempt. Sequence numbers
+// increase monotonically per attempt; resending a batch is safe because
+// duplicates are ignored.
+type EventsRequest struct {
+	Attempt int32      `json:"attempt"`
+	Events  []LogEvent `json:"events"`
+}
+
+// LogEvent is one line of job output. Secrets must be redacted by the Agent
+// before sending.
+type LogEvent struct {
+	Sequence int64  `json:"sequence"`
+	Stream   string `json:"stream"`
+	Message  string `json:"message"`
+}

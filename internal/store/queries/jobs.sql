@@ -39,3 +39,18 @@ WHERE id = @id
   AND lease_owner = @worker_id::text
   AND target_server_id = @server_id::uuid
 RETURNING lease_expires_at;
+
+-- name: IsAgentAttemptActive :one
+SELECT EXISTS (
+    SELECT 1 FROM jobs
+    WHERE id = @id
+      AND status = 'running'
+      AND attempt_count = @attempt
+      AND lease_owner = @worker_id::text
+      AND target_server_id = @server_id::uuid
+);
+
+-- name: AppendJobLogs :execrows
+INSERT INTO job_log_chunks (job_id, attempt_number, sequence_number, stream, content)
+SELECT @job_id, @attempt_number, unnest(@sequence_numbers::bigint[]), unnest(@streams::text[]), unnest(@contents::text[])
+ON CONFLICT (job_id, attempt_number, sequence_number) DO NOTHING;

@@ -13,6 +13,34 @@ import (
 	"github.com/google/uuid"
 )
 
+const appendJobLogs = `-- name: AppendJobLogs :execrows
+INSERT INTO job_log_chunks (job_id, attempt_number, sequence_number, stream, content)
+SELECT $1, $2, unnest($3::bigint[]), unnest($4::text[]), unnest($5::text[])
+ON CONFLICT (job_id, attempt_number, sequence_number) DO NOTHING
+`
+
+type AppendJobLogsParams struct {
+	JobID           uuid.UUID
+	AttemptNumber   int32
+	SequenceNumbers []int64
+	Streams         []string
+	Contents        []string
+}
+
+func (q *Queries) AppendJobLogs(ctx context.Context, arg AppendJobLogsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, appendJobLogs,
+		arg.JobID,
+		arg.AttemptNumber,
+		arg.SequenceNumbers,
+		arg.Streams,
+		arg.Contents,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const claimAgentJob = `-- name: ClaimAgentJob :one
 WITH next AS (
     SELECT queued.id FROM jobs AS queued
@@ -146,6 +174,36 @@ func (q *Queries) InsertJobAttempt(ctx context.Context, arg InsertJobAttemptPara
 		arg.StartedAt,
 	)
 	return err
+}
+
+const isAgentAttemptActive = `-- name: IsAgentAttemptActive :one
+SELECT EXISTS (
+    SELECT 1 FROM jobs
+    WHERE id = $1
+      AND status = 'running'
+      AND attempt_count = $2
+      AND lease_owner = $3::text
+      AND target_server_id = $4::uuid
+)
+`
+
+type IsAgentAttemptActiveParams struct {
+	ID       uuid.UUID
+	Attempt  int32
+	WorkerID string
+	ServerID uuid.UUID
+}
+
+func (q *Queries) IsAgentAttemptActive(ctx context.Context, arg IsAgentAttemptActiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isAgentAttemptActive,
+		arg.ID,
+		arg.Attempt,
+		arg.WorkerID,
+		arg.ServerID,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const notifyWorkers = `-- name: NotifyWorkers :exec
