@@ -32,14 +32,14 @@ async function fetchLogs(
   return { lines, truncated, fetchedAt: new Date() };
 }
 
-type Props = { serverId: string; container: Container };
+type Props = { serverId: string; container: Container; isDisabled?: boolean };
 
 /**
  * Past output of one container, fetched on demand through the Agent. Lines
  * are rendered as text (never HTML) and redaction happens before they reach
  * the browser.
  */
-export function ContainerLogs({ serverId, container }: Props) {
+export function ContainerLogs({ serverId, container, isDisabled = false }: Props) {
   const [tail, setTail] = useState(500);
   const logs = useMutation({
     mutationFn: (lines: number) => fetchLogs(serverId, container, lines),
@@ -47,7 +47,7 @@ export function ContainerLogs({ serverId, container }: Props) {
 
   return (
     <Drawer onOpenChange={(open) => open && logs.mutate(tail)}>
-      <Button size="sm" variant="tertiary">
+      <Button size="sm" variant="tertiary" isDisabled={isDisabled}>
         Logs
       </Button>
       <Drawer.Backdrop>

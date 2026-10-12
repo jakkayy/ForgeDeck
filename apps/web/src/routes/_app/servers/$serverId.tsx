@@ -49,6 +49,7 @@ function ServerPage() {
             list={containers.data}
             serverId={serverId}
             projectId={server.data.project_id}
+            isOnline={server.data.status === "online"}
           />
         )}
       </section>
@@ -100,9 +101,15 @@ function ServerSummary({ server }: { server: Server }) {
   );
 }
 
-type ContainersProps = { list: ContainerList; serverId: string; projectId: string };
+type ContainersProps = {
+  list: ContainerList;
+  serverId: string;
+  projectId: string;
+  /** Jobs only run while the Agent is connected, so actions wait for it. */
+  isOnline: boolean;
+};
 
-function Containers({ list, serverId, projectId }: ContainersProps) {
+function Containers({ list, serverId, projectId, isOnline }: ContainersProps) {
   const canOperate = useHasRole(projectId, "developer");
   return (
     <>
@@ -113,6 +120,7 @@ function Containers({ list, serverId, projectId }: ContainersProps) {
               {list.observed_at
                 ? `This list was reported ${timeAgo(list.observed_at)} and may be out of date: the Agent has not sent a fresh snapshot.`
                 : "The Agent has not reported any containers yet."}
+              {!isOnline && " Actions and logs are unavailable until the Agent reconnects."}
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -134,8 +142,18 @@ function Containers({ list, serverId, projectId }: ContainersProps) {
                 container={container}
                 actions={
                   <div className="flex items-center gap-2">
-                    <ContainerLogs serverId={serverId} container={container} />
-                    {canOperate && <ContainerActions serverId={serverId} container={container} />}
+                    <ContainerLogs
+                      serverId={serverId}
+                      container={container}
+                      isDisabled={!isOnline}
+                    />
+                    {canOperate && (
+                      <ContainerActions
+                        serverId={serverId}
+                        container={container}
+                        isDisabled={!isOnline}
+                      />
+                    )}
                   </div>
                 }
               />

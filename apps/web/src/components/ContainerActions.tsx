@@ -10,14 +10,14 @@ const progress: Record<ContainerAction, string> = {
   restart: "Restarting",
 };
 
-type Props = { serverId: string; container: Container };
+type Props = { serverId: string; container: Container; isDisabled?: boolean };
 
 /**
  * Start/Stop/Restart for one container. Stop and Restart interrupt service,
  * so they ask for confirmation. Success is reported only after the Agent
  * finishes the job, never when the request is merely accepted.
  */
-export function ContainerActions({ serverId, container }: Props) {
+export function ContainerActions({ serverId, container, isDisabled = false }: Props) {
   const queryClient = useQueryClient();
   const run = useMutation({
     mutationFn: async (action: ContainerAction) => {
@@ -56,13 +56,13 @@ export function ContainerActions({ serverId, container }: Props) {
           <ConfirmAction
             action="restart"
             container={container}
-            isPending={run.isPending}
+            isDisabled={isDisabled || run.isPending}
             onConfirm={() => run.mutate("restart")}
           />
           <ConfirmAction
             action="stop"
             container={container}
-            isPending={run.isPending}
+            isDisabled={isDisabled || run.isPending}
             onConfirm={() => run.mutate("stop")}
           />
         </>
@@ -94,18 +94,18 @@ const confirmCopy = {
 type ConfirmProps = {
   action: "restart" | "stop";
   container: Container;
-  isPending: boolean;
+  isDisabled: boolean;
   onConfirm: () => void;
 };
 
-function ConfirmAction({ action, container, isPending, onConfirm }: ConfirmProps) {
+function ConfirmAction({ action, container, isDisabled, onConfirm }: ConfirmProps) {
   const copy = confirmCopy[action];
   return (
     <AlertDialog>
       <Button
         size="sm"
         variant={action === "stop" ? "danger-soft" : "secondary"}
-        isDisabled={isPending}
+        isDisabled={isDisabled}
       >
         {copy.label}
       </Button>
