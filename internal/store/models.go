@@ -30,6 +30,50 @@ type EnrollmentToken struct {
 	ServerID   *uuid.UUID
 }
 
+type Job struct {
+	ID             uuid.UUID
+	ProjectID      uuid.UUID
+	Type           string
+	WorkerKind     string
+	TargetServerID *uuid.UUID
+	Status         string
+	Payload        json.RawMessage
+	Result         []byte
+	ErrorCode      *string
+	ErrorMessage   *string
+	AttemptCount   int32
+	MaxAttempts    int32
+	LeaseOwner     *string
+	LeaseExpiresAt *time.Time
+	IdempotencyKey *string
+	CreatedBy      *uuid.UUID
+	CreatedAt      time.Time
+	StartedAt      *time.Time
+	FinishedAt     *time.Time
+}
+
+type JobAttempt struct {
+	ID            uuid.UUID
+	JobID         uuid.UUID
+	AttemptNumber int32
+	WorkerID      string
+	Status        string
+	StartedAt     time.Time
+	FinishedAt    *time.Time
+	ErrorCode     *string
+	ErrorSummary  *string
+}
+
+type JobLogChunk struct {
+	ID             int64
+	JobID          uuid.UUID
+	AttemptNumber  int32
+	SequenceNumber int64
+	Stream         string
+	Content        string
+	CreatedAt      time.Time
+}
+
 type Project struct {
 	ID        uuid.UUID
 	Name      string
