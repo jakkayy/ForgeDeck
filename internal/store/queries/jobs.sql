@@ -83,3 +83,14 @@ WHERE id = @id
   AND attempt_count = @attempt
   AND lease_owner = @worker_id::text
   AND target_server_id = @server_id::uuid;
+
+-- name: GetJob :one
+SELECT * FROM jobs WHERE id = $1;
+
+-- name: ListJobLogs :many
+SELECT attempt_number, sequence_number, stream, content, created_at
+FROM job_log_chunks
+WHERE job_id = @job_id
+  AND (attempt_number, sequence_number) > (@after_attempt::integer, @after_sequence::bigint)
+ORDER BY attempt_number, sequence_number
+LIMIT @page_limit;

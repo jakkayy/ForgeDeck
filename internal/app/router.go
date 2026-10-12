@@ -31,7 +31,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	projectHandler := projects.NewHandler(projects.NewService(pool, authorizer))
 	serverService := servers.NewService(pool, authorizer, time.Now)
 	serverHandler := servers.NewHandler(serverService)
-	jobService := jobs.NewService(pool, time.Now)
+	jobService := jobs.NewService(pool, authorizer, time.Now)
 	notifier := jobs.NewNotifier(pool, logger)
 	go notifier.Run(ctx)
 	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier)
@@ -49,6 +49,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			signedIn.Use(authHandler.RequireUser)
 			projectHandler.Routes(signedIn)
 			serverHandler.Routes(signedIn)
+			jobs.NewHandler(jobService).Routes(signedIn)
 		})
 	})
 	return router

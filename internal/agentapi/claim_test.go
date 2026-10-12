@@ -10,7 +10,9 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
+	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
+	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
 type claimFixture struct {
@@ -29,7 +31,7 @@ func newClaimFixture(t *testing.T) claimFixture {
 	return claimFixture{
 		env: env, owner: owner, projectID: projectID,
 		agent: env.EnrollAgent(owner, projectID, "prod-01"),
-		jobs:  jobs.NewService(env.Pool, time.Now),
+		jobs:  jobs.NewService(env.Pool, authz.New(store.New(env.Pool)), time.Now),
 	}
 }
 

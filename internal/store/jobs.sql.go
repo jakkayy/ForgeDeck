@@ -203,6 +203,37 @@ func (q *Queries) GetAgentAttemptOutcome(ctx context.Context, arg GetAgentAttemp
 	return status, err
 }
 
+const getJob = `-- name: GetJob :one
+SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at FROM jobs WHERE id = $1
+`
+
+func (q *Queries) GetJob(ctx context.Context, id uuid.UUID) (Job, error) {
+	row := q.db.QueryRow(ctx, getJob, id)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Type,
+		&i.WorkerKind,
+		&i.TargetServerID,
+		&i.Status,
+		&i.Payload,
+		&i.Result,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.LeaseOwner,
+		&i.LeaseExpiresAt,
+		&i.IdempotencyKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
 const insertJob = `-- name: InsertJob :one
 INSERT INTO jobs (project_id, type, worker_kind, target_server_id, payload, max_attempts, idempotency_key, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -306,6 +337,61 @@ func (q *Queries) IsAgentAttemptActive(ctx context.Context, arg IsAgentAttemptAc
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const listJobLogs = `-- name: ListJobLogs :many
+SELECT attempt_number, sequence_number, stream, content, created_at
+FROM job_log_chunks
+WHERE job_id = $1
+  AND (attempt_number, sequence_number) > ($2::integer, $3::bigint)
+ORDER BY attempt_number, sequence_number
+LIMIT $4
+`
+
+type ListJobLogsParams struct {
+	JobID         uuid.UUID
+	AfterAttempt  int32
+	AfterSequence int64
+	PageLimit     int32
+}
+
+type ListJobLogsRow struct {
+	AttemptNumber  int32
+	SequenceNumber int64
+	Stream         string
+	Content        string
+	CreatedAt      time.Time
+}
+
+func (q *Queries) ListJobLogs(ctx context.Context, arg ListJobLogsParams) ([]ListJobLogsRow, error) {
+	rows, err := q.db.Query(ctx, listJobLogs,
+		arg.JobID,
+		arg.AfterAttempt,
+		arg.AfterSequence,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListJobLogsRow{}
+	for rows.Next() {
+		var i ListJobLogsRow
+		if err := rows.Scan(
+			&i.AttemptNumber,
+			&i.SequenceNumber,
+			&i.Stream,
+			&i.Content,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const notifyWorkers = `-- name: NotifyWorkers :exec

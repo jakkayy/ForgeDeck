@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/database"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
@@ -45,12 +46,13 @@ const runnerNotifyKey = "runner"
 type Service struct {
 	pool    *pgxpool.Pool
 	queries *store.Queries
+	authz   *authz.Authorizer
 	now     func() time.Time
 }
 
 // NewService returns a job Service; now is time.Now outside tests.
-func NewService(pool *pgxpool.Pool, now func() time.Time) *Service {
-	return &Service{pool: pool, queries: store.New(pool), now: now}
+func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, now func() time.Time) *Service {
+	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, now: now}
 }
 
 // NewJob describes a job to enqueue. TargetServerID is required for Agent

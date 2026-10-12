@@ -9,7 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
+	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
 )
 
@@ -26,7 +28,7 @@ func newFixture(t *testing.T) fixture {
 	t.Helper()
 	pool := testdb.New(t)
 	ctx := context.Background()
-	f := fixture{pool: pool, svc: jobs.NewService(pool, time.Now)}
+	f := fixture{pool: pool, svc: jobs.NewService(pool, authz.New(store.New(pool)), time.Now)}
 	if err := pool.QueryRow(ctx, "INSERT INTO projects (name, slug) VALUES ('Infra', 'infra') RETURNING id").Scan(&f.projectID); err != nil {
 		t.Fatal(err)
 	}

@@ -132,7 +132,7 @@ Never accept a client-supplied Docker socket, host address, or Docker API path.
 |---|---|---|
 | GET | `/jobs` | Paginated job history |
 | GET | `/jobs/{jobID}` | Job detail |
-| GET | `/jobs/{jobID}/logs` | Paginated stored log chunks (`?after_sequence=`) |
+| GET | `/jobs/{jobID}/logs` | Stored log lines after a keyset cursor (`?after=<attempt>.<sequence>&limit=`) |
 | GET | `/jobs/{jobID}/events` | SSE stream for live logs/events |
 | POST | `/jobs/{jobID}/cancel` | Request cancellation where supported |
 | POST | `/applications/{applicationID}/builds` | Start build |
