@@ -108,6 +108,7 @@ func runAgent(ctx context.Context, args []string) error {
 
 	handlers := map[string]agent.Handler{
 		agentproto.JobContainerAction: agent.ContainerActionHandler(engine, agent.SelfContainerID()),
+		agentproto.JobFetchLogs:       agent.FetchLogsHandler(engine),
 	}
 	return agent.Run(ctx, identity, version, handlers, engine, logger)
 }
