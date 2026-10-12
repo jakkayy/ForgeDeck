@@ -21,6 +21,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agent"
 	"github.com/jakkayy/ForgeDeck/internal/agent/docker"
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/logging"
 )
 
@@ -105,7 +106,10 @@ func runAgent(ctx context.Context, args []string) error {
 	}
 	defer func() { _ = engine.Close() }()
 
-	return agent.Run(ctx, identity, version, map[string]agent.Handler{}, engine, logger)
+	handlers := map[string]agent.Handler{
+		agentproto.JobContainerAction: agent.ContainerActionHandler(engine, agent.SelfContainerID()),
+	}
+	return agent.Run(ctx, identity, version, handlers, engine, logger)
 }
 
 // enrollmentToken reads the token from the environment or stdin, never from
