@@ -40,6 +40,7 @@ func (h *Handler) Routes(r chi.Router) {
 		agent.Post("/agent/jobs/claim", httpx.Handle(h.claim))
 		agent.Post("/agent/jobs/{jobID}/heartbeat", httpx.Handle(h.renewLease))
 		agent.Post("/agent/jobs/{jobID}/events", httpx.Handle(h.appendEvents))
+		agent.Post("/agent/jobs/{jobID}/complete", httpx.Handle(h.complete))
 	})
 }
 
@@ -158,6 +159,22 @@ func (h *Handler) appendEvents(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if err := h.jobs.AppendAgentLogs(r.Context(), lease, req.Events); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+func (h *Handler) complete(w http.ResponseWriter, r *http.Request) error {
+	var req agentproto.CompleteRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	lease, err := agentLease(r, req.Attempt)
+	if err != nil {
+		return err
+	}
+	if err := h.jobs.CompleteAgentJob(r.Context(), lease, req); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)

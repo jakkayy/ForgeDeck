@@ -101,6 +101,108 @@ func (q *Queries) ClaimAgentJob(ctx context.Context, arg ClaimAgentJobParams) (J
 	return i, err
 }
 
+const completeAgentJob = `-- name: CompleteAgentJob :execrows
+UPDATE jobs
+SET status           = $1::text,
+    result           = $2,
+    error_code       = $3,
+    error_message    = $4,
+    finished_at      = $5::timestamptz,
+    lease_expires_at = NULL
+WHERE id = $6
+  AND status = 'running'
+  AND attempt_count = $7
+  AND lease_owner = $8::text
+  AND target_server_id = $9::uuid
+`
+
+type CompleteAgentJobParams struct {
+	Status       string
+	Result       []byte
+	ErrorCode    *string
+	ErrorMessage *string
+	Now          time.Time
+	ID           uuid.UUID
+	Attempt      int32
+	WorkerID     string
+	ServerID     uuid.UUID
+}
+
+func (q *Queries) CompleteAgentJob(ctx context.Context, arg CompleteAgentJobParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeAgentJob,
+		arg.Status,
+		arg.Result,
+		arg.ErrorCode,
+		arg.ErrorMessage,
+		arg.Now,
+		arg.ID,
+		arg.Attempt,
+		arg.WorkerID,
+		arg.ServerID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const finishJobAttempt = `-- name: FinishJobAttempt :exec
+UPDATE job_attempts
+SET status        = $1::text,
+    finished_at   = $2::timestamptz,
+    error_code    = $3,
+    error_summary = $4
+WHERE job_id = $5 AND attempt_number = $6
+`
+
+type FinishJobAttemptParams struct {
+	Status        string
+	Now           time.Time
+	ErrorCode     *string
+	ErrorSummary  *string
+	JobID         uuid.UUID
+	AttemptNumber int32
+}
+
+func (q *Queries) FinishJobAttempt(ctx context.Context, arg FinishJobAttemptParams) error {
+	_, err := q.db.Exec(ctx, finishJobAttempt,
+		arg.Status,
+		arg.Now,
+		arg.ErrorCode,
+		arg.ErrorSummary,
+		arg.JobID,
+		arg.AttemptNumber,
+	)
+	return err
+}
+
+const getAgentAttemptOutcome = `-- name: GetAgentAttemptOutcome :one
+SELECT status FROM jobs
+WHERE id = $1
+  AND attempt_count = $2
+  AND lease_owner = $3::text
+  AND target_server_id = $4::uuid
+`
+
+type GetAgentAttemptOutcomeParams struct {
+	ID       uuid.UUID
+	Attempt  int32
+	WorkerID string
+	ServerID uuid.UUID
+}
+
+func (q *Queries) GetAgentAttemptOutcome(ctx context.Context, arg GetAgentAttemptOutcomeParams) (string, error) {
+	row := q.db.QueryRow(ctx, getAgentAttemptOutcome,
+		arg.ID,
+		arg.Attempt,
+		arg.WorkerID,
+		arg.ServerID,
+	)
+	var status string
+	err := row.Scan(&status)
+	return status, err
+}
+
 const insertJob = `-- name: InsertJob :one
 INSERT INTO jobs (project_id, type, worker_kind, target_server_id, payload, max_attempts, idempotency_key, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

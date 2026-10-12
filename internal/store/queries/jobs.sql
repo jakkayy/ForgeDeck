@@ -54,3 +54,32 @@ SELECT EXISTS (
 INSERT INTO job_log_chunks (job_id, attempt_number, sequence_number, stream, content)
 SELECT @job_id, @attempt_number, unnest(@sequence_numbers::bigint[]), unnest(@streams::text[]), unnest(@contents::text[])
 ON CONFLICT (job_id, attempt_number, sequence_number) DO NOTHING;
+
+-- name: CompleteAgentJob :execrows
+UPDATE jobs
+SET status           = @status::text,
+    result           = @result,
+    error_code       = @error_code,
+    error_message    = @error_message,
+    finished_at      = @now::timestamptz,
+    lease_expires_at = NULL
+WHERE id = @id
+  AND status = 'running'
+  AND attempt_count = @attempt
+  AND lease_owner = @worker_id::text
+  AND target_server_id = @server_id::uuid;
+
+-- name: FinishJobAttempt :exec
+UPDATE job_attempts
+SET status        = @status::text,
+    finished_at   = @now::timestamptz,
+    error_code    = @error_code,
+    error_summary = @error_summary
+WHERE job_id = @job_id AND attempt_number = @attempt_number;
+
+-- name: GetAgentAttemptOutcome :one
+SELECT status FROM jobs
+WHERE id = @id
+  AND attempt_count = @attempt
+  AND lease_owner = @worker_id::text
+  AND target_server_id = @server_id::uuid;

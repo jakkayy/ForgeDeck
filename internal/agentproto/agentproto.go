@@ -142,3 +142,23 @@ type LogEvent struct {
 	Stream   string `json:"stream"`
 	Message  string `json:"message"`
 }
+
+// Outcomes an Agent may report for a job attempt.
+const (
+	OutcomeSucceeded = "succeeded"
+	OutcomeFailed    = "failed"
+)
+
+// MaxResultBytes bounds the structured result stored with a job.
+const MaxResultBytes = 64 * 1024
+
+// CompleteRequest reports the final outcome of an attempt. Resending the
+// same outcome is safe. ErrorCode is a stable machine-readable code such as
+// "container_not_found"; ErrorMessage is shown to users.
+type CompleteRequest struct {
+	Attempt      int32           `json:"attempt"`
+	Outcome      string          `json:"outcome"`
+	Result       json.RawMessage `json:"result,omitempty"`
+	ErrorCode    string          `json:"error_code,omitempty"`
+	ErrorMessage string          `json:"error_message,omitempty"`
+}
