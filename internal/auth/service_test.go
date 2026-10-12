@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/store"
@@ -13,7 +14,7 @@ import (
 
 func newService(t *testing.T) *auth.Service {
 	t.Helper()
-	return auth.NewService(store.New(testdb.New(t)))
+	return auth.NewService(store.New(testdb.New(t)), time.Now)
 }
 
 func TestCreateUser(t *testing.T) {

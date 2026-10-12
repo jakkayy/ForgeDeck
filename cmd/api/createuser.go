@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 
@@ -45,7 +46,7 @@ func createUser(ctx context.Context, args []string, cfg config.Config, logger *s
 	}
 	defer pool.Close()
 
-	user, err := auth.NewService(store.New(pool)).CreateUser(ctx, *email, password)
+	user, err := auth.NewService(store.New(pool), time.Now).CreateUser(ctx, *email, password)
 	if err != nil {
 		return err
 	}

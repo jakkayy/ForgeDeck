@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
+	"time"
 
 	"github.com/jakkayy/ForgeDeck/internal/database"
 	"github.com/jakkayy/ForgeDeck/internal/store"
@@ -18,11 +19,13 @@ var ErrEmailTaken = errors.New("email already registered")
 // Service implements user and session operations.
 type Service struct {
 	queries *store.Queries
+	now     func() time.Time
 }
 
-// NewService returns a Service backed by queries.
-func NewService(queries *store.Queries) *Service {
-	return &Service{queries: queries}
+// NewService returns a Service backed by queries; now supplies the current
+// time (time.Now in production, a fixed clock in tests).
+func NewService(queries *store.Queries, now func() time.Time) *Service {
+	return &Service{queries: queries, now: now}
 }
 
 // CreateUser validates the input, hashes the password, and stores the user.
