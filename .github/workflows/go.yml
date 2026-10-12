@@ -22,6 +22,22 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: forgedeck
+          POSTGRES_PASSWORD: forgedeck
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U forgedeck"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      FORGEDECK_TEST_DATABASE_URL: postgres://forgedeck:forgedeck@localhost:5432/postgres?sslmode=disable
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
