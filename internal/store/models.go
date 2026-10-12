@@ -17,6 +17,18 @@ type Agent struct {
 	CreatedAt      time.Time
 }
 
+type EnrollmentToken struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	ServerName string
+	TokenHash  []byte
+	CreatedBy  *uuid.UUID
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	UsedAt     *time.Time
+	ServerID   *uuid.UUID
+}
+
 type Project struct {
 	ID        uuid.UUID
 	Name      string
