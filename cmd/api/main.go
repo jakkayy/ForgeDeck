@@ -12,6 +12,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/config"
 	"github.com/jakkayy/ForgeDeck/internal/httpserver"
+	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/logging"
 )
 
@@ -36,5 +37,6 @@ func run() error {
 	defer stop()
 
 	router := chi.NewRouter()
+	router.Use(httpx.RequestID)
 	return httpserver.Run(ctx, cfg.HTTPAddr, router, logger)
 }
