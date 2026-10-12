@@ -14,21 +14,26 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
+			ctx, slot := withErrorSlot(r.Context())
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-			next.ServeHTTP(ww, r)
+			next.ServeHTTP(ww, r.WithContext(ctx))
 
 			status := ww.Status()
 			if status == 0 {
 				status = http.StatusOK
 			}
-			logger.LogAttrs(r.Context(), levelFor(status), "http request",
-				slog.String("request_id", RequestIDFrom(r.Context())),
+			attrs := []slog.Attr{
+				slog.String("request_id", RequestIDFrom(ctx)),
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", status),
 				slog.Int("bytes", ww.BytesWritten()),
 				slog.Int64("duration_ms", time.Since(start).Milliseconds()),
-			)
+			}
+			if slot.err != nil {
+				attrs = append(attrs, slog.String("error", slot.err.Error()))
+			}
+			logger.LogAttrs(ctx, levelFor(status), "http request", attrs...)
 		})
 	}
 }
