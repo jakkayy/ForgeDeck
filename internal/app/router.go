@@ -24,6 +24,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/projects"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 	"github.com/jakkayy/ForgeDeck/internal/store"
+	"github.com/jakkayy/ForgeDeck/internal/webhooks"
 	"github.com/jakkayy/ForgeDeck/internal/webui"
 )
 
@@ -62,6 +63,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		authHandler.Routes(api)
 		agentHandler.Routes(api)
 		gitHandler.PublicRoutes(api)
+		webhooks.NewHandler(cfg.GitHubWebhookSecret).Routes(api)
 
 		api.Group(func(signedIn chi.Router) {
 			signedIn.Use(authHandler.RequireUser)
