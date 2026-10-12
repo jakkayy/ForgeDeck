@@ -3,7 +3,7 @@
 // Usage:
 //
 //	forgedeck-agent enroll --url https://forgedeck.example.com
-//	    (token from FORGEDECK_ENROLLMENT_TOKEN or the first line of stdin)
+//	    (prompts for the token; or pipe it on stdin / set FORGEDECK_ENROLLMENT_TOKEN)
 //	forgedeck-agent run
 package main
 
@@ -18,6 +18,8 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"golang.org/x/term"
 
 	"github.com/jakkayy/ForgeDeck/internal/agent"
 	"github.com/jakkayy/ForgeDeck/internal/agent/docker"
@@ -113,18 +115,32 @@ func runAgent(ctx context.Context, args []string) error {
 	return agent.Run(ctx, identity, version, handlers, engine, logger)
 }
 
-// enrollmentToken reads the token from the environment or stdin, never from
-// arguments, so it does not end up in shell history or process listings.
-func enrollmentToken(stdin io.Reader) (string, error) {
+// enrollmentToken reads the token from the environment, a hidden terminal
+// prompt, or piped stdin, never from arguments, so it does not end up in
+// shell history or process listings.
+func enrollmentToken(stdin *os.File) (string, error) {
 	if token := strings.TrimSpace(os.Getenv("FORGEDECK_ENROLLMENT_TOKEN")); token != "" {
 		return token, nil
+	}
+	if fd := int(stdin.Fd()); term.IsTerminal(fd) { //nolint:gosec // file descriptors fit in int
+		fmt.Fprint(os.Stderr, "Paste the enrollment token from the dashboard: ")
+		token, err := term.ReadPassword(fd)
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return "", fmt.Errorf("read enrollment token: %w", err)
+		}
+		return requireToken(string(token))
 	}
 	line, err := bufio.NewReader(stdin).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return "", fmt.Errorf("read enrollment token: %w", err)
 	}
-	if token := strings.TrimSpace(line); token != "" {
+	return requireToken(line)
+}
+
+func requireToken(raw string) (string, error) {
+	if token := strings.TrimSpace(raw); token != "" {
 		return token, nil
 	}
-	return "", errors.New("enrollment token missing: set FORGEDECK_ENROLLMENT_TOKEN or pipe it on stdin")
+	return "", errors.New("enrollment token missing: paste it when prompted, pipe it on stdin, or set FORGEDECK_ENROLLMENT_TOKEN")
 }
