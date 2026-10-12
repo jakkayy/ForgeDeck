@@ -2,6 +2,8 @@
 /bin/
 /dist/
 /apps/web/dist/
+/internal/webui/dist/*
+!/internal/webui/dist/.gitkeep
 
 # Dependencies
 node_modules/
