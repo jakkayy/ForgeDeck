@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -14,7 +15,7 @@ import (
 const createServer = `-- name: CreateServer :one
 INSERT INTO servers (project_id, name, agent_version)
 VALUES ($1, $2, $3)
-RETURNING id, project_id, name, agent_version, last_seen_at, created_at, updated_at
+RETURNING id, project_id, name, agent_version, last_seen_at, created_at, updated_at, docker_available, docker_version, cpu_percent, memory_percent, disk_percent
 `
 
 type CreateServerParams struct {
@@ -34,6 +35,49 @@ func (q *Queries) CreateServer(ctx context.Context, arg CreateServerParams) (Ser
 		&i.LastSeenAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DockerAvailable,
+		&i.DockerVersion,
+		&i.CpuPercent,
+		&i.MemoryPercent,
+		&i.DiskPercent,
 	)
 	return i, err
+}
+
+const recordHeartbeat = `-- name: RecordHeartbeat :exec
+UPDATE servers
+SET last_seen_at     = $1::timestamptz,
+    agent_version    = $2,
+    docker_available = $3,
+    docker_version   = $4,
+    cpu_percent      = $5,
+    memory_percent   = $6,
+    disk_percent     = $7,
+    updated_at       = $1
+WHERE id = $8
+`
+
+type RecordHeartbeatParams struct {
+	Now             time.Time
+	AgentVersion    *string
+	DockerAvailable bool
+	DockerVersion   *string
+	CpuPercent      *float32
+	MemoryPercent   *float32
+	DiskPercent     *float32
+	ID              uuid.UUID
+}
+
+func (q *Queries) RecordHeartbeat(ctx context.Context, arg RecordHeartbeatParams) error {
+	_, err := q.db.Exec(ctx, recordHeartbeat,
+		arg.Now,
+		arg.AgentVersion,
+		arg.DockerAvailable,
+		arg.DockerVersion,
+		arg.CpuPercent,
+		arg.MemoryPercent,
+		arg.DiskPercent,
+		arg.ID,
+	)
+	return err
 }

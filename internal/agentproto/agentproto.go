@@ -26,3 +26,29 @@ type EnrollResponse struct {
 	ServerID   uuid.UUID `json:"server_id"`
 	Credential string    `json:"credential"`
 }
+
+// HeartbeatRequest reports liveness and a status summary.
+type HeartbeatRequest struct {
+	AgentVersion    string     `json:"agent_version"`
+	ProtocolVersion int        `json:"protocol_version"`
+	Docker          Docker     `json:"docker"`
+	Resources       *Resources `json:"resources,omitempty"`
+}
+
+// Docker describes the local Docker Engine as seen by the Agent.
+type Docker struct {
+	Available bool   `json:"available"`
+	Version   string `json:"version,omitempty"`
+}
+
+// Resources is a host usage summary in percent (0–100).
+type Resources struct {
+	CPUPercent    float32 `json:"cpu_percent"`
+	MemoryPercent float32 `json:"memory_percent"`
+	DiskPercent   float32 `json:"disk_percent"`
+}
+
+// HeartbeatResponse tells the Agent when to send the next heartbeat.
+type HeartbeatResponse struct {
+	IntervalSeconds int `json:"interval_seconds"`
+}

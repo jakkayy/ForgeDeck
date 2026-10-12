@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -26,6 +27,10 @@ func NewHandler(serverService *servers.Service) *Handler {
 // Routes mounts the Agent endpoints on r.
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/agent/enroll", httpx.Handle(h.enroll))
+	r.Group(func(agent chi.Router) {
+		agent.Use(h.RequireAgent)
+		agent.Post("/agent/heartbeat", httpx.Handle(h.heartbeat))
+	})
 }
 
 func (h *Handler) enroll(w http.ResponseWriter, r *http.Request) error {
@@ -46,6 +51,22 @@ func (h *Handler) enroll(w http.ResponseWriter, r *http.Request) error {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	return httpx.WriteJSON(w, http.StatusCreated, resp)
+}
+
+func (h *Handler) heartbeat(w http.ResponseWriter, r *http.Request) error {
+	var req agentproto.HeartbeatRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	if err := checkProtocol(req.ProtocolVersion); err != nil {
+		return err
+	}
+	if err := h.servers.RecordHeartbeat(r.Context(), IdentityFrom(r.Context()), req); err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, agentproto.HeartbeatResponse{
+		IntervalSeconds: int(servers.HeartbeatInterval / time.Second),
+	})
 }
 
 func checkProtocol(version int) error {

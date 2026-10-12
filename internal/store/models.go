@@ -46,13 +46,18 @@ type ProjectMember struct {
 }
 
 type Server struct {
-	ID           uuid.UUID
-	ProjectID    uuid.UUID
-	Name         string
-	AgentVersion *string
-	LastSeenAt   *time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID              uuid.UUID
+	ProjectID       uuid.UUID
+	Name            string
+	AgentVersion    *string
+	LastSeenAt      *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DockerAvailable bool
+	DockerVersion   *string
+	CpuPercent      *float32
+	MemoryPercent   *float32
+	DiskPercent     *float32
 }
 
 type Session struct {
