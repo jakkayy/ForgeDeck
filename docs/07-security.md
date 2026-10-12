@@ -61,7 +61,7 @@ Container isolation alone should not be assumed to provide a perfect security bo
 
 ## 7. Secrets
 
-- Encrypt secrets at rest using authenticated encryption.
+- Encrypt secrets at rest using authenticated encryption (AES-256-GCM since Phase 2, when Git provider tokens become the first stored secrets).
 - Keep the encryption key outside PostgreSQL, for example in a protected environment/configuration source or external secret manager.
 - Track key version to support rotation.
 - Never return plaintext secret values in list APIs.

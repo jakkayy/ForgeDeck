@@ -46,6 +46,7 @@ Acceptance:
 ## Phase 2 — Git integration and job queue
 
 Build:
+- Authenticated encryption for stored credentials (AES-256-GCM, key outside the database, key versions). Git tokens are the first secrets stored, so this cannot wait for Phase 5.
 - GitHub and GitLab connection flow.
 - Webhook signature verification and deduplication.
 - Extend the Phase 1 job queue to the `runner` worker kind.
@@ -95,7 +96,7 @@ Acceptance:
 ## Phase 5 — Production hardening
 
 Build:
-- Secret encryption and rotation plan.
+- Project secrets on top of the Phase 2 encryption, and a key rotation procedure.
 - RBAC completion.
 - Audit logs.
 - Backup/restore procedure.
