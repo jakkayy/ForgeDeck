@@ -4,6 +4,7 @@
 //
 //	forgedeck-api [serve]             run the server (applies pending migrations first)
 //	forgedeck-api migrate up|down|status
+//	forgedeck-api create-user --email <address>   (password from terminal or stdin)
 package main
 
 import (
@@ -51,7 +52,9 @@ func dispatch(ctx context.Context, command string, args []string, cfg config.Con
 		return serve(ctx, cfg, logger)
 	case "migrate":
 		return migrate(ctx, args, cfg, logger)
+	case "create-user":
+		return createUser(ctx, args, cfg, logger)
 	default:
-		return fmt.Errorf("unknown command %q (want serve or migrate)", command)
+		return fmt.Errorf("unknown command %q (want serve, migrate or create-user)", command)
 	}
 }

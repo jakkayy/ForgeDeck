@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
 
 // maxBodyBytes bounds JSON request bodies.
@@ -82,11 +84,17 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	return json.NewEncoder(w).Encode(v)
 }
 
-// WriteError writes err in the standard error envelope. Errors that are not
-// *Error are hidden from the client and recorded on the access log line.
+// WriteError writes err in the standard error envelope. validate.Errors become
+// 422 responses; other errors that are not *Error are hidden from the client
+// and recorded on the access log line.
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr *Error
-	if !errors.As(err, &apiErr) {
+	var fieldErrs validate.Errors
+	switch {
+	case errors.As(err, &apiErr):
+	case errors.As(err, &fieldErrs):
+		apiErr = Invalid(fieldErrs)
+	default:
 		recordError(r.Context(), err)
 		apiErr = errInternal
 	}

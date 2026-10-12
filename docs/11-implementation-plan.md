@@ -25,7 +25,7 @@
 | Frontend | Vite + React SPA embed ใน Go binary | ไม่มี JavaScript runtime ตอนรันจริง, origin เดียว, ติดตั้ง binary เดียว ([08](08-frontend-ux.md#2-stack)) |
 | Package manager / build | Bun (ใช้ตอน build เท่านั้น) | ติดตั้ง dependency และรัน script เร็ว, ใช้รัน Vite ได้ |
 | CI | GitHub Actions | remote อยู่บน GitHub |
-| ผู้ใช้คนแรก | CLI `forgedeck-api create-admin` ใน MVP, Setup Wizard ไว้ Phase 5 | ปิด open decision ใน [01](01-product-spec.md#10-open-product-decisions) แบบง่ายที่สุดก่อน |
+| ผู้ใช้คนแรก | CLI `forgedeck-api create-user` ใน MVP (ไม่มี global admin, สิทธิ์อยู่ระดับ project), Setup Wizard ไว้ Phase 5 | ปิด open decision ใน [01](01-product-spec.md#10-open-product-decisions) แบบง่ายที่สุดก่อน |
 
 ---
 
@@ -74,7 +74,7 @@
 |---|---|---|
 | 1.12 | Migration ตาราง `users` | `feat(db): add users table` |
 | 1.13 | Password hashing ด้วย argon2id | `feat(api): add argon2id password hashing` |
-| 1.14 | Command `create-admin` | `feat(api): add create-admin command` |
+| 1.14 | Command `create-user` | `feat(api): add create-user command` |
 | 1.15 | Migration ตาราง `sessions` | `feat(db): add sessions table` |
 | 1.16 | Session store (create, lookup, revoke) | `feat(api): add session store` |
 | 1.17 | `POST /auth/login` | `feat(api): add login endpoint` |

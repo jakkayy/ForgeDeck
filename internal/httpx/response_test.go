@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
 
 type errorEnvelope struct {
@@ -49,6 +52,22 @@ func TestHandleWritesAPIError(t *testing.T) {
 	env := decodeEnvelope(t, rec)
 	if env.Error.Code != "validation_failed" || env.Error.Fields["name"] == "" || env.Error.RequestID == "" {
 		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
+func TestHandleMapsValidationErrors(t *testing.T) {
+	handler := Handle(func(http.ResponseWriter, *http.Request) error {
+		errs := validate.Errors{}
+		errs.Add("email", "Email is required.")
+		return fmt.Errorf("create user: %w", errs.Err())
+	})
+	rec, _ := serve(handler, httptest.NewRequest(http.MethodPost, "/", nil))
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := decodeEnvelope(t, rec).Error.Fields["email"]; got != "Email is required." {
+		t.Fatalf("fields.email = %q", got)
 	}
 }
 
