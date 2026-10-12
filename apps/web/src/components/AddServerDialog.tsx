@@ -2,7 +2,6 @@ import {
   Alert,
   Button,
   FieldError,
-  Form,
   Input,
   Label,
   ListBox,
@@ -17,6 +16,7 @@ import { isApiError } from "../api/client";
 import { projectsQuery } from "../api/projects";
 import { createEnrollmentToken, serversQuery } from "../api/servers";
 import type { EnrollmentToken } from "../api/types";
+import { ApiForm } from "./ApiForm";
 import { CopyField } from "./CopyField";
 
 /** Issues an enrollment token and walks the user through installing the Agent. */
@@ -45,6 +45,7 @@ export function AddServerDialog() {
                   onCancel={close}
                   isPending={issue.isPending}
                   error={issue.error}
+                  onClearError={issue.reset}
                 />
               )
             }
@@ -60,9 +61,10 @@ type ServerFormProps = {
   onCancel: () => void;
   isPending: boolean;
   error: Error | null;
+  onClearError: () => void;
 };
 
-function ServerForm({ onSubmit, onCancel, isPending, error }: ServerFormProps) {
+function ServerForm({ onSubmit, onCancel, isPending, error, onClearError }: ServerFormProps) {
   const projects = useQuery(projectsQuery);
   const manageable =
     projects.data?.items.filter((p) => p.role === "owner" || p.role === "admin") ?? [];
@@ -74,7 +76,7 @@ function ServerForm({ onSubmit, onCancel, isPending, error }: ServerFormProps) {
   };
 
   return (
-    <Form onSubmit={submit} validationErrors={isApiError(error, 422) ? error.fields : undefined}>
+    <ApiForm onSubmit={submit} error={error} onClearError={onClearError}>
       <Modal.Header>
         <Modal.Heading>Add a server</Modal.Heading>
       </Modal.Header>
@@ -132,7 +134,7 @@ function ServerForm({ onSubmit, onCancel, isPending, error }: ServerFormProps) {
           Create enrollment token
         </Button>
       </Modal.Footer>
-    </Form>
+    </ApiForm>
   );
 }
 

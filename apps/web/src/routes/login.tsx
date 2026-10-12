@@ -1,9 +1,10 @@
-import { Alert, Button, Card, FieldError, Form, Input, Label, TextField } from "@heroui/react";
+import { Alert, Button, Card, FieldError, Input, Label, TextField } from "@heroui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import type { FormEvent } from "react";
 import { login, meQuery } from "../api/auth";
 import { isApiError } from "../api/client";
+import { ApiForm } from "../components/ApiForm";
 import { safeRedirect } from "../lib/safeRedirect";
 
 export const Route = createFileRoute("/login")({
@@ -47,10 +48,11 @@ function LoginPage() {
           <Card.Description>Use the account your administrator created for you.</Card.Description>
         </Card.Header>
         <Card.Content>
-          <Form
+          <ApiForm
             className="flex flex-col gap-4"
             onSubmit={onSubmit}
-            validationErrors={isApiError(error, 422) ? error.fields : undefined}
+            error={error}
+            onClearError={signIn.reset}
           >
             {error && !isApiError(error, 422) && (
               <Alert status="danger">
@@ -72,7 +74,7 @@ function LoginPage() {
             <Button type="submit" variant="primary" fullWidth isPending={signIn.isPending}>
               Sign in
             </Button>
-          </Form>
+          </ApiForm>
         </Card.Content>
       </Card>
     </main>
