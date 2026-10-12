@@ -22,6 +22,9 @@ jobs:
           # Build the linter with the module's Go version; prebuilt binaries
           # can lag behind go.mod and refuse to load.
           install-mode: goinstall
+          # Config verification downloads a JSON schema and fails on network
+          # hiccups; the config is checked by `golangci-lint run` itself.
+          verify: false
 
   test:
     runs-on: ubuntu-latest
