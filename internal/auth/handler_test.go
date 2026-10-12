@@ -132,3 +132,19 @@ func TestLogoutWithoutSessionSucceeds(t *testing.T) {
 		t.Fatalf("status %d", rec.Code)
 	}
 }
+
+func TestMeReturnsCurrentUser(t *testing.T) {
+	api := newAuthAPI(t, true)
+	cookie := sessionCookie(t, api.do(loginRequest("dev@example.com", "long-enough-password")))
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/me", nil)
+	req.AddCookie(cookie)
+	rec := api.do(req)
+
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"email":"dev@example.com"`) {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body)
+	}
+	if unauth := api.do(httptest.NewRequest(http.MethodGet, "/auth/me", nil)); unauth.Code != http.StatusUnauthorized {
+		t.Fatalf("without session: status %d", unauth.Code)
+	}
+}

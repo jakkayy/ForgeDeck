@@ -26,6 +26,7 @@ func NewHandler(svc *Service, secureCookies bool) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/auth/login", httpx.Handle(h.login))
 	r.Post("/auth/logout", httpx.Handle(h.logout))
+	r.With(h.RequireUser).Get("/auth/me", httpx.Handle(h.me))
 }
 
 type loginRequest struct {
@@ -64,6 +65,10 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) error {
 	h.cookie.clear(w)
 	w.WriteHeader(http.StatusNoContent)
 	return nil
+}
+
+func (h *Handler) me(w http.ResponseWriter, r *http.Request) error {
+	return httpx.WriteJSON(w, http.StatusOK, map[string]any{"user": UserFrom(r.Context())})
 }
 
 // cookieConfig names and scopes the session cookie. Over HTTPS the __Host-
