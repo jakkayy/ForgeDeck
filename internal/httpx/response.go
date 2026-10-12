@@ -6,7 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"net"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
@@ -162,4 +166,21 @@ func recordError(ctx context.Context, err error) {
 	if slot, ok := ctx.Value(errorSlotKey{}).(*errorSlot); ok {
 		slot.err = err
 	}
+}
+
+// TooManyRequests sets Retry-After and returns a 429 error for the handler to return.
+func TooManyRequests(w http.ResponseWriter, retryAfter time.Duration) *Error {
+	seconds := int(math.Ceil(retryAfter.Seconds()))
+	w.Header().Set("Retry-After", strconv.Itoa(max(seconds, 1)))
+	return &Error{Status: http.StatusTooManyRequests, Code: "rate_limited", Message: "Too many attempts. Wait a moment and try again."}
+}
+
+// ClientIP returns the TCP peer address of the request without the port.
+// Behind a reverse proxy this is the proxy's address.
+func ClientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }

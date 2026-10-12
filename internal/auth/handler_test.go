@@ -148,3 +148,22 @@ func TestMeReturnsCurrentUser(t *testing.T) {
 		t.Fatalf("without session: status %d", unauth.Code)
 	}
 }
+
+func TestLoginIsRateLimitedPerEmail(t *testing.T) {
+	api := newAuthAPI(t, true)
+
+	var last *httptest.ResponseRecorder
+	for range 11 {
+		last = api.do(loginRequest("dev@example.com", "not-the-password"))
+	}
+	if last.Code != http.StatusTooManyRequests {
+		t.Fatalf("11th attempt: status %d, want 429", last.Code)
+	}
+	if last.Header().Get("Retry-After") == "" {
+		t.Fatal("Retry-After missing")
+	}
+	other := api.do(loginRequest("someone-else@example.com", "whatever-password"))
+	if other.Code == http.StatusTooManyRequests {
+		t.Fatal("limit leaked to another email")
+	}
+}

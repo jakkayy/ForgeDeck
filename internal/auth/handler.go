@@ -3,23 +3,41 @@ package auth
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
+	"github.com/jakkayy/ForgeDeck/internal/ratelimit"
+)
+
+// Login attempts are limited per client IP and per email. The per-email limit
+// still protects an account when every request arrives from one proxy IP.
+const (
+	loginBurstPerIP     = 20
+	loginRefillPerIP    = 3 * time.Second
+	loginBurstPerEmail  = 10
+	loginRefillPerEmail = 30 * time.Second
 )
 
 // Handler serves the /auth endpoints.
 type Handler struct {
-	svc    *Service
-	cookie cookieConfig
+	svc          *Service
+	cookie       cookieConfig
+	loginByIP    *ratelimit.Limiter
+	loginByEmail *ratelimit.Limiter
 }
 
 // NewHandler returns auth endpoints. secureCookies must be true when the
 // Control Plane is served over HTTPS.
 func NewHandler(svc *Service, secureCookies bool) *Handler {
-	return &Handler{svc: svc, cookie: newCookieConfig(secureCookies)}
+	return &Handler{
+		svc:          svc,
+		cookie:       newCookieConfig(secureCookies),
+		loginByIP:    ratelimit.New(loginRefillPerIP, loginBurstPerIP, time.Now),
+		loginByEmail: ratelimit.New(loginRefillPerEmail, loginBurstPerEmail, time.Now),
+	}
 }
 
 // Routes mounts the auth endpoints on r.
@@ -39,6 +57,9 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) error {
 	if err := httpx.DecodeJSON(w, r, &req); err != nil {
 		return err
 	}
+	if err := h.limitLogin(w, r, req.Email); err != nil {
+		return err
+	}
 
 	user, session, err := h.svc.Login(r.Context(), req.Email, req.Password)
 	if errors.Is(err, ErrInvalidCredentials) {
@@ -52,6 +73,16 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) error {
 	return httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"user": user,
 	})
+}
+
+func (h *Handler) limitLogin(w http.ResponseWriter, r *http.Request, email string) error {
+	if ok, retry := h.loginByIP.Allow(httpx.ClientIP(r)); !ok {
+		return httpx.TooManyRequests(w, retry)
+	}
+	if ok, retry := h.loginByEmail.Allow(strings.ToLower(strings.TrimSpace(email))); !ok {
+		return httpx.TooManyRequests(w, retry)
+	}
+	return nil
 }
 
 // logout ends the current session, if any, and clears the cookie. It succeeds
