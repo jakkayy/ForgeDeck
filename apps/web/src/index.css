@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 /* HeroUI prelude: component CSS depends on these utilities and variants. */
+@import "tw-animate-css";
 @import "@heroui/styles/utilities";
 @import "@heroui/styles/variants";
 @import "@heroui/styles/themes/default" layer(theme);
@@ -18,6 +19,9 @@
 @import "@heroui/styles/components/input.css" layer(components);
 @import "@heroui/styles/components/label.css" layer(components);
 @import "@heroui/styles/components/field-error.css" layer(components);
+@import "@heroui/styles/components/description.css" layer(components);
+@import "@heroui/styles/components/modal.css" layer(components);
+@import "@heroui/styles/components/close-button.css" layer(components);
 
 /*
  * ForgeDeck design tokens on top of the HeroUI theme (unlayered, so they
