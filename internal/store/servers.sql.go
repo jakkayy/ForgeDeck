@@ -44,6 +44,148 @@ func (q *Queries) CreateServer(ctx context.Context, arg CreateServerParams) (Ser
 	return i, err
 }
 
+const getServer = `-- name: GetServer :one
+SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, projects.name AS project_name
+FROM servers
+JOIN projects ON projects.id = servers.project_id
+WHERE servers.id = $1
+`
+
+type GetServerRow struct {
+	Server      Server
+	ProjectName string
+}
+
+func (q *Queries) GetServer(ctx context.Context, id uuid.UUID) (GetServerRow, error) {
+	row := q.db.QueryRow(ctx, getServer, id)
+	var i GetServerRow
+	err := row.Scan(
+		&i.Server.ID,
+		&i.Server.ProjectID,
+		&i.Server.Name,
+		&i.Server.AgentVersion,
+		&i.Server.LastSeenAt,
+		&i.Server.CreatedAt,
+		&i.Server.UpdatedAt,
+		&i.Server.DockerAvailable,
+		&i.Server.DockerVersion,
+		&i.Server.CpuPercent,
+		&i.Server.MemoryPercent,
+		&i.Server.DiskPercent,
+		&i.ProjectName,
+	)
+	return i, err
+}
+
+const listProjectServers = `-- name: ListProjectServers :many
+SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, projects.name AS project_name
+FROM servers
+JOIN projects ON projects.id = servers.project_id
+WHERE servers.project_id = $1
+ORDER BY servers.name, servers.id
+LIMIT $3 OFFSET $2
+`
+
+type ListProjectServersParams struct {
+	ProjectID  uuid.UUID
+	PageOffset int32
+	PageLimit  int32
+}
+
+type ListProjectServersRow struct {
+	Server      Server
+	ProjectName string
+}
+
+func (q *Queries) ListProjectServers(ctx context.Context, arg ListProjectServersParams) ([]ListProjectServersRow, error) {
+	rows, err := q.db.Query(ctx, listProjectServers, arg.ProjectID, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectServersRow{}
+	for rows.Next() {
+		var i ListProjectServersRow
+		if err := rows.Scan(
+			&i.Server.ID,
+			&i.Server.ProjectID,
+			&i.Server.Name,
+			&i.Server.AgentVersion,
+			&i.Server.LastSeenAt,
+			&i.Server.CreatedAt,
+			&i.Server.UpdatedAt,
+			&i.Server.DockerAvailable,
+			&i.Server.DockerVersion,
+			&i.Server.CpuPercent,
+			&i.Server.MemoryPercent,
+			&i.Server.DiskPercent,
+			&i.ProjectName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listServersForUser = `-- name: ListServersForUser :many
+SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, projects.name AS project_name
+FROM servers
+JOIN projects ON projects.id = servers.project_id
+JOIN project_members ON project_members.project_id = servers.project_id
+WHERE project_members.user_id = $1
+ORDER BY projects.name, servers.name, servers.id
+LIMIT $3 OFFSET $2
+`
+
+type ListServersForUserParams struct {
+	UserID     uuid.UUID
+	PageOffset int32
+	PageLimit  int32
+}
+
+type ListServersForUserRow struct {
+	Server      Server
+	ProjectName string
+}
+
+func (q *Queries) ListServersForUser(ctx context.Context, arg ListServersForUserParams) ([]ListServersForUserRow, error) {
+	rows, err := q.db.Query(ctx, listServersForUser, arg.UserID, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListServersForUserRow{}
+	for rows.Next() {
+		var i ListServersForUserRow
+		if err := rows.Scan(
+			&i.Server.ID,
+			&i.Server.ProjectID,
+			&i.Server.Name,
+			&i.Server.AgentVersion,
+			&i.Server.LastSeenAt,
+			&i.Server.CreatedAt,
+			&i.Server.UpdatedAt,
+			&i.Server.DockerAvailable,
+			&i.Server.DockerVersion,
+			&i.Server.CpuPercent,
+			&i.Server.MemoryPercent,
+			&i.Server.DiskPercent,
+			&i.ProjectName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const recordHeartbeat = `-- name: RecordHeartbeat :exec
 UPDATE servers
 SET last_seen_at     = $1::timestamptz,

@@ -22,7 +22,50 @@ func NewHandler(svc *Service) *Handler {
 
 // Routes mounts the server endpoints on r.
 func (h *Handler) Routes(r chi.Router) {
+	r.Get("/servers", httpx.Handle(h.listForUser))
+	r.Get("/servers/{serverID}", httpx.Handle(h.get))
+	r.Get("/projects/{projectID}/servers", httpx.Handle(h.listForProject))
 	r.Post("/projects/{projectID}/servers/enrollment-tokens", httpx.Handle(h.createEnrollmentToken))
+}
+
+func (h *Handler) listForUser(w http.ResponseWriter, r *http.Request) error {
+	page, err := httpx.ParsePage(r)
+	if err != nil {
+		return err
+	}
+	servers, err := h.svc.ListForUser(r.Context(), auth.UserFrom(r.Context()).ID, page.Limit, page.Offset)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, httpx.NewList(servers, page))
+}
+
+func (h *Handler) listForProject(w http.ResponseWriter, r *http.Request) error {
+	projectID, err := httpx.UUIDParam(r, "projectID")
+	if err != nil {
+		return err
+	}
+	page, err := httpx.ParsePage(r)
+	if err != nil {
+		return err
+	}
+	servers, err := h.svc.ListForProject(r.Context(), auth.UserFrom(r.Context()).ID, projectID, page.Limit, page.Offset)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, httpx.NewList(servers, page))
+}
+
+func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
+	serverID, err := httpx.UUIDParam(r, "serverID")
+	if err != nil {
+		return err
+	}
+	server, err := h.svc.Get(r.Context(), auth.UserFrom(r.Context()).ID, serverID)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, server)
 }
 
 type enrollmentTokenRequest struct {
