@@ -34,6 +34,42 @@ type InsertServerContainersParams struct {
 	ReceivedAt  time.Time
 }
 
+const listServerContainers = `-- name: ListServerContainers :many
+SELECT server_id, container_id, name, image, state, status_text, labels, observed_at, received_at FROM server_containers
+WHERE server_id = $1
+ORDER BY name, container_id
+`
+
+func (q *Queries) ListServerContainers(ctx context.Context, serverID uuid.UUID) ([]ServerContainer, error) {
+	rows, err := q.db.Query(ctx, listServerContainers, serverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ServerContainer{}
+	for rows.Next() {
+		var i ServerContainer
+		if err := rows.Scan(
+			&i.ServerID,
+			&i.ContainerID,
+			&i.Name,
+			&i.Image,
+			&i.State,
+			&i.StatusText,
+			&i.Labels,
+			&i.ObservedAt,
+			&i.ReceivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockServerSnapshotTime = `-- name: LockServerSnapshotTime :one
 SELECT containers_observed_at FROM servers WHERE id = $1 FOR UPDATE
 `

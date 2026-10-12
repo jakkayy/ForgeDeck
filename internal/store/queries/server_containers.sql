@@ -10,3 +10,8 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
 
 -- name: SetServerSnapshotTime :exec
 UPDATE servers SET containers_observed_at = $2 WHERE id = $1;
+
+-- name: ListServerContainers :many
+SELECT * FROM server_containers
+WHERE server_id = $1
+ORDER BY name, container_id;

@@ -25,6 +25,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/servers", httpx.Handle(h.listForUser))
 	r.Get("/servers/{serverID}", httpx.Handle(h.get))
 	r.Delete("/servers/{serverID}", httpx.Handle(h.delete))
+	r.Get("/servers/{serverID}/containers", httpx.Handle(h.listContainers))
 	r.Get("/projects/{projectID}/servers", httpx.Handle(h.listForProject))
 	r.Post("/projects/{projectID}/servers/enrollment-tokens", httpx.Handle(h.createEnrollmentToken))
 }
@@ -79,6 +80,18 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
 	}
 	w.WriteHeader(http.StatusNoContent)
 	return nil
+}
+
+func (h *Handler) listContainers(w http.ResponseWriter, r *http.Request) error {
+	serverID, err := httpx.UUIDParam(r, "serverID")
+	if err != nil {
+		return err
+	}
+	list, err := h.svc.ListContainers(r.Context(), auth.UserFrom(r.Context()).ID, serverID)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, list)
 }
 
 type enrollmentTokenRequest struct {
