@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
-import type { EnrollmentToken, List, Server } from "./types";
+import type { ContainerList, EnrollmentToken, List, Server } from "./types";
 
 /** Matches the Agent heartbeat interval, so status is never more than one beat behind. */
 export const SERVER_REFRESH_MS = 20_000;
@@ -17,3 +17,17 @@ export function createEnrollmentToken(projectId: string, serverName: string) {
     body: { server_name: serverName },
   });
 }
+
+export const serverQuery = (serverId: string) =>
+  queryOptions({
+    queryKey: ["servers", serverId],
+    queryFn: ({ signal }) => api<Server>(`/servers/${serverId}`, { signal }),
+    refetchInterval: SERVER_REFRESH_MS,
+  });
+
+export const containersQuery = (serverId: string) =>
+  queryOptions({
+    queryKey: ["servers", serverId, "containers"],
+    queryFn: ({ signal }) => api<ContainerList>(`/servers/${serverId}/containers`, { signal }),
+    refetchInterval: SERVER_REFRESH_MS,
+  });

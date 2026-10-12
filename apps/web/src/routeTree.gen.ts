@@ -13,7 +13,8 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppProjectsRouteImport } from './routes/_app/projects'
-import { Route as AppServersRouteImport } from './routes/_app/servers'
+import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
+import { Route as AppServersServerIdRouteImport } from './routes/_app/servers/$serverId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -34,9 +35,14 @@ const AppProjectsRoute = AppProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => AppRoute,
 } as any)
-const AppServersRoute = AppServersRouteImport.update({
-  id: '/servers',
-  path: '/servers',
+const AppServersIndexRoute = AppServersIndexRouteImport.update({
+  id: '/servers/',
+  path: '/servers/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppServersServerIdRoute = AppServersServerIdRouteImport.update({
+  id: '/servers/$serverId',
+  path: '/servers/$serverId',
   getParentRoute: () => AppRoute,
 } as any)
 
@@ -44,34 +50,38 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/projects': typeof AppProjectsRoute
-  '/servers': typeof AppServersRoute
+  '/servers/$serverId': typeof AppServersServerIdRoute
+  '/servers/': typeof AppServersIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/projects': typeof AppProjectsRoute
-  '/servers': typeof AppServersRoute
   '/': typeof AppIndexRoute
+  '/servers/$serverId': typeof AppServersServerIdRoute
+  '/servers': typeof AppServersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/projects': typeof AppProjectsRoute
-  '/_app/servers': typeof AppServersRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/servers/$serverId': typeof AppServersServerIdRoute
+  '/_app/servers/': typeof AppServersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/projects' | '/servers'
+  fullPaths: '/' | '/login' | '/projects' | '/servers/$serverId' | '/servers/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/projects' | '/servers' | '/'
+  to: '/login' | '/projects' | '/' | '/servers/$serverId' | '/servers'
   id:
     | '__root__'
     | '/_app'
     | '/login'
     | '/_app/projects'
-    | '/_app/servers'
     | '/_app/'
+    | '/_app/servers/$serverId'
+    | '/_app/servers/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -109,11 +119,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/servers': {
-      id: '/_app/servers'
+    '/_app/servers/': {
+      id: '/_app/servers/'
       path: '/servers'
-      fullPath: '/servers'
-      preLoaderRoute: typeof AppServersRouteImport
+      fullPath: '/servers/'
+      preLoaderRoute: typeof AppServersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/servers/$serverId': {
+      id: '/_app/servers/$serverId'
+      path: '/servers/$serverId'
+      fullPath: '/servers/$serverId'
+      preLoaderRoute: typeof AppServersServerIdRouteImport
       parentRoute: typeof AppRoute
     }
   }
@@ -121,14 +138,16 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppProjectsRoute: typeof AppProjectsRoute
-  AppServersRoute: typeof AppServersRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppServersServerIdRoute: typeof AppServersServerIdRoute
+  AppServersIndexRoute: typeof AppServersIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppProjectsRoute: AppProjectsRoute,
-  AppServersRoute: AppServersRoute,
   AppIndexRoute: AppIndexRoute,
+  AppServersServerIdRoute: AppServersServerIdRoute,
+  AppServersIndexRoute: AppServersIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

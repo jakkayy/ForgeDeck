@@ -1,16 +1,16 @@
 import { Card, Spinner } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { serversQuery } from "../../api/servers";
-import type { Server } from "../../api/types";
-import { AddServerDialog } from "../../components/AddServerDialog";
-import { EmptyState } from "../../components/EmptyState";
-import { PageHeader } from "../../components/PageHeader";
-import { QueryError } from "../../components/QueryError";
-import { ServerStatusChip } from "../../components/ServerStatusChip";
-import { timeAgo } from "../../lib/time";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { serversQuery } from "../../../api/servers";
+import type { Server } from "../../../api/types";
+import { AddServerDialog } from "../../../components/AddServerDialog";
+import { EmptyState } from "../../../components/EmptyState";
+import { PageHeader } from "../../../components/PageHeader";
+import { QueryError } from "../../../components/QueryError";
+import { ServerStatusChip } from "../../../components/ServerStatusChip";
+import { timeAgo } from "../../../lib/time";
 
-export const Route = createFileRoute("/_app/servers")({
+export const Route = createFileRoute("/_app/servers/")({
   loader: ({ context }) => context.queryClient.prefetchQuery(serversQuery),
   component: ServersPage,
 });
@@ -50,7 +50,13 @@ function ServerRow({ server }: { server: Server }) {
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
       <div className="min-w-48 flex-1">
-        <p className="font-medium">{server.name}</p>
+        <Link
+          to="/servers/$serverId"
+          params={{ serverId: server.id }}
+          className="font-medium hover:underline"
+        >
+          {server.name}
+        </Link>
         <p className="text-xs text-[var(--muted)]">{server.project_name}</p>
       </div>
       <ServerStatusChip status={server.status} />
