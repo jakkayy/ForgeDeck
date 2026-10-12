@@ -15,7 +15,7 @@ import (
 const createServer = `-- name: CreateServer :one
 INSERT INTO servers (project_id, name, agent_version)
 VALUES ($1, $2, $3)
-RETURNING id, project_id, name, agent_version, last_seen_at, created_at, updated_at, docker_available, docker_version, cpu_percent, memory_percent, disk_percent
+RETURNING id, project_id, name, agent_version, last_seen_at, created_at, updated_at, docker_available, docker_version, cpu_percent, memory_percent, disk_percent, containers_observed_at
 `
 
 type CreateServerParams struct {
@@ -40,6 +40,7 @@ func (q *Queries) CreateServer(ctx context.Context, arg CreateServerParams) (Ser
 		&i.CpuPercent,
 		&i.MemoryPercent,
 		&i.DiskPercent,
+		&i.ContainersObservedAt,
 	)
 	return i, err
 }
@@ -54,7 +55,7 @@ func (q *Queries) DeleteServer(ctx context.Context, id uuid.UUID) error {
 }
 
 const getServer = `-- name: GetServer :one
-SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, projects.name AS project_name
+SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, servers.containers_observed_at, projects.name AS project_name
 FROM servers
 JOIN projects ON projects.id = servers.project_id
 WHERE servers.id = $1
@@ -81,13 +82,14 @@ func (q *Queries) GetServer(ctx context.Context, id uuid.UUID) (GetServerRow, er
 		&i.Server.CpuPercent,
 		&i.Server.MemoryPercent,
 		&i.Server.DiskPercent,
+		&i.Server.ContainersObservedAt,
 		&i.ProjectName,
 	)
 	return i, err
 }
 
 const listProjectServers = `-- name: ListProjectServers :many
-SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, projects.name AS project_name
+SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, servers.containers_observed_at, projects.name AS project_name
 FROM servers
 JOIN projects ON projects.id = servers.project_id
 WHERE servers.project_id = $1
@@ -128,6 +130,7 @@ func (q *Queries) ListProjectServers(ctx context.Context, arg ListProjectServers
 			&i.Server.CpuPercent,
 			&i.Server.MemoryPercent,
 			&i.Server.DiskPercent,
+			&i.Server.ContainersObservedAt,
 			&i.ProjectName,
 		); err != nil {
 			return nil, err
@@ -141,7 +144,7 @@ func (q *Queries) ListProjectServers(ctx context.Context, arg ListProjectServers
 }
 
 const listServersForUser = `-- name: ListServersForUser :many
-SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, projects.name AS project_name
+SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, servers.containers_observed_at, projects.name AS project_name
 FROM servers
 JOIN projects ON projects.id = servers.project_id
 JOIN project_members ON project_members.project_id = servers.project_id
@@ -183,6 +186,7 @@ func (q *Queries) ListServersForUser(ctx context.Context, arg ListServersForUser
 			&i.Server.CpuPercent,
 			&i.Server.MemoryPercent,
 			&i.Server.DiskPercent,
+			&i.Server.ContainersObservedAt,
 			&i.ProjectName,
 		); err != nil {
 			return nil, err

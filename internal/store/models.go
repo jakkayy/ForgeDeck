@@ -5,6 +5,7 @@
 package store
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,18 +47,31 @@ type ProjectMember struct {
 }
 
 type Server struct {
-	ID              uuid.UUID
-	ProjectID       uuid.UUID
-	Name            string
-	AgentVersion    *string
-	LastSeenAt      *time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	DockerAvailable bool
-	DockerVersion   *string
-	CpuPercent      *float32
-	MemoryPercent   *float32
-	DiskPercent     *float32
+	ID                   uuid.UUID
+	ProjectID            uuid.UUID
+	Name                 string
+	AgentVersion         *string
+	LastSeenAt           *time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	DockerAvailable      bool
+	DockerVersion        *string
+	CpuPercent           *float32
+	MemoryPercent        *float32
+	DiskPercent          *float32
+	ContainersObservedAt *time.Time
+}
+
+type ServerContainer struct {
+	ServerID    uuid.UUID
+	ContainerID string
+	Name        string
+	Image       string
+	State       string
+	StatusText  *string
+	Labels      json.RawMessage
+	ObservedAt  time.Time
+	ReceivedAt  time.Time
 }
 
 type Session struct {
