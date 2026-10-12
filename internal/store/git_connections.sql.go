@@ -52,6 +52,59 @@ func (q *Queries) CreateGitHubConnection(ctx context.Context, arg CreateGitHubCo
 	return i, err
 }
 
+const createGitLabConnection = `-- name: CreateGitLabConnection :one
+INSERT INTO git_connections (
+    id, project_id, provider, display_name, base_url,
+    token_ciphertext, token_key_id, webhook_ciphertext, webhook_key_id, created_by
+) VALUES (
+    $1, $2, 'gitlab', $3, $4,
+    $5, $6, $7, $8, $9
+)
+RETURNING id, project_id, provider, display_name, base_url, installation_id, token_ciphertext, token_key_id, webhook_ciphertext, webhook_key_id, created_by, created_at
+`
+
+type CreateGitLabConnectionParams struct {
+	ID                uuid.UUID
+	ProjectID         uuid.UUID
+	DisplayName       string
+	BaseUrl           string
+	TokenCiphertext   []byte
+	TokenKeyID        *string
+	WebhookCiphertext []byte
+	WebhookKeyID      *string
+	CreatedBy         *uuid.UUID
+}
+
+func (q *Queries) CreateGitLabConnection(ctx context.Context, arg CreateGitLabConnectionParams) (GitConnection, error) {
+	row := q.db.QueryRow(ctx, createGitLabConnection,
+		arg.ID,
+		arg.ProjectID,
+		arg.DisplayName,
+		arg.BaseUrl,
+		arg.TokenCiphertext,
+		arg.TokenKeyID,
+		arg.WebhookCiphertext,
+		arg.WebhookKeyID,
+		arg.CreatedBy,
+	)
+	var i GitConnection
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Provider,
+		&i.DisplayName,
+		&i.BaseUrl,
+		&i.InstallationID,
+		&i.TokenCiphertext,
+		&i.TokenKeyID,
+		&i.WebhookCiphertext,
+		&i.WebhookKeyID,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const deleteGitConnection = `-- name: DeleteGitConnection :exec
 DELETE FROM git_connections WHERE id = $1
 `

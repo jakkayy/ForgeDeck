@@ -61,6 +61,7 @@ See [13 — Git Providers](13-git-providers.md) for provider setup.
 | GET | `/projects/{projectID}/git-connections` | List the project's connections |
 | POST | `/projects/{projectID}/git-connections/github` | Start a GitHub App install; returns `install_url` |
 | GET | `/git/github/setup` | GitHub install callback (no session; verified by sealed state and OAuth) |
+| POST | `/projects/{projectID}/git-connections/gitlab` | Connect GitLab with `base_url` and an access token |
 | DELETE | `/git-connections/{connectionID}` | Remove a connection and its stored credentials |
 | GET | `/projects/{projectID}/applications` | List applications |
 | POST | `/projects/{projectID}/applications` | Create application |

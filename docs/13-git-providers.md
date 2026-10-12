@@ -44,6 +44,21 @@ For GitHub Enterprise Server also set `FORGEDECK_GITHUB_URL` and `FORGEDECK_GITH
 
 `installation_id` is a guessable number in the URL. Without step 3, anyone could paste another organization's installation ID into the callback and gain access to its repositories through the App. The callback works without the session cookie (GitHub's redirect is cross-site, and the cookie is `SameSite=Strict`), so the sealed state is what identifies the user.
 
-## GitLab (project access token)
+## GitLab (access token)
 
-Coming in the next plan item; see [11 — Implementation Plan](11-implementation-plan.md).
+Works with gitlab.com and self-hosted GitLab. Each connection holds one **project or group access token** with:
+
+- Scope: `api` (read repositories and register the ForgeDeck webhook)
+- Role: Maintainer (needed to manage webhooks)
+
+A project admin pastes the token and the GitLab address in **Project → Git**. ForgeDeck checks with GitLab that the token is active and has the `api` scope, then stores it encrypted together with a generated webhook secret.
+
+### Self-hosted GitLab on a private network
+
+The GitLab address is user input, so ForgeDeck connects only to public addresses by default, checked after DNS resolution. Loopback, link-local (including cloud metadata at `169.254.169.254`), and private ranges are refused, and redirects are not followed. If your GitLab is on an internal network, the operator can allow private addresses:
+
+```text
+FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS=true
+```
+
+This also permits `http://` GitLab addresses, for internal instances without TLS. Loopback and link-local addresses stay blocked.

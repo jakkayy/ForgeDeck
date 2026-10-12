@@ -11,6 +11,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
 	"github.com/jakkayy/ForgeDeck/internal/keyring"
+	"github.com/jakkayy/ForgeDeck/internal/safehttp"
 )
 
 // Config holds the Control Plane runtime settings.
@@ -29,6 +30,9 @@ type Config struct {
 	GitHub *github.Config
 	// GitHubWebhookSecret verifies GitHub App webhook deliveries.
 	GitHubWebhookSecret string
+	// Outbound limits requests to user-supplied URLs such as a self-hosted
+	// GitLab. FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS opens private networks.
+	Outbound safehttp.Policy
 }
 
 // LookupFunc matches os.LookupEnv so tests can supply their own environment.
@@ -51,6 +55,7 @@ func Load(lookup LookupFunc) (Config, error) {
 	cfg.Keyring = keys
 	cfg.PublicURL = strings.TrimRight(env.string("FORGEDECK_PUBLIC_URL", ""), "/")
 	cfg.GitHub, cfg.GitHubWebhookSecret = env.gitHubApp()
+	cfg.Outbound = safehttp.Policy{AllowPrivate: env.bool("FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS", false)}
 
 	if err := errors.Join(append(env.errs, cfg.validate())...); err != nil {
 		return Config{}, err

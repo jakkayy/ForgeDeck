@@ -22,6 +22,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/config"
 	"github.com/jakkayy/ForgeDeck/internal/keyring"
+	"github.com/jakkayy/ForgeDeck/internal/safehttp"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
 )
@@ -47,7 +48,8 @@ func New(t testing.TB, options ...Option) *Env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Config{CookieSecure: false, Keyring: keys}
+	// Fakes for Git providers listen on 127.0.0.1, which production blocks.
+	cfg := config.Config{CookieSecure: false, Keyring: keys, Outbound: safehttp.Policy{AllowLoopback: true}}
 	for _, option := range options {
 		option(&cfg)
 	}

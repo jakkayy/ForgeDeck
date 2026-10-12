@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
 	"github.com/jakkayy/ForgeDeck/internal/keyring"
+	"github.com/jakkayy/ForgeDeck/internal/safehttp"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
@@ -34,17 +36,32 @@ type Connection struct {
 
 // Service implements Git connection operations.
 type Service struct {
-	pool    *pgxpool.Pool
-	queries *store.Queries
-	authz   *authz.Authorizer
-	keyring *keyring.Keyring
-	github  *github.Client // nil when the GitHub App is not configured
-	now     func() time.Time
+	pool           *pgxpool.Pool
+	queries        *store.Queries
+	authz          *authz.Authorizer
+	keyring        *keyring.Keyring
+	github         *github.Client // nil when the GitHub App is not configured
+	outbound       *http.Client   // for user-supplied provider URLs
+	outboundPolicy safehttp.Policy
+	now            func() time.Time
 }
 
-// NewService returns a Service. githubClient may be nil.
-func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, ring *keyring.Keyring, githubClient *github.Client, now func() time.Time) *Service {
-	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, keyring: ring, github: githubClient, now: now}
+// Deps are the collaborators a Service needs. GitHub may be nil.
+type Deps struct {
+	Pool     *pgxpool.Pool
+	Authz    *authz.Authorizer
+	Keyring  *keyring.Keyring
+	GitHub   *github.Client
+	Outbound safehttp.Policy
+	Now      func() time.Time
+}
+
+// NewService returns a Service.
+func NewService(d Deps) *Service {
+	return &Service{
+		pool: d.Pool, queries: store.New(d.Pool), authz: d.Authz, keyring: d.Keyring, github: d.GitHub,
+		outbound: safehttp.NewClient(d.Outbound, 15*time.Second), outboundPolicy: d.Outbound, now: d.Now,
+	}
 }
 
 // List returns the project's connections.

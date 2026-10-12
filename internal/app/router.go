@@ -43,7 +43,9 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	if cfg.GitHub != nil {
 		githubClient = github.NewClient(*cfg.GitHub, time.Now)
 	}
-	gitHandler := gitconn.NewHandler(gitconn.NewService(pool, authorizer, cfg.Keyring, githubClient, time.Now), logger)
+	gitHandler := gitconn.NewHandler(gitconn.NewService(gitconn.Deps{
+		Pool: pool, Authz: authorizer, Keyring: cfg.Keyring, GitHub: githubClient, Outbound: cfg.Outbound, Now: time.Now,
+	}), logger)
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, middleware.GetHead)

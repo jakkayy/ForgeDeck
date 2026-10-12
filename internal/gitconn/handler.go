@@ -28,6 +28,7 @@ func NewHandler(svc *Service, logger *slog.Logger) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/projects/{projectID}/git-connections", httpx.Handle(h.list))
 	r.Post("/projects/{projectID}/git-connections/github", httpx.Handle(h.startGitHub))
+	r.Post("/projects/{projectID}/git-connections/gitlab", httpx.Handle(h.connectGitLab))
 	r.Delete("/git-connections/{connectionID}", httpx.Handle(h.delete))
 }
 
@@ -60,6 +61,27 @@ func (h *Handler) startGitHub(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.WriteJSON(w, http.StatusOK, map[string]string{"install_url": installURL})
+}
+
+type gitLabRequest struct {
+	BaseURL string `json:"base_url"`
+	Token   string `json:"token"`
+}
+
+func (h *Handler) connectGitLab(w http.ResponseWriter, r *http.Request) error {
+	projectID, err := httpx.UUIDParam(r, "projectID")
+	if err != nil {
+		return err
+	}
+	var req gitLabRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	conn, err := h.svc.ConnectGitLab(r.Context(), auth.UserFrom(r.Context()).ID, projectID, GitLabInput(req))
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusCreated, conn)
 }
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
