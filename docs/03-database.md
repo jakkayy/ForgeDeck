@@ -184,7 +184,7 @@ Holds the latest container state reported by the Agent. It is a cache for the da
 - `received_at TIMESTAMPTZ NOT NULL` (when the Control Plane stored it)
 - Composite primary key `(server_id, container_id)`
 
-Apply each snapshot in one transaction: upsert reported containers and delete rows for that server that the snapshot no longer contains. Reject a snapshot whose `observed_at` is older than the stored one, so a delayed request cannot overwrite newer state.
+Apply each snapshot in one transaction: lock the server row, delete its stored containers, and bulk-insert the reported ones. `servers.containers_observed_at` records the time of the last applied snapshot (even an empty one); a snapshot whose `observed_at` is not newer is ignored, so a delayed request cannot overwrite newer state.
 
 `observed_at` is Agent-reported. The Control Plane should clamp values that are ahead of `received_at` beyond a small skew tolerance. The UI uses `observed_at` to show data age and marks the list stale when it exceeds a configurable threshold.
 

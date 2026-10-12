@@ -3,7 +3,11 @@
 // changes: bump ProtocolVersion for incompatible ones.
 package agentproto
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // ProtocolVersion is the Agent protocol spoken by this build.
 const ProtocolVersion = 1
@@ -51,4 +55,28 @@ type Resources struct {
 // HeartbeatResponse tells the Agent when to send the next heartbeat.
 type HeartbeatResponse struct {
 	IntervalSeconds int `json:"interval_seconds"`
+}
+
+// ContainerSnapshot is the full list of containers on the Agent's host at
+// ObservedAt. It replaces the previous snapshot; it is not a diff.
+type ContainerSnapshot struct {
+	ObservedAt time.Time   `json:"observed_at"`
+	Containers []Container `json:"containers"`
+}
+
+// Container is one Docker container. It deliberately omits environment
+// variables, mounts, and other inspect data that may contain secrets.
+type Container struct {
+	ID         string            `json:"container_id"`
+	Name       string            `json:"name"`
+	Image      string            `json:"image"`
+	State      string            `json:"state"`
+	StatusText string            `json:"status_text,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
+}
+
+// SnapshotResponse reports whether the snapshot replaced the stored one.
+// A snapshot older than the stored one is ignored, not an error.
+type SnapshotResponse struct {
+	Accepted bool `json:"accepted"`
 }

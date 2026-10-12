@@ -30,6 +30,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Group(func(agent chi.Router) {
 		agent.Use(h.RequireAgent)
 		agent.Post("/agent/heartbeat", httpx.Handle(h.heartbeat))
+		agent.Post("/agent/containers/snapshot", httpx.Handle(h.snapshot))
 	})
 }
 
@@ -67,6 +68,18 @@ func (h *Handler) heartbeat(w http.ResponseWriter, r *http.Request) error {
 	return httpx.WriteJSON(w, http.StatusOK, agentproto.HeartbeatResponse{
 		IntervalSeconds: int(servers.HeartbeatInterval / time.Second),
 	})
+}
+
+func (h *Handler) snapshot(w http.ResponseWriter, r *http.Request) error {
+	var req agentproto.ContainerSnapshot
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	accepted, err := h.servers.ApplySnapshot(r.Context(), IdentityFrom(r.Context()), req)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, agentproto.SnapshotResponse{Accepted: accepted})
 }
 
 func checkProtocol(version int) error {
