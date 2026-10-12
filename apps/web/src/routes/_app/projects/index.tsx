@@ -3,7 +3,6 @@ import {
   Card,
   Description,
   FieldError,
-  Form,
   Input,
   Label,
   Modal,
@@ -11,16 +10,17 @@ import {
   TextField,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import type { FormEvent } from "react";
-import { isApiError } from "../../api/client";
-import { createProject, projectsQuery } from "../../api/projects";
-import { EmptyState } from "../../components/EmptyState";
-import { PageHeader } from "../../components/PageHeader";
-import { QueryError } from "../../components/QueryError";
-import { RoleChip } from "../../components/RoleChip";
+import { isApiError } from "../../../api/client";
+import { createProject, projectsQuery } from "../../../api/projects";
+import { ApiForm } from "../../../components/ApiForm";
+import { EmptyState } from "../../../components/EmptyState";
+import { PageHeader } from "../../../components/PageHeader";
+import { QueryError } from "../../../components/QueryError";
+import { RoleChip } from "../../../components/RoleChip";
 
-export const Route = createFileRoute("/_app/projects")({
+export const Route = createFileRoute("/_app/projects/")({
   loader: ({ context }) => context.queryClient.prefetchQuery(projectsQuery),
   component: ProjectsPage,
 });
@@ -49,7 +49,13 @@ function ProjectsPage() {
             {projects.data.items.map((project) => (
               <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{project.name}</p>
+                  <Link
+                    to="/projects/$projectId"
+                    params={{ projectId: project.id }}
+                    className="block truncate font-medium hover:underline"
+                  >
+                    {project.name}
+                  </Link>
                   <p className="truncate font-mono text-xs text-[var(--muted)]">{project.slug}</p>
                 </div>
                 <RoleChip role={project.role} />
@@ -86,10 +92,7 @@ function NewProjectDialog() {
                 );
               };
               return (
-                <Form
-                  onSubmit={onSubmit}
-                  validationErrors={isApiError(create.error, 422) ? create.error.fields : undefined}
-                >
+                <ApiForm onSubmit={onSubmit} error={create.error} onClearError={create.reset}>
                   <Modal.Header>
                     <Modal.Heading>New project</Modal.Heading>
                   </Modal.Header>
@@ -117,7 +120,7 @@ function NewProjectDialog() {
                       Create project
                     </Button>
                   </Modal.Footer>
-                </Form>
+                </ApiForm>
               );
             }}
           </Modal.Dialog>
