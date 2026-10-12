@@ -1,12 +1,15 @@
 import { Alert, Card, Spinner } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { containersQuery, serverQuery } from "../../../api/servers";
 import type { Container, ContainerList, Server } from "../../../api/types";
+import { ContainerActions } from "../../../components/ContainerActions";
 import { ContainerStateChip } from "../../../components/ContainerStateChip";
 import { QueryError } from "../../../components/QueryError";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { timeAgo } from "../../../lib/time";
+import { useHasRole } from "../../../lib/useHasRole";
 
 export const Route = createFileRoute("/_app/servers/$serverId")({
   loader: ({ context, params }) =>
@@ -39,7 +42,13 @@ function ServerPage() {
         {containers.isError && (
           <QueryError error={containers.error} onRetry={() => containers.refetch()} />
         )}
-        {containers.isSuccess && <Containers list={containers.data} />}
+        {containers.isSuccess && (
+          <Containers
+            list={containers.data}
+            serverId={serverId}
+            projectId={server.data.project_id}
+          />
+        )}
       </section>
     </div>
   );
@@ -83,7 +92,10 @@ function ServerSummary({ server }: { server: Server }) {
   );
 }
 
-function Containers({ list }: { list: ContainerList }) {
+type ContainersProps = { list: ContainerList; serverId: string; projectId: string };
+
+function Containers({ list, serverId, projectId }: ContainersProps) {
+  const canOperate = useHasRole(projectId, "developer");
   return (
     <>
       {list.stale ? (
@@ -109,7 +121,13 @@ function Containers({ list }: { list: ContainerList }) {
         <Card className="p-0">
           <ul className="divide-y divide-[var(--separator)]">
             {list.containers.map((container) => (
-              <ContainerRow key={container.container_id} container={container} />
+              <ContainerRow
+                key={container.container_id}
+                container={container}
+                actions={
+                  canOperate && <ContainerActions serverId={serverId} container={container} />
+                }
+              />
             ))}
           </ul>
         </Card>
@@ -118,7 +136,7 @@ function Containers({ list }: { list: ContainerList }) {
   );
 }
 
-function ContainerRow({ container }: { container: Container }) {
+function ContainerRow({ container, actions }: { container: Container; actions: ReactNode }) {
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3">
       <div className="min-w-48 flex-1">
@@ -127,6 +145,7 @@ function ContainerRow({ container }: { container: Container }) {
       </div>
       <ContainerStateChip state={container.state} />
       <p className="w-40 text-sm text-[var(--muted)]">{container.status_text}</p>
+      {actions}
     </li>
   );
 }

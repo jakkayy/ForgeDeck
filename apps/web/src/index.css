@@ -26,6 +26,8 @@
 @import "@heroui/styles/components/popover.css" layer(components);
 @import "@heroui/styles/components/list-box.css" layer(components);
 @import "@heroui/styles/components/list-box-item.css" layer(components);
+@import "@heroui/styles/components/alert-dialog.css" layer(components);
+@import "@heroui/styles/components/toast.css" layer(components);
 
 /*
  * ForgeDeck design tokens on top of the HeroUI theme (unlayered, so they

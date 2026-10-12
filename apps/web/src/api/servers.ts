@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
-import type { ContainerList, EnrollmentToken, List, Server } from "./types";
+import type { ContainerList, EnrollmentToken, List, QueuedJob, Server } from "./types";
 
 /** Matches the Agent heartbeat interval, so status is never more than one beat behind. */
 export const SERVER_REFRESH_MS = 20_000;
@@ -31,3 +31,16 @@ export const containersQuery = (serverId: string) =>
     queryFn: ({ signal }) => api<ContainerList>(`/servers/${serverId}/containers`, { signal }),
     refetchInterval: SERVER_REFRESH_MS,
   });
+
+export type ContainerAction = "start" | "stop" | "restart";
+
+export function requestContainerAction(
+  serverId: string,
+  containerId: string,
+  action: ContainerAction,
+) {
+  return api<QueuedJob>(`/servers/${serverId}/containers/${containerId}/actions`, {
+    method: "POST",
+    body: { action },
+  });
+}
