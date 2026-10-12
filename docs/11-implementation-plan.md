@@ -180,6 +180,18 @@
 | 1.82 | วัด latency จากกด action ถึงเห็นสถานะใหม่ และบันทึกผล | `docs: record phase 1 action latency measurement` |
 | 1.83 | วัด RAM ของ API (รวม UI) ตอน idle และบันทึกผล | `docs: record phase 1 idle memory measurement` |
 
+### 1K. Added during Phase 1
+
+Found while building and testing the dashboard; not in the original list.
+
+| # | งาน | Commit |
+|---|---|---|
+| 1.84 | ให้ `enroll` ถาม token แบบไม่ echo | `feat(agent): prompt for enrollment token without echo` |
+| 1.85 | ล้าง error 422 จาก server เมื่อแก้ field (ฟอร์มส่งซ้ำได้ทันที) | `fix(web): clear server validation errors when a field changes` |
+| 1.86 | หน้าสมาชิกของ project | `feat(web): add project members page` |
+| 1.87 | ปุ่มลบ server (revoke Agent) | `feat(web): add server removal` |
+| 1.88 | ปิด action/log ขณะ server offline | `feat(web): pause container actions while a server is offline` |
+
 ---
 
 ## Phase 2 — Git integration and job queue
