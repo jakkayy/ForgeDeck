@@ -37,6 +37,6 @@ func run() error {
 	defer stop()
 
 	router := chi.NewRouter()
-	router.Use(httpx.RequestID)
+	router.Use(httpx.RequestID, httpx.AccessLog(logger))
 	return httpserver.Run(ctx, cfg.HTTPAddr, router, logger)
 }
