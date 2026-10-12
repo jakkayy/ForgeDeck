@@ -166,3 +166,13 @@ type User struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
+
+type WebhookEvent struct {
+	ID              uuid.UUID
+	Provider        string
+	DeliveryID      string
+	EventType       string
+	GitConnectionID *uuid.UUID
+	ReceivedAt      time.Time
+	Result          *string
+}
