@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentapi"
@@ -20,6 +21,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/projects"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 	"github.com/jakkayy/ForgeDeck/internal/store"
+	"github.com/jakkayy/ForgeDeck/internal/webui"
 )
 
 // NewRouter wires every module and returns the root HTTP handler. It also
@@ -37,11 +39,14 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier)
 
 	router := chi.NewRouter()
-	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover)
+	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, middleware.GetHead)
 	router.Get("/healthz", health.Handler(map[string]health.Check{"database": pool.Ping}))
 
 	router.Route("/api/v1", func(api chi.Router) {
 		api.Use(httpx.CSRF)
+		api.NotFound(httpx.Handle(func(http.ResponseWriter, *http.Request) error {
+			return httpx.NotFound("No API endpoint at this path.")
+		}))
 		authHandler.Routes(api)
 		agentHandler.Routes(api)
 
@@ -52,5 +57,6 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			jobs.NewHandler(jobService).Routes(signedIn)
 		})
 	})
+	router.Get("/*", webui.Handler(webui.FS()).ServeHTTP)
 	return router
 }
