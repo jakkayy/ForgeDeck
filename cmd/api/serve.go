@@ -41,6 +41,7 @@ func newRouter(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.
 	router.Get("/healthz", health.Handler(map[string]health.Check{"database": pool.Ping}))
 
 	router.Route("/api/v1", func(api chi.Router) {
+		api.Use(httpx.CSRF)
 		auth.NewHandler(authService, cfg.CookieSecure).Routes(api)
 	})
 	return router
