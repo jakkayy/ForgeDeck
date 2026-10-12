@@ -63,7 +63,7 @@ Simplicity + Speed + Self-hosted + Docker-native + Developer UX
 ```text
               ┌────────────────────┐
               │      Browser       │
-              │ Next.js + HeroUI   │
+              │ React SPA + HeroUI │
               └─────────┬──────────┘
                         │
                         ▼
@@ -94,7 +94,7 @@ Simplicity + Speed + Self-hosted + Docker-native + Developer UX
 | PostgreSQL | Source of truth และ job queue (`SKIP LOCKED`) | [03](03-database.md) |
 | Runner | Checkout → test → build → push แยกจาก production | [06](06-ci-cd-pipeline.md) |
 | Agent | ควบคุม Docker บน server, ส่ง heartbeat และ container snapshot | [05](05-agent-protocol.md) |
-| Web UI | Next.js, TypeScript, Tailwind, HeroUI, TanStack Query | [08](08-frontend-ux.md) |
+| Web UI | Vite + React SPA, HeroUI, TanStack Query — build เป็น static แล้ว embed ใน Go binary | [08](08-frontend-ux.md) |
 
 หลักสำคัญ:
 
@@ -102,6 +102,7 @@ Simplicity + Speed + Self-hosted + Docker-native + Developer UX
 - **Agent ใช้ pull model** — server ไม่ต้องเปิด inbound port, อยู่หลัง NAT ได้
 - **Runner แยกจาก Production** — source code เป็น untrusted input, ห้าม mount Docker socket
 - **Deploy ด้วย image digest** — rollback ใช้ digest เดิม ไม่ build ใหม่
+- **Control Plane เป็น binary เดียว** — Web UI ถูก embed ไว้ใน Go binary, production ไม่ต้องมี JavaScript runtime (ใช้ Bun แค่ตอน build)
 
 ---
 
@@ -163,7 +164,7 @@ Monorepo:
 
 ```text
 forgedeck/
-├── apps/web/          Next.js dashboard
+├── apps/web/          Vite + React dashboard (embed ใน cmd/api)
 ├── cmd/
 │   ├── api/           Control Plane
 │   ├── runner/        CI Runner

@@ -9,7 +9,7 @@ This is a planned development setup. Exact commands depend on the repository's p
 Recommended local tools:
 - Git
 - Go toolchain
-- Node.js LTS and the selected package manager
+- Bun (build-time only for the Web UI; not needed to run ForgeDeck)
 - Docker Engine
 - Docker Compose plugin
 - PostgreSQL (or the project Compose service)
@@ -62,6 +62,7 @@ Adjust this layout if implementation reveals a simpler boundary. Do not create e
 
 - Start with PostgreSQL and the API.
 - Add the Web UI after the first API contract is testable.
+- During development, run the Vite dev server and proxy `/api` to the Go API so the browser still sees a single origin. Production builds embed `apps/web/dist` into the API binary.
 - Develop Agent operations against a disposable test Docker host first.
 - Use a separate test Runner environment; never test untrusted build code on a production machine.
 - Keep local secrets in ignored environment files or a secret manager.
@@ -89,7 +90,7 @@ fmt:
 	gofmt -w $$(find . -name '*.go' -not -path './vendor/*')
 
 web-dev:
-	cd apps/web && npm run dev
+	cd apps/web && bun run dev
 ```
 
 Add lint, SQL generation, migrations, and build commands when their tools are selected. Do not include commands that do not actually work.

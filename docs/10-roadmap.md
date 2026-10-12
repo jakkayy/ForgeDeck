@@ -30,7 +30,7 @@ Build:
 - Minimal Agent job queue: `worker_kind`/`target_server_id`, `SKIP LOCKED` claim, long-poll, lease, complete.
 - `container_action` jobs for start/stop/restart behind authorization.
 - `fetch_logs` jobs for bounded past container logs (no live tail).
-- Minimal Next.js/HeroUI shell.
+- Minimal React/HeroUI shell embedded in and served by the API binary.
 
 Acceptance:
 - A test server can enroll and appear online in the token's project.

@@ -6,12 +6,17 @@ The UI should feel like a modern, friendly developer tool: clean, minimal, fast,
 
 ## 2. Stack
 
-- Next.js App Router
-- TypeScript
+- Vite (build only)
+- React + TypeScript
+- TanStack Router
 - Tailwind CSS
 - HeroUI
 - TanStack Query
 - SSE for live job/deployment updates
+
+The app is a client-rendered SPA. `vite build` produces static files that the Control Plane embeds with Go `embed` and serves from the same origin as the API. Unknown non-API paths fall back to `index.html` so client-side routes work on reload.
+
+Why not Next.js: every page is behind login (no SEO need), business logic already lives in the Go API, and a Node.js server would add a second runtime process, a second origin for cookies/SSE, and more memory on small installations.
 
 Choose compatible versions at implementation time and document the selected versions in package manifests. Avoid adding libraries that duplicate existing functionality.
 
@@ -141,6 +146,9 @@ Empty states should explain the next action, e.g. “No servers yet — register
 
 ## 13. Performance
 
+- Split code per route so a page only loads what it uses.
+- Enforce a bundle size budget in CI and review it when adding dependencies. HeroUI and its animation dependency are the largest expected contributors; import components individually and measure.
+- Serve hashed assets with long-lived cache headers and `index.html` with no-cache.
 - Fetch only the data needed for the current page.
 - Use pagination and server-side filtering.
 - Avoid aggressive global polling.
@@ -168,3 +176,4 @@ Prioritize desktop for server administration, while keeping core flows usable on
 - Exact typography and color palette.
 - Whether the Overview is global or project-scoped by default.
 - Which table library is needed beyond HeroUI's components.
+- Initial bundle size budget (set after measuring the first shell build).

@@ -12,7 +12,9 @@
 
 ### Web UI
 
-Next.js App Router, TypeScript, Tailwind CSS, HeroUI, and TanStack Query. It presents projects, applications, servers, jobs, releases, logs, and settings.
+A single-page application built with Vite, React, TypeScript, Tailwind CSS, HeroUI, and TanStack Query. It presents projects, applications, servers, jobs, releases, logs, and settings.
+
+The build output is static files embedded into the Control Plane binary with Go `embed` and served from the same origin as `/api/v1`. There is no separate web server process and no JavaScript runtime in production; Bun is only needed to build the assets.
 
 ### Control Plane API
 
@@ -40,7 +42,7 @@ Stores built images. Initial integrations may include GHCR and GitLab Container 
 Browser
   │ HTTPS
   ▼
-Next.js Web UI ───────► Go Control Plane ───────► PostgreSQL
+Go Control Plane (embedded Web UI) ───────► PostgreSQL
                               │
                               ├── GitHub/GitLab webhooks
                               │
@@ -102,7 +104,7 @@ Delivery is at-least-once in practical failure scenarios. Operations must theref
 
 ## 8. Deployment model
 
-Each installation runs its own Control Plane and database. A basic installation may use Docker Compose for `web`, `api`, `postgres`, and optionally `runner`. Production servers run the Agent separately.
+Each installation runs its own Control Plane and database. A basic installation may use Docker Compose for `api` (which also serves the Web UI), `postgres`, and optionally `runner`. Production servers run the Agent separately.
 
 ## 9. Technology decisions
 
@@ -112,7 +114,7 @@ Each installation runs its own Control Plane and database. A basic installation 
 | HTTP router | Chi | Small, idiomatic routing layer |
 | Database access | pgx + sqlc | Explicit SQL and typed generated access |
 | Database | PostgreSQL | Metadata, transactions, and initial queue |
-| Frontend | Next.js + TypeScript | Structured dashboard and mature ecosystem |
+| Frontend | Vite + React + TypeScript SPA, embedded in the Go binary | No JavaScript runtime process, single origin, single binary to install |
 | UI | HeroUI + Tailwind | Consistent components and fast UI iteration |
 | Live logs | SSE | One-way server-to-browser stream |
 | Runtime | Docker Engine / Compose | Matches MVP scope |

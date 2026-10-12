@@ -46,7 +46,7 @@ ForgeDeck aims to provide one understandable workflow and a clear view of what i
 - Health checks, deployment history, image digest, and manual rollback.
 - SSE for live job/deployment logs.
 - Audit records for important actions.
-- Responsive dashboard built with Next.js, TypeScript, Tailwind CSS, and HeroUI.
+- Responsive dashboard built with Vite, React, TypeScript, Tailwind CSS, and HeroUI, served by the Control Plane.
 
 ### Explicitly out of scope for MVP
 

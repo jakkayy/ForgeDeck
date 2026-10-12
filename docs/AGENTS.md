@@ -12,6 +12,7 @@ These instructions apply to AI coding agents working in the ForgeDeck repository
 ## Core architecture rules
 
 - Use Go for the backend, Runner, and Agent.
+- The Web UI is a Vite + React SPA embedded in the API binary. Use Bun as the package manager and build tool. Do not add a JavaScript server runtime or move business logic into the frontend.
 - Keep the Control Plane a modular monolith until there is a demonstrated reason to split it.
 - Use PostgreSQL as the initial source of truth and job queue; do not add Redis, Kafka, or Temporal without an approved requirement.
 - Use Docker Engine / Docker Compose for the MVP. Do not introduce Kubernetes into the MVP.
