@@ -8,7 +8,9 @@ This is a planned development setup. Exact commands depend on the repository's p
 
 Recommended local tools:
 - Git
-- Go toolchain
+- Go toolchain (version from `go.mod`)
+- golangci-lint v2.5 (`make lint`, `make fmt`)
+- sqlc v1.30 (`make generate`): `go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0`
 - Bun (build-time only for the Web UI; not needed to run ForgeDeck)
 - Docker Engine
 - Docker Compose plugin

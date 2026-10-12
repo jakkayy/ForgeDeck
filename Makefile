@@ -1,4 +1,4 @@
-.PHONY: fmt lint test migrate-up migrate-down migrate-status
+.PHONY: fmt lint test generate migrate-up migrate-down migrate-status
 
 fmt:
 	golangci-lint fmt
@@ -8,6 +8,9 @@ lint:
 
 test:
 	go test -race ./...
+
+generate:
+	sqlc generate
 
 migrate-up:
 	go run ./cmd/api migrate up
