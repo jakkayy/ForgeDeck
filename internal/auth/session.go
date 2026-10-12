@@ -30,8 +30,8 @@ var ErrInvalidSession = errors.New("invalid session")
 
 // User is the authenticated user attached to a request.
 type User struct {
-	ID    uuid.UUID
-	Email string
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
 }
 
 // NewSession is a started session; Token is shown to the client once.

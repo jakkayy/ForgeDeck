@@ -1,0 +1,79 @@
+package auth
+
+import (
+	"errors"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/jakkayy/ForgeDeck/internal/httpx"
+)
+
+// Handler serves the /auth endpoints.
+type Handler struct {
+	svc    *Service
+	cookie cookieConfig
+}
+
+// NewHandler returns auth endpoints. secureCookies must be true when the
+// Control Plane is served over HTTPS.
+func NewHandler(svc *Service, secureCookies bool) *Handler {
+	return &Handler{svc: svc, cookie: newCookieConfig(secureCookies)}
+}
+
+// Routes mounts the auth endpoints on r.
+func (h *Handler) Routes(r chi.Router) {
+	r.Post("/auth/login", httpx.Handle(h.login))
+}
+
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (h *Handler) login(w http.ResponseWriter, r *http.Request) error {
+	var req loginRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+
+	user, session, err := h.svc.Login(r.Context(), req.Email, req.Password)
+	if errors.Is(err, ErrInvalidCredentials) {
+		return httpx.Unauthorized("Email or password is incorrect.")
+	}
+	if err != nil {
+		return err
+	}
+
+	h.cookie.set(w, session.Token)
+	return httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"user": user,
+	})
+}
+
+// cookieConfig names and scopes the session cookie. Over HTTPS the __Host-
+// prefix pins the cookie to this exact origin.
+type cookieConfig struct {
+	name   string
+	secure bool
+}
+
+func newCookieConfig(secure bool) cookieConfig {
+	if secure {
+		return cookieConfig{name: "__Host-forgedeck_session", secure: true}
+	}
+	return cookieConfig{name: "forgedeck_session"}
+}
+
+func (c cookieConfig) set(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     c.name,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(sessionMaxLifetime / time.Second),
+		HttpOnly: true,
+		Secure:   c.secure,
+		SameSite: http.SameSiteStrictMode,
+	})
+}
