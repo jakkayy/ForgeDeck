@@ -1,3 +1,7 @@
+# Local settings (see .env.example); optional.
+-include .env
+export
+
 .PHONY: fmt lint test generate migrate-up migrate-down migrate-status
 
 fmt:
