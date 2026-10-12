@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { containersQuery, serverQuery } from "../../../api/servers";
 import type { Container, ContainerList, Server } from "../../../api/types";
 import { ContainerActions } from "../../../components/ContainerActions";
+import { ContainerLogs } from "../../../components/ContainerLogs";
 import { ContainerStateChip } from "../../../components/ContainerStateChip";
 import { QueryError } from "../../../components/QueryError";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
@@ -125,7 +126,10 @@ function Containers({ list, serverId, projectId }: ContainersProps) {
                 key={container.container_id}
                 container={container}
                 actions={
-                  canOperate && <ContainerActions serverId={serverId} container={container} />
+                  <div className="flex items-center gap-2">
+                    <ContainerLogs serverId={serverId} container={container} />
+                    {canOperate && <ContainerActions serverId={serverId} container={container} />}
+                  </div>
                 }
               />
             ))}

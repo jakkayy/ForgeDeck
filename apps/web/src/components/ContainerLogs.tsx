@@ -1,0 +1,154 @@
+import { Alert, Button, Drawer, ListBox, Select, Spinner } from "@heroui/react";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { getAllJobLogs, waitForJob } from "../api/jobs";
+import { requestContainerLogs } from "../api/servers";
+import type { Container, LogLine } from "../api/types";
+
+const tailOptions = [100, 500, 2000];
+
+// stderr is marked in the gutter rather than colored: many programs log
+// ordinary output there, and an all-red log reads as an outage.
+const streamStyle: Record<LogLine["stream"], string> = {
+  stdout: "border-transparent",
+  stderr: "border-[var(--warning)]",
+  system: "border-transparent text-[var(--muted)]",
+};
+
+type FetchedLogs = { lines: LogLine[]; truncated: boolean; fetchedAt: Date };
+
+async function fetchLogs(
+  serverId: string,
+  container: Container,
+  tail: number,
+): Promise<FetchedLogs> {
+  const queued = await requestContainerLogs(serverId, container.container_id, tail);
+  const job = await waitForJob(queued.job_id);
+  if (job.status !== "succeeded") {
+    throw new Error(job.error?.message ?? "The Agent could not read the logs.");
+  }
+  const lines = await getAllJobLogs(job.id);
+  const truncated = (job.result as { truncated?: boolean } | undefined)?.truncated === true;
+  return { lines, truncated, fetchedAt: new Date() };
+}
+
+type Props = { serverId: string; container: Container };
+
+/**
+ * Past output of one container, fetched on demand through the Agent. Lines
+ * are rendered as text (never HTML) and redaction happens before they reach
+ * the browser.
+ */
+export function ContainerLogs({ serverId, container }: Props) {
+  const [tail, setTail] = useState(500);
+  const logs = useMutation({
+    mutationFn: (lines: number) => fetchLogs(serverId, container, lines),
+  });
+
+  return (
+    <Drawer onOpenChange={(open) => open && logs.mutate(tail)}>
+      <Button size="sm" variant="tertiary">
+        Logs
+      </Button>
+      <Drawer.Backdrop>
+        <Drawer.Content placement="right">
+          <Drawer.Dialog className="w-full max-w-[95vw] sm:w-[52rem]">
+            <Drawer.Header className="flex-row flex-wrap items-center gap-3 pe-10">
+              <Drawer.Heading className="flex-1">Logs · {container.name}</Drawer.Heading>
+              <Select
+                aria-label="Lines to fetch"
+                className="w-36"
+                selectedKey={String(tail)}
+                onSelectionChange={(key) => setTail(Number(key))}
+              >
+                <Select.Trigger>
+                  <Select.Value />
+                  <Select.Indicator />
+                </Select.Trigger>
+                <Select.Popover>
+                  <ListBox>
+                    {tailOptions.map((n) => (
+                      <ListBox.Item key={n} id={String(n)} textValue={`Last ${n} lines`}>
+                        Last {n} lines
+                        <ListBox.ItemIndicator />
+                      </ListBox.Item>
+                    ))}
+                  </ListBox>
+                </Select.Popover>
+              </Select>
+              <Button
+                size="sm"
+                variant="secondary"
+                isPending={logs.isPending}
+                onPress={() => logs.mutate(tail)}
+              >
+                Refresh
+              </Button>
+              <Drawer.CloseTrigger />
+            </Drawer.Header>
+            <Drawer.Body className="flex min-h-0 flex-1 flex-col gap-3">
+              {logs.isPending && (
+                <p className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                  <Spinner size="sm" aria-hidden="true" /> Asking the Agent for logs…
+                </p>
+              )}
+              {logs.isError && (
+                <Alert status="danger">
+                  <Alert.Content>
+                    <Alert.Description>{logs.error.message}</Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              )}
+              {logs.isSuccess && <LogOutput logs={logs.data} />}
+            </Drawer.Body>
+          </Drawer.Dialog>
+        </Drawer.Content>
+      </Drawer.Backdrop>
+    </Drawer>
+  );
+}
+
+/** Splits Docker's "2026-10-12T20:08:09.43Z message" prefix into a short time. */
+function splitTimestamp(message: string): { time: string | null; text: string } {
+  const match = /^(\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2})[.\d]*Z) (.*)$/s.exec(message);
+  return match ? { time: match[2] ?? null, text: match[3] ?? "" } : { time: null, text: message };
+}
+
+function LogOutput({ logs }: { logs: FetchedLogs }) {
+  // Start at the newest lines, which is what someone debugging looks for first.
+  const scrollToEnd = (element: HTMLPreElement | null) => {
+    element?.scrollTo({ top: element.scrollHeight });
+  };
+
+  if (logs.lines.length === 0) {
+    return (
+      <p className="text-sm text-[var(--muted)]">This container has not written any output.</p>
+    );
+  }
+  return (
+    <>
+      <p className="text-xs text-[var(--muted)]">
+        {logs.lines.length} lines, fetched at {logs.fetchedAt.toLocaleTimeString()}.
+        {logs.truncated &&
+          " Output was truncated at 1 MB; fetch fewer lines to see the newest ones."}
+      </p>
+      <pre
+        ref={scrollToEnd}
+        className="min-h-0 flex-1 overflow-auto rounded-lg bg-[var(--surface-secondary)] py-3 font-mono text-xs leading-5"
+      >
+        {logs.lines.map((line) => {
+          const { time, text } = splitTimestamp(line.message);
+          return (
+            <div
+              key={`${line.attempt}.${line.sequence}`}
+              className={`flex gap-3 border-s-2 px-3 ${streamStyle[line.stream]}`}
+            >
+              {time && <span className="shrink-0 select-none text-[var(--muted)]">{time}</span>}
+              <span className="whitespace-pre-wrap break-all">{text}</span>
+            </div>
+          );
+        })}
+      </pre>
+    </>
+  );
+}

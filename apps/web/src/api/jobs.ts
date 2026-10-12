@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Job, JobStatus } from "./types";
+import type { Job, JobStatus, List, LogLine } from "./types";
 
 const finished: JobStatus[] = ["succeeded", "failed", "cancelled"];
 const POLL_MS = 500;
@@ -24,5 +24,23 @@ export async function waitForJob(jobId: string, signal?: AbortSignal): Promise<J
       throw new Error("The Agent has not finished this job yet. Check that the server is online.");
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+  }
+}
+
+/** Reads every stored log line of a finished job, page by page. */
+export async function getAllJobLogs(jobId: string, signal?: AbortSignal): Promise<LogLine[]> {
+  const lines: LogLine[] = [];
+  let after: string | null = null;
+  for (;;) {
+    const query = new URLSearchParams({ limit: "100" });
+    if (after) {
+      query.set("after", after);
+    }
+    const page: List<LogLine> = await api(`/jobs/${jobId}/logs?${query}`, { signal });
+    lines.push(...page.items);
+    if (page.items.length < 100 || !page.next_cursor) {
+      return lines;
+    }
+    after = page.next_cursor;
   }
 }

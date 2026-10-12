@@ -44,3 +44,10 @@ export function requestContainerAction(
     body: { action },
   });
 }
+
+export function requestContainerLogs(serverId: string, containerId: string, tailLines: number) {
+  return api<QueuedJob>(`/servers/${serverId}/containers/${containerId}/logs`, {
+    method: "POST",
+    body: { tail_lines: tailLines, timestamps: true },
+  });
+}
