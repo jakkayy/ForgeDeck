@@ -8,9 +8,70 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+const claimAgentJob = `-- name: ClaimAgentJob :one
+WITH next AS (
+    SELECT queued.id FROM jobs AS queued
+    WHERE queued.status = 'queued'
+      AND queued.worker_kind = 'agent'
+      AND queued.target_server_id = $4::uuid
+    ORDER BY queued.created_at
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE jobs
+SET status           = 'running',
+    attempt_count    = attempt_count + 1,
+    lease_owner      = $1::text,
+    lease_expires_at = $2::timestamptz,
+    started_at       = COALESCE(started_at, $3::timestamptz)
+FROM next
+WHERE jobs.id = next.id
+RETURNING jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at
+`
+
+type ClaimAgentJobParams struct {
+	WorkerID       string
+	LeaseExpiresAt time.Time
+	Now            time.Time
+	ServerID       uuid.UUID
+}
+
+func (q *Queries) ClaimAgentJob(ctx context.Context, arg ClaimAgentJobParams) (Job, error) {
+	row := q.db.QueryRow(ctx, claimAgentJob,
+		arg.WorkerID,
+		arg.LeaseExpiresAt,
+		arg.Now,
+		arg.ServerID,
+	)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Type,
+		&i.WorkerKind,
+		&i.TargetServerID,
+		&i.Status,
+		&i.Payload,
+		&i.Result,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.LeaseOwner,
+		&i.LeaseExpiresAt,
+		&i.IdempotencyKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
 
 const insertJob = `-- name: InsertJob :one
 INSERT INTO jobs (project_id, type, worker_kind, target_server_id, payload, max_attempts, idempotency_key, created_by)
@@ -63,6 +124,28 @@ func (q *Queries) InsertJob(ctx context.Context, arg InsertJobParams) (Job, erro
 		&i.FinishedAt,
 	)
 	return i, err
+}
+
+const insertJobAttempt = `-- name: InsertJobAttempt :exec
+INSERT INTO job_attempts (job_id, attempt_number, worker_id, status, started_at)
+VALUES ($1, $2, $3, 'running', $4)
+`
+
+type InsertJobAttemptParams struct {
+	JobID         uuid.UUID
+	AttemptNumber int32
+	WorkerID      string
+	StartedAt     time.Time
+}
+
+func (q *Queries) InsertJobAttempt(ctx context.Context, arg InsertJobAttemptParams) error {
+	_, err := q.db.Exec(ctx, insertJobAttempt,
+		arg.JobID,
+		arg.AttemptNumber,
+		arg.WorkerID,
+		arg.StartedAt,
+	)
+	return err
 }
 
 const notifyJobQueued = `-- name: NotifyJobQueued :exec

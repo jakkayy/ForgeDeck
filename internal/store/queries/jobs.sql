@@ -5,3 +5,27 @@ RETURNING *;
 
 -- name: NotifyJobQueued :exec
 SELECT pg_notify(@channel::text, @payload::text);
+
+-- name: ClaimAgentJob :one
+WITH next AS (
+    SELECT queued.id FROM jobs AS queued
+    WHERE queued.status = 'queued'
+      AND queued.worker_kind = 'agent'
+      AND queued.target_server_id = @server_id::uuid
+    ORDER BY queued.created_at
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE jobs
+SET status           = 'running',
+    attempt_count    = attempt_count + 1,
+    lease_owner      = @worker_id::text,
+    lease_expires_at = @lease_expires_at::timestamptz,
+    started_at       = COALESCE(started_at, @now::timestamptz)
+FROM next
+WHERE jobs.id = next.id
+RETURNING jobs.*;
+
+-- name: InsertJobAttempt :exec
+INSERT INTO job_attempts (job_id, attempt_number, worker_id, status, started_at)
+VALUES ($1, $2, $3, 'running', $4);
