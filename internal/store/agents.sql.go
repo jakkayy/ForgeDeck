@@ -33,3 +33,23 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 	)
 	return i, err
 }
+
+const getAgentByCredentialHash = `-- name: GetAgentByCredentialHash :one
+SELECT agents.id, agents.server_id, servers.project_id
+FROM agents
+JOIN servers ON servers.id = agents.server_id
+WHERE agents.credential_hash = $1
+`
+
+type GetAgentByCredentialHashRow struct {
+	ID        uuid.UUID
+	ServerID  uuid.UUID
+	ProjectID uuid.UUID
+}
+
+func (q *Queries) GetAgentByCredentialHash(ctx context.Context, credentialHash []byte) (GetAgentByCredentialHashRow, error) {
+	row := q.db.QueryRow(ctx, getAgentByCredentialHash, credentialHash)
+	var i GetAgentByCredentialHashRow
+	err := row.Scan(&i.ID, &i.ServerID, &i.ProjectID)
+	return i, err
+}
