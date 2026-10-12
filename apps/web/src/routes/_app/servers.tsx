@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { serversQuery } from "../../api/servers";
 import type { Server } from "../../api/types";
+import { AddServerDialog } from "../../components/AddServerDialog";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { QueryError } from "../../components/QueryError";
@@ -19,7 +20,11 @@ function ServersPage() {
 
   return (
     <>
-      <PageHeader title="Servers" description="Docker hosts running the ForgeDeck Agent." />
+      <PageHeader
+        title="Servers"
+        description="Docker hosts running the ForgeDeck Agent."
+        actions={<AddServerDialog />}
+      />
       {servers.isPending && <Spinner aria-label="Loading servers" />}
       {servers.isError && <QueryError error={servers.error} onRetry={() => servers.refetch()} />}
       {servers.isSuccess && servers.data.items.length === 0 && (

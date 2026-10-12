@@ -22,6 +22,10 @@
 @import "@heroui/styles/components/description.css" layer(components);
 @import "@heroui/styles/components/modal.css" layer(components);
 @import "@heroui/styles/components/close-button.css" layer(components);
+@import "@heroui/styles/components/select.css" layer(components);
+@import "@heroui/styles/components/popover.css" layer(components);
+@import "@heroui/styles/components/list-box.css" layer(components);
+@import "@heroui/styles/components/list-box-item.css" layer(components);
 
 /*
  * ForgeDeck design tokens on top of the HeroUI theme (unlayered, so they
