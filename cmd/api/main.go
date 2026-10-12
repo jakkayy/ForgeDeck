@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/jakkayy/ForgeDeck/internal/config"
+	"github.com/jakkayy/ForgeDeck/internal/health"
 	"github.com/jakkayy/ForgeDeck/internal/httpserver"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/logging"
@@ -38,5 +39,6 @@ func run() error {
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover)
+	router.Get("/healthz", health.Handler(nil))
 	return httpserver.Run(ctx, cfg.HTTPAddr, router, logger)
 }
