@@ -83,3 +83,28 @@ func (s *Service) gitLabClient(row store.GitConnection) (*gitlab.Client, error) 
 	}
 	return gitlab.NewClient(s.outbound, row.BaseUrl, string(token)), nil
 }
+
+// ErrRepositoryNotFound means the connection cannot read the repository.
+var ErrRepositoryNotFound = apperr.NotFound("The connection cannot access this repository.")
+
+// FindRepository returns one repository the connection can read, checking
+// that the connection belongs to projectID.
+func (s *Service) FindRepository(ctx context.Context, userID, projectID, connectionID uuid.UUID, repositoryID string) (Repository, error) {
+	row, err := s.authorize(ctx, userID, connectionID, authz.ManageGit)
+	if err != nil {
+		return Repository{}, err
+	}
+	if row.ProjectID != projectID {
+		return Repository{}, errConnectionNotFound
+	}
+	repos, err := s.Repositories(ctx, userID, connectionID)
+	if err != nil {
+		return Repository{}, err
+	}
+	for _, repo := range repos {
+		if repo.ID == repositoryID {
+			return repo, nil
+		}
+	}
+	return Repository{}, ErrRepositoryNotFound
+}

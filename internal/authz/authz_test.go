@@ -6,10 +6,10 @@ func TestRoleCan(t *testing.T) {
 	want := map[Role][]Permission{
 		RoleViewer:    {ViewProject},
 		RoleDeveloper: {ViewProject, OperateContainer},
-		RoleAdmin:     {ViewProject, OperateContainer, UpdateProject, ManageMembers, ManageServers, ManageGit},
-		RoleOwner:     {ViewProject, OperateContainer, UpdateProject, ManageMembers, ManageServers, ManageGit, DeleteProject},
+		RoleAdmin:     {ViewProject, OperateContainer, UpdateProject, ManageMembers, ManageServers, ManageGit, ManageApps},
+		RoleOwner:     {ViewProject, OperateContainer, UpdateProject, ManageMembers, ManageServers, ManageGit, ManageApps, DeleteProject},
 	}
-	all := []Permission{ViewProject, OperateContainer, UpdateProject, ManageMembers, ManageServers, ManageGit, DeleteProject}
+	all := []Permission{ViewProject, OperateContainer, UpdateProject, ManageMembers, ManageServers, ManageGit, ManageApps, DeleteProject}
 
 	for role, granted := range want {
 		allowed := map[Permission]bool{}

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentapi"
+	"github.com/jakkayy/ForgeDeck/internal/applications"
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/config"
@@ -43,9 +44,11 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	if cfg.GitHub != nil {
 		githubClient = github.NewClient(*cfg.GitHub, time.Now)
 	}
-	gitHandler := gitconn.NewHandler(gitconn.NewService(gitconn.Deps{
+	gitService := gitconn.NewService(gitconn.Deps{
 		Pool: pool, Authz: authorizer, Keyring: cfg.Keyring, GitHub: githubClient, Outbound: cfg.Outbound, Now: time.Now,
-	}), logger)
+	})
+	gitHandler := gitconn.NewHandler(gitService, logger)
+	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService))
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, middleware.GetHead)
@@ -66,6 +69,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			serverHandler.Routes(signedIn)
 			jobs.NewHandler(jobService).Routes(signedIn)
 			gitHandler.Routes(signedIn)
+			appHandler.Routes(signedIn)
 		})
 	})
 	router.Get("/*", webui.Handler(webui.FS()).ServeHTTP)
