@@ -14,6 +14,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/apperr"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
+	"github.com/jakkayy/ForgeDeck/internal/database"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
 	"github.com/jakkayy/ForgeDeck/internal/keyring"
 	"github.com/jakkayy/ForgeDeck/internal/safehttp"
@@ -85,7 +86,11 @@ func (s *Service) Delete(ctx context.Context, userID, connectionID uuid.UUID) er
 	if _, err := s.authorize(ctx, userID, connectionID, authz.ManageGit); err != nil {
 		return err
 	}
-	if err := s.queries.DeleteGitConnection(ctx, connectionID); err != nil {
+	err := s.queries.DeleteGitConnection(ctx, connectionID)
+	if database.IsForeignKeyViolation(err) {
+		return apperr.Conflict("connection_in_use", "Applications still build from this connection. Remove or move them first.")
+	}
+	if err != nil {
 		return fmt.Errorf("delete git connection: %w", err)
 	}
 	return nil

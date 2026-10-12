@@ -18,6 +18,23 @@ type Agent struct {
 	CreatedAt      time.Time
 }
 
+type Application struct {
+	ID                 uuid.UUID
+	ProjectID          uuid.UUID
+	Name               string
+	GitConnectionID    uuid.UUID
+	RepositoryID       string
+	RepositoryFullName string
+	Branch             string
+	DockerfilePath     string
+	BuildContext       string
+	TestCommand        *string
+	ProviderWebhookID  *string
+	CreatedBy          *uuid.UUID
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 type EnrollmentToken struct {
 	ID         uuid.UUID
 	ProjectID  uuid.UUID
