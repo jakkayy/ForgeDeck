@@ -18,9 +18,15 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 
+	pool, err := database.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover)
-	router.Get("/healthz", health.Handler(nil))
+	router.Get("/healthz", health.Handler(map[string]health.Check{"database": pool.Ping}))
 
 	return httpserver.Run(ctx, cfg.HTTPAddr, router, logger)
 }
