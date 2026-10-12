@@ -30,6 +30,21 @@ type EnrollmentToken struct {
 	ServerID   *uuid.UUID
 }
 
+type GitConnection struct {
+	ID                uuid.UUID
+	ProjectID         uuid.UUID
+	Provider          string
+	DisplayName       string
+	BaseUrl           string
+	InstallationID    *int64
+	TokenCiphertext   []byte
+	TokenKeyID        *string
+	WebhookCiphertext []byte
+	WebhookKeyID      *string
+	CreatedBy         *uuid.UUID
+	CreatedAt         time.Time
+}
+
 type Job struct {
 	ID             uuid.UUID
 	ProjectID      uuid.UUID
