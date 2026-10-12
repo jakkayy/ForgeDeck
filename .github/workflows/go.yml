@@ -18,7 +18,10 @@ jobs:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.5
+          version: v2.5.0
+          # Build the linter with the module's Go version; prebuilt binaries
+          # can lag behind go.mod and refuse to load.
+          install-mode: goinstall
 
   test:
     runs-on: ubuntu-latest
