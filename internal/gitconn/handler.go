@@ -30,6 +30,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Post("/projects/{projectID}/git-connections/github", httpx.Handle(h.startGitHub))
 	r.Post("/projects/{projectID}/git-connections/gitlab", httpx.Handle(h.connectGitLab))
 	r.Delete("/git-connections/{connectionID}", httpx.Handle(h.delete))
+	r.Get("/git-connections/{connectionID}/repositories", httpx.Handle(h.repositories))
 }
 
 // PublicRoutes mounts the GitHub setup callback. It runs without a session
@@ -94,6 +95,18 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
 	}
 	w.WriteHeader(http.StatusNoContent)
 	return nil
+}
+
+func (h *Handler) repositories(w http.ResponseWriter, r *http.Request) error {
+	connectionID, err := httpx.UUIDParam(r, "connectionID")
+	if err != nil {
+		return err
+	}
+	repos, err := h.svc.Repositories(r.Context(), auth.UserFrom(r.Context()).ID, connectionID)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": repos})
 }
 
 // gitHubSetup finishes an install and sends the browser back to the project
