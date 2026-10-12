@@ -11,6 +11,22 @@ import (
 	"github.com/google/uuid"
 )
 
+const addProjectMember = `-- name: AddProjectMember :exec
+INSERT INTO project_members (project_id, user_id, role)
+VALUES ($1, $2, $3)
+`
+
+type AddProjectMemberParams struct {
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+	Role      string
+}
+
+func (q *Queries) AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error {
+	_, err := q.db.Exec(ctx, addProjectMember, arg.ProjectID, arg.UserID, arg.Role)
+	return err
+}
+
 const getMemberRole = `-- name: GetMemberRole :one
 SELECT role FROM project_members
 WHERE project_id = $1 AND user_id = $2
