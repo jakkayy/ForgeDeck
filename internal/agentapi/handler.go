@@ -38,6 +38,7 @@ func (h *Handler) Routes(r chi.Router) {
 		agent.Post("/agent/heartbeat", httpx.Handle(h.heartbeat))
 		agent.Post("/agent/containers/snapshot", httpx.Handle(h.snapshot))
 		agent.Post("/agent/jobs/claim", httpx.Handle(h.claim))
+		agent.Post("/agent/jobs/{jobID}/heartbeat", httpx.Handle(h.renewLease))
 	})
 }
 
@@ -128,6 +129,35 @@ func (h *Handler) claim(w http.ResponseWriter, r *http.Request) error {
 	return httpx.WriteJSON(w, http.StatusOK, agentproto.Job{
 		ID: job.ID, Type: job.Type, Attempt: job.Attempt, Payload: job.Payload, LeaseExpiresAt: job.LeaseExpiresAt,
 	})
+}
+
+func (h *Handler) renewLease(w http.ResponseWriter, r *http.Request) error {
+	var req agentproto.LeaseRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	lease, err := agentLease(r, req.Attempt)
+	if err != nil {
+		return err
+	}
+	expiresAt, err := h.jobs.RenewAgentLease(r.Context(), lease)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, agentproto.LeaseResponse{LeaseExpiresAt: expiresAt})
+}
+
+// agentLease identifies the attempt named in the URL as held by the
+// authenticated Agent, so the job queries can verify ownership.
+func agentLease(r *http.Request, attempt int32) (jobs.AgentLease, error) {
+	jobID, err := httpx.UUIDParam(r, "jobID")
+	if err != nil {
+		return jobs.AgentLease{}, err
+	}
+	identity := IdentityFrom(r.Context())
+	return jobs.AgentLease{
+		JobID: jobID, Attempt: attempt, ServerID: identity.ServerID, WorkerID: identity.AgentID.String(),
+	}, nil
 }
 
 func checkProtocol(version int) error {

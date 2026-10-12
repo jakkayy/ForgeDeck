@@ -29,3 +29,13 @@ RETURNING jobs.*;
 -- name: InsertJobAttempt :exec
 INSERT INTO job_attempts (job_id, attempt_number, worker_id, status, started_at)
 VALUES ($1, $2, $3, 'running', $4);
+
+-- name: RenewJobLease :one
+UPDATE jobs
+SET lease_expires_at = @lease_expires_at::timestamptz
+WHERE id = @id
+  AND status = 'running'
+  AND attempt_count = @attempt
+  AND lease_owner = @worker_id::text
+  AND target_server_id = @server_id::uuid
+RETURNING lease_expires_at;

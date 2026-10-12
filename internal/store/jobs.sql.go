@@ -161,3 +161,35 @@ func (q *Queries) NotifyWorkers(ctx context.Context, arg NotifyWorkersParams) er
 	_, err := q.db.Exec(ctx, notifyWorkers, arg.Channel, arg.Payload)
 	return err
 }
+
+const renewJobLease = `-- name: RenewJobLease :one
+UPDATE jobs
+SET lease_expires_at = $1::timestamptz
+WHERE id = $2
+  AND status = 'running'
+  AND attempt_count = $3
+  AND lease_owner = $4::text
+  AND target_server_id = $5::uuid
+RETURNING lease_expires_at
+`
+
+type RenewJobLeaseParams struct {
+	LeaseExpiresAt time.Time
+	ID             uuid.UUID
+	Attempt        int32
+	WorkerID       string
+	ServerID       uuid.UUID
+}
+
+func (q *Queries) RenewJobLease(ctx context.Context, arg RenewJobLeaseParams) (*time.Time, error) {
+	row := q.db.QueryRow(ctx, renewJobLease,
+		arg.LeaseExpiresAt,
+		arg.ID,
+		arg.Attempt,
+		arg.WorkerID,
+		arg.ServerID,
+	)
+	var lease_expires_at *time.Time
+	err := row.Scan(&lease_expires_at)
+	return lease_expires_at, err
+}

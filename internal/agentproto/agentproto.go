@@ -102,3 +102,14 @@ type Job struct {
 	Payload        json.RawMessage `json:"payload"`
 	LeaseExpiresAt time.Time       `json:"lease_expires_at"`
 }
+
+// LeaseRequest renews the lease on a claimed job attempt.
+type LeaseRequest struct {
+	Attempt int32 `json:"attempt"`
+}
+
+// LeaseResponse carries the new lease expiry. A 409 with code "lease_lost"
+// means the attempt no longer belongs to this Agent and must be abandoned.
+type LeaseResponse struct {
+	LeaseExpiresAt time.Time `json:"lease_expires_at"`
+}
