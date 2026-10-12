@@ -1,1 +1,36 @@
 @import "tailwindcss";
+
+/* HeroUI prelude: component CSS depends on these utilities and variants. */
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";
+@import "@heroui/styles/themes/default" layer(theme);
+
+/*
+ * Only the components the dashboard uses, to keep the CSS small.
+ * Add a line here when a page starts using a new HeroUI component.
+ */
+@import "@heroui/styles/components/button.css" layer(components);
+@import "@heroui/styles/components/card.css" layer(components);
+@import "@heroui/styles/components/chip.css" layer(components);
+@import "@heroui/styles/components/spinner.css" layer(components);
+
+/*
+ * ForgeDeck design tokens on top of the HeroUI theme (unlayered, so they
+ * override HeroUI and Tailwind defaults such as font-sans / font-mono). Keep the palette
+ * restrained: neutral surfaces, one accent, and status colors that carry
+ * meaning (online, failed, stale) rather than decoration.
+ */
+:root {
+  --radius: 0.625rem;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
