@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jakkayy/ForgeDeck/internal/apperr"
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
 
@@ -88,14 +89,17 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	return json.NewEncoder(w).Encode(v)
 }
 
-// WriteError writes err in the standard error envelope. validate.Errors become
-// 422 responses; other errors that are not *Error are hidden from the client
+// WriteError writes err in the standard error envelope. apperr.Error maps to
+// its status, validate.Errors become 422 responses; other errors that are not *Error are hidden from the client
 // and recorded on the access log line.
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr *Error
+	var appErr *apperr.Error
 	var fieldErrs validate.Errors
 	switch {
 	case errors.As(err, &apiErr):
+	case errors.As(err, &appErr):
+		apiErr = &Error{Status: statusFor(appErr.Kind), Code: appErr.Code, Message: appErr.Message}
 	case errors.As(err, &fieldErrs):
 		apiErr = Invalid(fieldErrs)
 	default:
@@ -111,6 +115,19 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		RequestID: RequestIDFrom(r.Context()),
 	}}
 	_ = WriteJSON(w, apiErr.Status, body)
+}
+
+func statusFor(kind apperr.Kind) int {
+	switch kind {
+	case apperr.KindNotFound:
+		return http.StatusNotFound
+	case apperr.KindForbidden:
+		return http.StatusForbidden
+	case apperr.KindConflict:
+		return http.StatusConflict
+	default:
+		return http.StatusInternalServerError
+	}
 }
 
 type errorBody struct {

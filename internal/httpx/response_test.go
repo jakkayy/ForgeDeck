@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jakkayy/ForgeDeck/internal/apperr"
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
 
@@ -68,6 +69,24 @@ func TestHandleMapsValidationErrors(t *testing.T) {
 	}
 	if got := decodeEnvelope(t, rec).Error.Fields["email"]; got != "Email is required." {
 		t.Fatalf("fields.email = %q", got)
+	}
+}
+
+func TestHandleMapsAppErrors(t *testing.T) {
+	cases := map[*apperr.Error]int{
+		apperr.NotFound("Project not found."):   http.StatusNotFound,
+		apperr.Forbidden("Not allowed."):        http.StatusForbidden,
+		apperr.Conflict("slug_taken", "Taken."): http.StatusConflict,
+	}
+	for appErr, want := range cases {
+		handler := Handle(func(http.ResponseWriter, *http.Request) error {
+			return fmt.Errorf("wrapped: %w", appErr)
+		})
+		rec, _ := serve(handler, httptest.NewRequest(http.MethodGet, "/", nil))
+		env := decodeEnvelope(t, rec)
+		if rec.Code != want || env.Error.Code != appErr.Code || env.Error.Message != appErr.Message {
+			t.Errorf("%s: status %d envelope %+v", appErr.Code, rec.Code, env)
+		}
 	}
 }
 
