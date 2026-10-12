@@ -7,7 +7,8 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "size": "bun scripts/check-size.ts"
   },
   "dependencies": {
     "@heroui/react": "3.2.6",

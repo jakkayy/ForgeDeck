@@ -147,7 +147,7 @@ Empty states should explain the next action, e.g. “No servers yet — register
 ## 13. Performance
 
 - Split code per route so a page only loads what it uses.
-- Enforce a bundle size budget in CI and review it when adding dependencies. HeroUI and its animation dependency are the largest expected contributors; import components individually and measure.
+- Enforce a bundle size budget in CI (`bun run size`: initial JS ≤ 130 KB, CSS ≤ 15 KB, each route chunk ≤ 60 KB, all gzip) and review it when adding dependencies. HeroUI and its animation dependency are the largest expected contributors; import components individually and measure.
 - Serve hashed assets with long-lived cache headers and `index.html` with no-cache.
 - Fetch only the data needed for the current page.
 - Use pagination and server-side filtering.
@@ -176,4 +176,3 @@ Prioritize desktop for server administration, while keeping core flows usable on
 - Exact typography and color palette.
 - Whether the Overview is global or project-scoped by default.
 - Which table library is needed beyond HeroUI's components.
-- Initial bundle size budget (set after measuring the first shell build).
