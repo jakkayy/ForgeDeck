@@ -98,3 +98,48 @@ func TestProjectsRequireSignIn(t *testing.T) {
 	env := apitest.New(t)
 	env.Anonymous().Do(http.MethodGet, "/api/v1/projects", nil).RequireStatus(http.StatusUnauthorized)
 }
+
+func TestGetProjectHidesNonMemberProjects(t *testing.T) {
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	outsider, _ := env.NewUser("outsider@example.com")
+	p := createProject(t, owner, "Secret", "")
+
+	owner.Do(http.MethodGet, "/api/v1/projects/"+p.ID.String(), nil).RequireStatus(http.StatusOK)
+	outsider.Do(http.MethodGet, "/api/v1/projects/"+p.ID.String(), nil).RequireStatus(http.StatusNotFound)
+	owner.Do(http.MethodGet, "/api/v1/projects/not-a-uuid", nil).RequireStatus(http.StatusNotFound)
+}
+
+func TestUpdateProjectRequiresAdmin(t *testing.T) {
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	dev, devID := env.NewUser("dev@example.com")
+	p := createProject(t, owner, "Old Name", "")
+	env.AddMember(p.ID, devID, "developer")
+	path := "/api/v1/projects/" + p.ID.String()
+
+	dev.Do(http.MethodPatch, path, map[string]string{"name": "Hijacked"}).RequireStatus(http.StatusForbidden)
+
+	var updated projects.Project
+	owner.Do(http.MethodPatch, path, map[string]string{"name": "New Name"}).RequireStatus(http.StatusOK).Decode(&updated)
+	if updated.Name != "New Name" || updated.Slug != "old-name" {
+		t.Fatalf("got %+v", updated)
+	}
+
+	createProject(t, owner, "Other", "other")
+	owner.Do(http.MethodPatch, path, map[string]string{"slug": "other"}).RequireStatus(http.StatusUnprocessableEntity)
+}
+
+func TestDeleteProjectRequiresOwnerAndConfirmation(t *testing.T) {
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	admin, adminID := env.NewUser("admin@example.com")
+	p := createProject(t, owner, "Doomed", "doomed")
+	env.AddMember(p.ID, adminID, "admin")
+	path := "/api/v1/projects/" + p.ID.String()
+
+	admin.Do(http.MethodDelete, path, map[string]string{"confirm": "doomed"}).RequireStatus(http.StatusForbidden)
+	owner.Do(http.MethodDelete, path, map[string]string{"confirm": "wrong"}).RequireStatus(http.StatusUnprocessableEntity)
+	owner.Do(http.MethodDelete, path, map[string]string{"confirm": "doomed"}).RequireStatus(http.StatusNoContent)
+	owner.Do(http.MethodGet, path, nil).RequireStatus(http.StatusNotFound)
+}

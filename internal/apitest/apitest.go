@@ -54,6 +54,17 @@ func (e *Env) CreateUser(email string) uuid.UUID {
 	return user.ID
 }
 
+// AddMember gives userID a role in projectID directly in the database.
+func (e *Env) AddMember(projectID, userID uuid.UUID, role string) {
+	e.t.Helper()
+	err := store.New(e.Pool).AddProjectMember(context.Background(), store.AddProjectMemberParams{
+		ProjectID: projectID, UserID: userID, Role: role,
+	})
+	if err != nil {
+		e.t.Fatalf("apitest: add member: %v", err)
+	}
+}
+
 // Anonymous returns a client without a session.
 func (e *Env) Anonymous() *Client {
 	jar, _ := cookiejar.New(nil)

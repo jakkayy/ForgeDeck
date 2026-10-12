@@ -37,6 +37,33 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 	return i, err
 }
 
+const deleteProject = `-- name: DeleteProject :exec
+DELETE FROM projects WHERE id = $1
+`
+
+func (q *Queries) DeleteProject(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteProject, id)
+	return err
+}
+
+const getProject = `-- name: GetProject :one
+SELECT id, name, slug, created_by, created_at, updated_at FROM projects WHERE id = $1
+`
+
+func (q *Queries) GetProject(ctx context.Context, id uuid.UUID) (Project, error) {
+	row := q.db.QueryRow(ctx, getProject, id)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listProjectsForUser = `-- name: ListProjectsForUser :many
 SELECT projects.id, projects.name, projects.slug, projects.created_by, projects.created_at, projects.updated_at, project_members.role
 FROM projects
@@ -83,4 +110,33 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, arg ListProjectsForUs
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateProject = `-- name: UpdateProject :one
+UPDATE projects
+SET name = COALESCE($1, name),
+    slug = COALESCE($2, slug),
+    updated_at = now()
+WHERE id = $3
+RETURNING id, name, slug, created_by, created_at, updated_at
+`
+
+type UpdateProjectParams struct {
+	Name *string
+	Slug *string
+	ID   uuid.UUID
+}
+
+func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
+	row := q.db.QueryRow(ctx, updateProject, arg.Name, arg.Slug, arg.ID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

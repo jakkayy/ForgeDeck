@@ -24,6 +24,9 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/projects", httpx.Handle(h.list))
 	r.Post("/projects", httpx.Handle(h.create))
+	r.Get("/projects/{projectID}", httpx.Handle(h.get))
+	r.Patch("/projects/{projectID}", httpx.Handle(h.update))
+	r.Delete("/projects/{projectID}", httpx.Handle(h.delete))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
@@ -53,4 +56,57 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.WriteJSON(w, http.StatusCreated, project)
+}
+
+func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
+	projectID, err := httpx.UUIDParam(r, "projectID")
+	if err != nil {
+		return err
+	}
+	project, err := h.svc.Get(r.Context(), auth.UserFrom(r.Context()).ID, projectID)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, project)
+}
+
+type updateRequest struct {
+	Name *string `json:"name"`
+	Slug *string `json:"slug"`
+}
+
+func (h *Handler) update(w http.ResponseWriter, r *http.Request) error {
+	projectID, err := httpx.UUIDParam(r, "projectID")
+	if err != nil {
+		return err
+	}
+	var req updateRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	project, err := h.svc.Update(r.Context(), auth.UserFrom(r.Context()).ID, projectID, UpdateInput(req))
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, project)
+}
+
+type deleteRequest struct {
+	Confirm string `json:"confirm"`
+}
+
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
+	projectID, err := httpx.UUIDParam(r, "projectID")
+	if err != nil {
+		return err
+	}
+	var req deleteRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	if err := h.svc.Delete(r.Context(), auth.UserFrom(r.Context()).ID, projectID, req.Confirm); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
 }

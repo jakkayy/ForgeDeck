@@ -40,15 +40,19 @@ type Project struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
+// errSlugTaken is reported on the slug field when the unique index rejects it.
+var errSlugTaken = validate.Errors{"slug": "Another project already uses this slug."}
+
 // Service implements project operations.
 type Service struct {
 	pool    *pgxpool.Pool
 	queries *store.Queries
+	authz   *authz.Authorizer
 }
 
 // NewService returns a project Service.
-func NewService(pool *pgxpool.Pool) *Service {
-	return &Service{pool: pool, queries: store.New(pool)}
+func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer) *Service {
+	return &Service{pool: pool, queries: store.New(pool), authz: authorizer}
 }
 
 // CreateInput is the data needed to create a project. Slug is optional and
@@ -78,12 +82,82 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in CreateInput) 
 		})
 	})
 	if database.IsUniqueViolation(err) {
-		return Project{}, validate.Errors{"slug": "Another project already uses this slug."}
+		return Project{}, errSlugTaken
 	}
 	if err != nil {
 		return Project{}, fmt.Errorf("create project: %w", err)
 	}
 	return toProject(created, authz.RoleOwner), nil
+}
+
+// Get returns a project the user is a member of.
+func (s *Service) Get(ctx context.Context, userID, projectID uuid.UUID) (Project, error) {
+	role, err := s.authz.Require(ctx, userID, projectID, authz.ViewProject)
+	if err != nil {
+		return Project{}, err
+	}
+	p, err := s.queries.GetProject(ctx, projectID)
+	if err != nil {
+		return Project{}, fmt.Errorf("get project: %w", err)
+	}
+	return toProject(p, role), nil
+}
+
+// UpdateInput changes the fields that are non-nil.
+type UpdateInput struct {
+	Name *string
+	Slug *string
+}
+
+// Update renames a project or changes its slug.
+func (s *Service) Update(ctx context.Context, userID, projectID uuid.UUID, in UpdateInput) (Project, error) {
+	role, err := s.authz.Require(ctx, userID, projectID, authz.UpdateProject)
+	if err != nil {
+		return Project{}, err
+	}
+	params := store.UpdateProjectParams{ID: projectID}
+	errs := validate.Errors{}
+	if in.Name != nil {
+		name := strings.TrimSpace(*in.Name)
+		validateName(errs, name)
+		params.Name = &name
+	}
+	if in.Slug != nil {
+		slug := strings.TrimSpace(*in.Slug)
+		validateSlug(errs, slug)
+		params.Slug = &slug
+	}
+	if err := errs.Err(); err != nil {
+		return Project{}, err
+	}
+
+	p, err := s.queries.UpdateProject(ctx, params)
+	if database.IsUniqueViolation(err) {
+		return Project{}, errSlugTaken
+	}
+	if err != nil {
+		return Project{}, fmt.Errorf("update project: %w", err)
+	}
+	return toProject(p, role), nil
+}
+
+// Delete removes a project. confirmSlug must equal the project's slug so a
+// project is never deleted by a stray request.
+func (s *Service) Delete(ctx context.Context, userID, projectID uuid.UUID, confirmSlug string) error {
+	if _, err := s.authz.Require(ctx, userID, projectID, authz.DeleteProject); err != nil {
+		return err
+	}
+	p, err := s.queries.GetProject(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("get project: %w", err)
+	}
+	if confirmSlug != p.Slug {
+		return validate.Errors{"confirm": "Type the project slug to confirm deletion."}
+	}
+	if err := s.queries.DeleteProject(ctx, projectID); err != nil {
+		return fmt.Errorf("delete project: %w", err)
+	}
+	return nil
 }
 
 // List returns the projects userID belongs to, ordered by name.
@@ -108,18 +182,27 @@ func toProject(p store.Project, role authz.Role) Project {
 func normalizeCreateInput(in CreateInput) (name, slug string, err error) {
 	errs := validate.Errors{}
 	name = strings.TrimSpace(in.Name)
+	validateName(errs, name)
+
+	slug = strings.TrimSpace(in.Slug)
+	if slug == "" {
+		slug = slugify(name)
+	} else {
+		validateSlug(errs, slug)
+	}
+	return name, slug, errs.Err()
+}
+
+func validateName(errs validate.Errors, name string) {
 	if name == "" || utf8.RuneCountInString(name) > maxNameLength {
 		errs.Add("name", fmt.Sprintf("Name must be 1–%d characters.", maxNameLength))
 	}
+}
 
-	slug = strings.TrimSpace(in.Slug)
-	switch {
-	case slug == "":
-		slug = slugify(name)
-	case len(slug) > maxSlugLength || !validSlug.MatchString(slug):
+func validateSlug(errs validate.Errors, slug string) {
+	if len(slug) > maxSlugLength || !validSlug.MatchString(slug) {
 		errs.Add("slug", "Use lowercase letters, numbers and single hyphens.")
 	}
-	return name, slug, errs.Err()
 }
 
 // slugify derives a URL-safe slug. Names without Latin letters or digits

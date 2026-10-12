@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jakkayy/ForgeDeck/internal/auth"
+	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/config"
 	"github.com/jakkayy/ForgeDeck/internal/health"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
@@ -21,7 +22,8 @@ import (
 func NewRouter(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.Handler {
 	authService := auth.NewService(store.New(pool), time.Now)
 	authHandler := auth.NewHandler(authService, cfg.CookieSecure)
-	projectHandler := projects.NewHandler(projects.NewService(pool))
+	authorizer := authz.New(store.New(pool))
+	projectHandler := projects.NewHandler(projects.NewService(pool, authorizer))
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover)
