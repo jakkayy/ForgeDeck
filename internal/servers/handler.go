@@ -24,6 +24,7 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/servers", httpx.Handle(h.listForUser))
 	r.Get("/servers/{serverID}", httpx.Handle(h.get))
+	r.Delete("/servers/{serverID}", httpx.Handle(h.delete))
 	r.Get("/projects/{projectID}/servers", httpx.Handle(h.listForProject))
 	r.Post("/projects/{projectID}/servers/enrollment-tokens", httpx.Handle(h.createEnrollmentToken))
 }
@@ -66,6 +67,18 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.WriteJSON(w, http.StatusOK, server)
+}
+
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
+	serverID, err := httpx.UUIDParam(r, "serverID")
+	if err != nil {
+		return err
+	}
+	if err := h.svc.Delete(r.Context(), auth.UserFrom(r.Context()).ID, serverID); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
 type enrollmentTokenRequest struct {

@@ -44,6 +44,15 @@ func (q *Queries) CreateServer(ctx context.Context, arg CreateServerParams) (Ser
 	return i, err
 }
 
+const deleteServer = `-- name: DeleteServer :exec
+DELETE FROM servers WHERE id = $1
+`
+
+func (q *Queries) DeleteServer(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteServer, id)
+	return err
+}
+
 const getServer = `-- name: GetServer :one
 SELECT servers.id, servers.project_id, servers.name, servers.agent_version, servers.last_seen_at, servers.created_at, servers.updated_at, servers.docker_available, servers.docker_version, servers.cpu_percent, servers.memory_percent, servers.disk_percent, projects.name AS project_name
 FROM servers

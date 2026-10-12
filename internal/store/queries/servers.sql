@@ -37,3 +37,6 @@ JOIN projects ON projects.id = servers.project_id
 WHERE servers.project_id = @project_id
 ORDER BY servers.name, servers.id
 LIMIT @page_limit OFFSET @page_offset;
+
+-- name: DeleteServer :exec
+DELETE FROM servers WHERE id = $1;

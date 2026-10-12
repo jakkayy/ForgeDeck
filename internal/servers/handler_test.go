@@ -88,3 +88,24 @@ func TestServerListsAndDetail(t *testing.T) {
 	outsider.Do(http.MethodGet, "/api/v1/servers/"+prod.ServerID.String(), nil).RequireStatus(http.StatusNotFound)
 	outsider.Do(http.MethodGet, "/api/v1/projects/"+infra.String()+"/servers", nil).RequireStatus(http.StatusNotFound)
 }
+
+func TestDeleteServerRevokesAgent(t *testing.T) {
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	dev, devID := env.NewUser("dev@example.com")
+	projectID := owner.CreateProject("Infra")
+	env.AddMember(projectID, devID, "developer")
+	agent := env.EnrollAgent(owner, projectID, "prod-01")
+	path := "/api/v1/servers/" + agent.ServerID.String()
+	hb := agentproto.HeartbeatRequest{AgentVersion: "0.1.0", ProtocolVersion: agentproto.ProtocolVersion}
+
+	agent.Do(http.MethodPost, "/api/v1/agent/heartbeat", hb).RequireStatus(http.StatusOK)
+	dev.Do(http.MethodDelete, path, nil).RequireStatus(http.StatusForbidden)
+
+	owner.Do(http.MethodDelete, path, nil).RequireStatus(http.StatusNoContent)
+	owner.Do(http.MethodGet, path, nil).RequireStatus(http.StatusNotFound)
+	agent.Do(http.MethodPost, "/api/v1/agent/heartbeat", hb).RequireStatus(http.StatusUnauthorized)
+
+	// The name is free again, so the same host can be re-enrolled.
+	env.EnrollAgent(owner, projectID, "prod-01")
+}
