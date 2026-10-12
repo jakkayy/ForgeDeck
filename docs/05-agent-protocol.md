@@ -47,7 +47,7 @@ Heartbeat data may include:
 - Docker availability.
 - Capability/version information.
 
-The Control Plane should compute online/offline status based on last successful heartbeat and a configurable timeout. Metrics reported by the Agent are operational hints, not security evidence.
+The Control Plane sets the interval (20 seconds, returned in each heartbeat response) and computes connectivity from the last heartbeat on its own clock: `pending` (never seen), `online` (within two intervals), `unreachable` (within five minutes), `offline` (older). Metrics reported by the Agent are operational hints, not security evidence.
 
 Heartbeats stay small. Container state is sent separately as a snapshot.
 
