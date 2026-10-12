@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 )
 
@@ -131,4 +133,36 @@ func (c *Client) Snapshot(ctx context.Context, snapshot agentproto.ContainerSnap
 	var resp agentproto.SnapshotResponse
 	err := c.do(ctx, requestTimeout, "/api/v1/agent/containers/snapshot", snapshot, &resp)
 	return resp, err
+}
+
+// Claim waits up to wait for the next job; it returns (nil, nil) when none
+// arrived.
+func (c *Client) Claim(ctx context.Context, wait time.Duration) (*agentproto.Job, error) {
+	seconds := int(wait / time.Second)
+	var job agentproto.Job
+	if err := c.do(ctx, wait+requestTimeout, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &seconds}, &job); err != nil {
+		return nil, err
+	}
+	if job.ID == uuid.Nil {
+		return nil, nil
+	}
+	return &job, nil
+}
+
+// RenewLease extends the lease on a job attempt.
+func (c *Client) RenewLease(ctx context.Context, job *agentproto.Job) error {
+	return c.do(ctx, requestTimeout, "/api/v1/agent/jobs/"+job.ID.String()+"/heartbeat",
+		agentproto.LeaseRequest{Attempt: job.Attempt}, nil)
+}
+
+// SendEvents appends log events to a job attempt.
+func (c *Client) SendEvents(ctx context.Context, job *agentproto.Job, events []agentproto.LogEvent) error {
+	return c.do(ctx, requestTimeout, "/api/v1/agent/jobs/"+job.ID.String()+"/events",
+		agentproto.EventsRequest{Attempt: job.Attempt, Events: events}, nil)
+}
+
+// Complete reports the outcome of a job attempt.
+func (c *Client) Complete(ctx context.Context, job *agentproto.Job, req agentproto.CompleteRequest) error {
+	req.Attempt = job.Attempt
+	return c.do(ctx, requestTimeout, "/api/v1/agent/jobs/"+job.ID.String()+"/complete", req, nil)
 }

@@ -4,6 +4,7 @@
 //
 //	forgedeck-agent enroll --url https://forgedeck.example.com
 //	    (token from FORGEDECK_ENROLLMENT_TOKEN or the first line of stdin)
+//	forgedeck-agent run
 package main
 
 import (
@@ -19,6 +20,8 @@ import (
 	"syscall"
 
 	"github.com/jakkayy/ForgeDeck/internal/agent"
+	"github.com/jakkayy/ForgeDeck/internal/agent/docker"
+	"github.com/jakkayy/ForgeDeck/internal/logging"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -36,13 +39,15 @@ func run(args []string) error {
 	defer stop()
 
 	if len(args) == 0 {
-		return errors.New("usage: forgedeck-agent enroll [flags]")
+		return errors.New("usage: forgedeck-agent enroll|run [flags]")
 	}
 	switch args[0] {
 	case "enroll":
 		return enroll(ctx, args[1:])
+	case "run":
+		return runAgent(ctx, args[1:])
 	default:
-		return fmt.Errorf("unknown command %q (want enroll)", args[0])
+		return fmt.Errorf("unknown command %q (want enroll or run)", args[0])
 	}
 }
 
@@ -72,6 +77,35 @@ func enroll(ctx context.Context, args []string) error {
 	}
 	fmt.Fprintf(os.Stderr, "enrolled server %s; start the Agent with `forgedeck-agent run`\n", identity.ServerID)
 	return nil
+}
+
+func runAgent(ctx context.Context, args []string) error {
+	flags := flag.NewFlagSet("run", flag.ContinueOnError)
+	stateDir := flags.String("state-dir", agent.DefaultStateDir, "directory for the Agent identity")
+	logLevel := flags.String("log-level", "info", "debug, info, warn or error")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	logger, err := logging.New(os.Stderr, *logLevel, "text")
+	if err != nil {
+		return err
+	}
+
+	state, err := agent.NewState(*stateDir)
+	if err != nil {
+		return err
+	}
+	identity, err := state.Load()
+	if err != nil {
+		return err
+	}
+	engine, err := docker.New()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = engine.Close() }()
+
+	return agent.Run(ctx, identity, version, map[string]agent.Handler{}, engine, logger)
 }
 
 // enrollmentToken reads the token from the environment or stdin, never from
