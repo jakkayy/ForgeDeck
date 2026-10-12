@@ -3,6 +3,7 @@ package servers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -66,4 +67,27 @@ func (s *Service) enqueueContainerJob(ctx context.Context, userID, serverID uuid
 		return QueuedJob{}, err
 	}
 	return QueuedJob{JobID: job.ID, Status: jobs.Status(job.Status)}, nil
+}
+
+// LogRequest selects which past container output to fetch.
+type LogRequest struct {
+	TailLines  *int
+	Since      *time.Time
+	Timestamps bool
+}
+
+// RequestContainerLogs queues a bounded log fetch. The output arrives as job
+// logs, readable through the job endpoints.
+func (s *Service) RequestContainerLogs(ctx context.Context, userID, serverID uuid.UUID, containerID string, req LogRequest) (QueuedJob, error) {
+	tail := agentproto.DefaultTailLines
+	if req.TailLines != nil {
+		if *req.TailLines < 1 || *req.TailLines > agentproto.MaxTailLines {
+			return QueuedJob{}, validate.Errors{"tail_lines": fmt.Sprintf("tail_lines must be 1–%d.", agentproto.MaxTailLines)}
+		}
+		tail = *req.TailLines
+	}
+	payload := agentproto.FetchLogsPayload{
+		ContainerID: containerID, TailLines: tail, Since: req.Since, Timestamps: req.Timestamps,
+	}
+	return s.enqueueContainerJob(ctx, userID, serverID, containerID, authz.ViewProject, agentproto.JobFetchLogs, payload)
 }

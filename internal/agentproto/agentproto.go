@@ -182,3 +182,19 @@ type ContainerActionPayload struct {
 	ContainerID string `json:"container_id"`
 	Action      string `json:"action"`
 }
+
+// Log fetch limits. The Agent enforces them too, even if a payload asks for more.
+const (
+	DefaultTailLines = 500
+	MaxTailLines     = 2000
+	MaxFetchLogBytes = 1 << 20
+)
+
+// FetchLogsPayload reads a bounded range of a container's past output. The
+// Agent streams it back as job events and reports truncation in the result.
+type FetchLogsPayload struct {
+	ContainerID string     `json:"container_id"`
+	TailLines   int        `json:"tail_lines"`
+	Since       *time.Time `json:"since,omitempty"`
+	Timestamps  bool       `json:"timestamps"`
+}

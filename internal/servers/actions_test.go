@@ -60,3 +60,30 @@ func TestContainerActionRules(t *testing.T) {
 	owner.Do(http.MethodPost, base+apiContainer+"/actions", map[string]string{"action": "rm -rf"}).
 		RequireStatus(http.StatusUnprocessableEntity)
 }
+
+func TestContainerLogsQueuesBoundedFetch(t *testing.T) {
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	viewer, viewerID := env.NewUser("viewer@example.com")
+	projectID := owner.CreateProject("Infra")
+	env.AddMember(projectID, viewerID, "viewer")
+	agent := env.EnrollAgent(owner, projectID, "prod-01")
+	agent.ReportContainers(t, apiContainer)
+	path := "/api/v1/servers/" + agent.ServerID.String() + "/containers/" + apiContainer + "/logs"
+
+	viewer.Do(http.MethodPost, path, map[string]any{}).RequireStatus(http.StatusAccepted)
+	owner.Do(http.MethodPost, path, map[string]any{"tail_lines": agentproto.MaxTailLines + 1}).
+		RequireStatus(http.StatusUnprocessableEntity)
+
+	wait := 0
+	var job agentproto.Job
+	agent.Do(http.MethodPost, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).
+		RequireStatus(http.StatusOK).Decode(&job)
+	var payload agentproto.FetchLogsPayload
+	if err := json.Unmarshal(job.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if job.Type != agentproto.JobFetchLogs || payload.TailLines != agentproto.DefaultTailLines || payload.ContainerID != apiContainer {
+		t.Fatalf("job %+v payload %+v", job, payload)
+	}
+}
