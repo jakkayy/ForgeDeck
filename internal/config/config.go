@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/jakkayy/ForgeDeck/internal/keyring"
 )
 
 // Config holds the Control Plane runtime settings.
@@ -16,6 +18,8 @@ type Config struct {
 	LogLevel     string
 	LogFormat    string
 	CookieSecure bool
+	// Keyring encrypts stored credentials; parsed from FORGEDECK_SECRET_KEYS.
+	Keyring *keyring.Keyring
 }
 
 // LookupFunc matches os.LookupEnv so tests can supply their own environment.
@@ -31,6 +35,12 @@ func Load(lookup LookupFunc) (Config, error) {
 		LogFormat:    env.string("FORGEDECK_LOG_FORMAT", "json"),
 		CookieSecure: env.bool("FORGEDECK_COOKIE_SECURE", true),
 	}
+	keys, err := keyring.Parse(env.string("FORGEDECK_SECRET_KEYS", ""))
+	if err != nil {
+		env.errs = append(env.errs, fmt.Errorf("FORGEDECK_SECRET_KEYS: %w (generate a key with: openssl rand -base64 32)", err))
+	}
+	cfg.Keyring = keys
+
 	if err := errors.Join(append(env.errs, cfg.validate())...); err != nil {
 		return Config{}, err
 	}

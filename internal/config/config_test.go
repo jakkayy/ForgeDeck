@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+// testKey is a valid keyring spec; tests that are not about it include it.
+const testKey = "v1:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+
 func envOf(vars map[string]string) LookupFunc {
 	return func(key string) (string, bool) {
 		v, ok := vars[key]
@@ -15,19 +18,13 @@ func envOf(vars map[string]string) LookupFunc {
 func TestLoadAppliesDefaults(t *testing.T) {
 	cfg, err := Load(envOf(map[string]string{
 		"FORGEDECK_DATABASE_URL": "postgres://localhost/forgedeck",
+		"FORGEDECK_SECRET_KEYS":  testKey,
 	}))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	want := Config{
-		HTTPAddr:     ":8080",
-		DatabaseURL:  "postgres://localhost/forgedeck",
-		LogLevel:     "info",
-		LogFormat:    "json",
-		CookieSecure: true,
-	}
-	if cfg != want {
-		t.Fatalf("got %+v, want %+v", cfg, want)
+	if cfg.HTTPAddr != ":8080" || cfg.LogLevel != "info" || cfg.LogFormat != "json" || !cfg.CookieSecure || cfg.Keyring == nil {
+		t.Fatalf("defaults not applied: %+v", cfg)
 	}
 }
 
@@ -38,6 +35,7 @@ func TestLoadReadsOverrides(t *testing.T) {
 		"FORGEDECK_LOG_LEVEL":     "debug",
 		"FORGEDECK_LOG_FORMAT":    "text",
 		"FORGEDECK_COOKIE_SECURE": "false",
+		"FORGEDECK_SECRET_KEYS":   testKey,
 	}))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -56,7 +54,7 @@ func TestLoadReportsAllInvalidValues(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	for _, want := range []string{"FORGEDECK_COOKIE_SECURE", "FORGEDECK_LOG_LEVEL", "FORGEDECK_LOG_FORMAT", "FORGEDECK_DATABASE_URL"} {
+	for _, want := range []string{"FORGEDECK_COOKIE_SECURE", "FORGEDECK_LOG_LEVEL", "FORGEDECK_LOG_FORMAT", "FORGEDECK_DATABASE_URL", "FORGEDECK_SECRET_KEYS"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not mention %s", err, want)
 		}

@@ -21,6 +21,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/app"
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/config"
+	"github.com/jakkayy/ForgeDeck/internal/keyring"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
 )
@@ -39,7 +40,11 @@ type Env struct {
 func New(t testing.TB) *Env {
 	t.Helper()
 	pool := testdb.New(t)
-	cfg := config.Config{CookieSecure: false}
+	keys, err := keyring.Parse("test:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{CookieSecure: false, Keyring: keys}
 	ctx, cancel := context.WithCancel(context.Background())
 	server := httptest.NewServer(app.NewRouter(ctx, cfg, pool, slog.New(slog.DiscardHandler)))
 	t.Cleanup(func() {
