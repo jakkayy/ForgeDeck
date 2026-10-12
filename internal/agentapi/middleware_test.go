@@ -23,7 +23,7 @@ func TestRequireAgent(t *testing.T) {
 	projectID := owner.CreateProject("Infra")
 	agent := env.EnrollAgent(owner, projectID, "prod-01")
 
-	svc := servers.NewService(env.Pool, authz.New(store.New(env.Pool)), time.Now)
+	svc := servers.NewService(env.Pool, authz.New(store.New(env.Pool)), nil, time.Now)
 	router := chi.NewRouter()
 	router.Use(agentapi.NewHandler(context.Background(), svc, nil, nil).RequireAgent)
 	router.Get("/whoami", func(w http.ResponseWriter, r *http.Request) {

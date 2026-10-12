@@ -162,3 +162,23 @@ type CompleteRequest struct {
 	ErrorCode    string          `json:"error_code,omitempty"`
 	ErrorMessage string          `json:"error_message,omitempty"`
 }
+
+// Agent job types.
+const (
+	JobContainerAction = "container_action"
+	JobFetchLogs       = "fetch_logs"
+)
+
+// Container actions accepted by JobContainerAction.
+const (
+	ActionStart   = "start"
+	ActionStop    = "stop"
+	ActionRestart = "restart"
+)
+
+// ContainerActionPayload starts, stops, or restarts one container. Applying
+// an action that is already in effect (start a running container) succeeds.
+type ContainerActionPayload struct {
+	ContainerID string `json:"container_id"`
+	Action      string `json:"action"`
+}

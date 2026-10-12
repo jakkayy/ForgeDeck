@@ -173,6 +173,23 @@ func (e *Env) EnrollAgent(owner *Client, projectID uuid.UUID, name string) Agent
 	return Agent{EnrollResponse: enrolled, Client: client}
 }
 
+// ReportContainers sends a snapshot of running containers with the given
+// IDs (12+ lowercase hex characters) and requires it to be accepted.
+func (a Agent) ReportContainers(t testing.TB, ids ...string) {
+	t.Helper()
+	containers := make([]agentproto.Container, len(ids))
+	for i, id := range ids {
+		containers[i] = agentproto.Container{ID: id, Name: "c" + id[:6], Image: "example:1", State: "running"}
+	}
+	var resp agentproto.SnapshotResponse
+	a.Do(http.MethodPost, "/api/v1/agent/containers/snapshot", agentproto.ContainerSnapshot{
+		ObservedAt: time.Now(), Containers: containers,
+	}).RequireStatus(http.StatusOK).Decode(&resp)
+	if !resp.Accepted {
+		t.Fatal("apitest: snapshot not accepted")
+	}
+}
+
 // CreateProject creates a project owned by the client's user and returns its ID.
 func (c *Client) CreateProject(name string) uuid.UUID {
 	c.t.Helper()

@@ -15,3 +15,8 @@ UPDATE servers SET containers_observed_at = $2 WHERE id = $1;
 SELECT * FROM server_containers
 WHERE server_id = $1
 ORDER BY name, container_id;
+
+-- name: ServerHasContainer :one
+SELECT EXISTS (
+    SELECT 1 FROM server_containers WHERE server_id = $1 AND container_id = $2
+);

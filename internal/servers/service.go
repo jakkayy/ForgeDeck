@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jakkayy/ForgeDeck/internal/authz"
+	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/securetoken"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/validate"
@@ -28,12 +29,13 @@ type Service struct {
 	pool    *pgxpool.Pool
 	queries *store.Queries
 	authz   *authz.Authorizer
+	jobs    *jobs.Service
 	now     func() time.Time
 }
 
 // NewService returns a server Service; now is time.Now outside tests.
-func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, now func() time.Time) *Service {
-	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, now: now}
+func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, jobService *jobs.Service, now func() time.Time) *Service {
+	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, jobs: jobService, now: now}
 }
 
 // EnrollmentToken is a newly issued token. Token is shown once and only its

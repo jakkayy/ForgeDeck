@@ -26,6 +26,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/servers/{serverID}", httpx.Handle(h.get))
 	r.Delete("/servers/{serverID}", httpx.Handle(h.delete))
 	r.Get("/servers/{serverID}/containers", httpx.Handle(h.listContainers))
+	r.Post("/servers/{serverID}/containers/{containerID}/actions", httpx.Handle(h.containerAction))
 	r.Get("/projects/{projectID}/servers", httpx.Handle(h.listForProject))
 	r.Post("/projects/{projectID}/servers/enrollment-tokens", httpx.Handle(h.createEnrollmentToken))
 }
@@ -92,6 +93,27 @@ func (h *Handler) listContainers(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.WriteJSON(w, http.StatusOK, list)
+}
+
+type containerActionRequest struct {
+	Action string `json:"action"`
+}
+
+func (h *Handler) containerAction(w http.ResponseWriter, r *http.Request) error {
+	serverID, err := httpx.UUIDParam(r, "serverID")
+	if err != nil {
+		return err
+	}
+	var req containerActionRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	queued, err := h.svc.RequestContainerAction(r.Context(), auth.UserFrom(r.Context()).ID, serverID,
+		chi.URLParam(r, "containerID"), req.Action)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusAccepted, queued)
 }
 
 type enrollmentTokenRequest struct {

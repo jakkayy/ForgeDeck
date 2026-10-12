@@ -81,6 +81,24 @@ func (q *Queries) LockServerSnapshotTime(ctx context.Context, id uuid.UUID) (*ti
 	return containers_observed_at, err
 }
 
+const serverHasContainer = `-- name: ServerHasContainer :one
+SELECT EXISTS (
+    SELECT 1 FROM server_containers WHERE server_id = $1 AND container_id = $2
+)
+`
+
+type ServerHasContainerParams struct {
+	ServerID    uuid.UUID
+	ContainerID string
+}
+
+func (q *Queries) ServerHasContainer(ctx context.Context, arg ServerHasContainerParams) (bool, error) {
+	row := q.db.QueryRow(ctx, serverHasContainer, arg.ServerID, arg.ContainerID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const setServerSnapshotTime = `-- name: SetServerSnapshotTime :exec
 UPDATE servers SET containers_observed_at = $2 WHERE id = $1
 `
