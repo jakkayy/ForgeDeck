@@ -10,6 +10,13 @@ import (
 	"github.com/google/uuid"
 )
 
+type Agent struct {
+	ID             uuid.UUID
+	ServerID       uuid.UUID
+	CredentialHash []byte
+	CreatedAt      time.Time
+}
+
 type Project struct {
 	ID        uuid.UUID
 	Name      string
@@ -24,6 +31,16 @@ type ProjectMember struct {
 	UserID    uuid.UUID
 	Role      string
 	CreatedAt time.Time
+}
+
+type Server struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	Name         string
+	AgentVersion *string
+	LastSeenAt   *time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type Session struct {

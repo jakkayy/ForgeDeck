@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/jakkayy/ForgeDeck/internal/apperr"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/database"
 	"github.com/jakkayy/ForgeDeck/internal/store"
@@ -155,7 +156,11 @@ func (s *Service) Delete(ctx context.Context, userID, projectID uuid.UUID, confi
 	if confirmSlug != p.Slug {
 		return validate.Errors{"confirm": "Type the project slug to confirm deletion."}
 	}
-	if err := s.queries.DeleteProject(ctx, projectID); err != nil {
+	err = s.queries.DeleteProject(ctx, projectID)
+	if database.IsForeignKeyViolation(err) {
+		return apperr.Conflict("project_has_servers", "Remove this project's servers before deleting it.")
+	}
+	if err != nil {
 		return fmt.Errorf("delete project: %w", err)
 	}
 	return nil

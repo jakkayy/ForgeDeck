@@ -132,12 +132,13 @@ Use a unique constraint for environment name within an application.
 ### `servers`
 
 - `id UUID PRIMARY KEY`
-- `project_id UUID NOT NULL REFERENCES projects(id)`
+- `project_id UUID NOT NULL REFERENCES projects(id) ON DELETE RESTRICT`
 - `name TEXT NOT NULL`
-- `status TEXT NOT NULL`
 - `last_seen_at TIMESTAMPTZ`
 - `agent_version TEXT`
 - `created_at`, `updated_at`
+
+Online/offline status is computed from `last_seen_at` and the heartbeat timeout rather than stored, so it cannot go stale. A project cannot be deleted while it still has servers.
 
 A server belongs to exactly one project. Authorization for a server, its containers, and its Agent jobs is resolved through `servers.project_id` and `project_members`. Index `project_id` for project-scoped listing and use a unique constraint for server name within a project.
 
@@ -146,12 +147,11 @@ Avoid treating client-reported CPU/memory values as trusted security data.
 ### `agents`
 
 - `id UUID PRIMARY KEY`
-- `server_id UUID NOT NULL REFERENCES servers(id)`
-- `credential_hash` or secure credential reference
-- `status TEXT NOT NULL`
-- `last_heartbeat_at TIMESTAMPTZ`
-- `revoked_at TIMESTAMPTZ`
+- `server_id UUID NOT NULL UNIQUE REFERENCES servers(id) ON DELETE CASCADE`
+- `credential_hash BYTEA NOT NULL UNIQUE`
 - `created_at`
+
+One Agent identity per server. Removing a server deletes its Agent row, which revokes the credential immediately. Credential rotation (Phase 5) replaces `credential_hash` in place.
 
 Store credentials so they can be validated or rotated without exposing their raw values in ordinary database reads.
 
