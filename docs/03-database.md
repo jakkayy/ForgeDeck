@@ -313,17 +313,19 @@ The encryption key must be provided from outside the database. Avoid returning d
 
 ### `audit_logs`
 
+An append-only record of who did what. Nothing updates a row; only the retention job removes them.
+
 - `id UUID PRIMARY KEY`
-- `project_id UUID REFERENCES projects(id)`
-- `actor_user_id UUID REFERENCES users(id)`
-- `actor_agent_id UUID REFERENCES agents(id)`
-- `action TEXT NOT NULL`
-- `resource_type TEXT`
-- `resource_id UUID`
-- `metadata JSONB`
+- `project_id UUID` — **no foreign key**, so deleting a project does not erase the record of who deleted it; NULL for installation-level events
+- `actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL`
+- `actor TEXT NOT NULL` — the actor as text so the record outlives the user: an email address, or `agent`, `runner`, `system`
+- `action TEXT NOT NULL` — `<noun>.<verb>`, such as `secret.set`
+- `target_type TEXT NOT NULL`, `target_id TEXT`, `target_name TEXT`
+- `metadata JSONB NOT NULL` — non-sensitive details only; values under keys that look like credentials (`secret`, `password`, `token`, `credential`, `key`, `value`) are replaced with `[redacted]` before they are stored
+- `request_id TEXT` — ties the event to the request that caused it
 - `created_at TIMESTAMPTZ NOT NULL`
 
-Avoid putting secret values or sensitive payloads into audit metadata.
+Events are written after the action they describe has succeeded. A failure to write is logged at error level and does not fail the action: the action has already happened.
 
 ## 5. Queue transaction requirements
 

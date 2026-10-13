@@ -13,6 +13,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agentapi"
 	"github.com/jakkayy/ForgeDeck/internal/applications"
+	"github.com/jakkayy/ForgeDeck/internal/audit"
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/builds"
@@ -98,6 +99,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			appHandler.Routes(signedIn)
 			registries.NewHandler(registryService).Routes(signedIn)
 			secrets.NewHandler(secretService).Routes(signedIn)
+			audit.NewHandler(audit.NewReader(store.New(pool), authorizer)).Routes(signedIn)
 			deploymentHandler.Routes(signedIn)
 			environments.NewHandler(environments.NewService(store.New(pool), authorizer, secretService)).Routes(signedIn)
 			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)

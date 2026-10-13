@@ -87,6 +87,14 @@ See [15 — Deployments §4](15-deployments.md#4-project-secrets-phase-5).
 
 `name` is `[A-Z_][A-Z0-9_]{0,63}`; the value is 6 bytes to 4 KB. A secret is used by listing its name in an environment's `config.secrets` (the environment API rejects unknown names with `422`); the service receives it as an environment variable of that name at the next deployment.
 
+### Audit log
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/projects/{projectID}/audit-logs` | Events newest first; `?action=` filters by action; keyset `cursor`; admin or owner only |
+
+Each entry has `actor`, `action`, `target_type`, `target_id`, `target_name`, `metadata`, `request_id`, and `created_at`. See [03](03-database.md) for what is recorded and what is never put in metadata.
+
 ### Environments
 
 See [15 — Deployments](15-deployments.md) for the model and the `config` fields.

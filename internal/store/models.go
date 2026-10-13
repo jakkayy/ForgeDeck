@@ -37,6 +37,20 @@ type Application struct {
 	ImageRepository      *string
 }
 
+type AuditLog struct {
+	ID          uuid.UUID
+	ProjectID   *uuid.UUID
+	ActorUserID *uuid.UUID
+	Actor       string
+	Action      string
+	TargetType  string
+	TargetID    *string
+	TargetName  *string
+	Metadata    json.RawMessage
+	RequestID   *string
+	CreatedAt   time.Time
+}
+
 type Deployment struct {
 	ID               uuid.UUID
 	EnvironmentID    uuid.UUID
