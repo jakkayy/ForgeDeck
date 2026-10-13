@@ -9,6 +9,7 @@ import { ContainerLogs } from "../../../components/ContainerLogs";
 import { ContainerStateChip } from "../../../components/ContainerStateChip";
 import { QueryError } from "../../../components/QueryError";
 import { RemoveServerDialog } from "../../../components/RemoveServerDialog";
+import { RotateCredentialButton } from "../../../components/RotateCredentialButton";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { timeAgo } from "../../../lib/time";
 import { useHasRole } from "../../../lib/useHasRole";
@@ -83,7 +84,8 @@ function ServerSummary({ server }: { server: Server }) {
           <h1 className="text-xl font-semibold tracking-tight">{server.name}</h1>
           <ServerStatusChip status={server.status} />
           {canManage && (
-            <div className="ms-auto">
+            <div className="ms-auto flex gap-2">
+              <RotateCredentialButton server={server} />
               <RemoveServerDialog server={server} />
             </div>
           )}
