@@ -6,60 +6,25 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/http/cgi"
-	"net/http/httptest"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/applications"
 	"github.com/jakkayy/ForgeDeck/internal/builds"
 	"github.com/jakkayy/ForgeDeck/internal/config"
+	"github.com/jakkayy/ForgeDeck/internal/dockertest"
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab/gitlabtest"
+	"github.com/jakkayy/ForgeDeck/internal/gittest"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/registries"
 )
-
-const gitBackend = "/usr/lib/git-core/git-http-backend"
-
-// gitServer serves bare repositories over smart HTTP behind the fake
-// GitLab's API, so one URL works for both API calls and clones. Clones need
-// the token the fake accepts, like a private repository.
-func gitServer(t *testing.T, fake *gitlabtest.Server, token string, repos map[string]string) string {
-	t.Helper()
-	if _, err := os.Stat(gitBackend); err != nil {
-		t.Skip("git-http-backend is not installed")
-	}
-	root := t.TempDir()
-	for path, source := range repos {
-		cmd := exec.CommandContext(t.Context(), "git", "clone", "--quiet", "--bare", source, root+"/"+path)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("clone %s: %v\n%s", path, err, out)
-		}
-	}
-	backend := &cgi.Handler{Path: gitBackend, Env: []string{"GIT_PROJECT_ROOT=" + root, "GIT_HTTP_EXPORT_ALL=1"}}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.URL.Path, ".git/") {
-			fake.Config.Handler.ServeHTTP(w, r)
-			return
-		}
-		if _, password, ok := r.BasicAuth(); !ok || password != token {
-			w.Header().Set("WWW-Authenticate", "Basic")
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		backend.ServeHTTP(w, r)
-	}))
-	t.Cleanup(server.Close)
-	return server.URL
-}
 
 type buildFixture struct {
 	env       *apitest.Env
@@ -70,20 +35,23 @@ type buildFixture struct {
 	host      string
 }
 
-func newBuildFixture(t *testing.T, repos map[string]string, commits map[string]string) buildFixture {
+func newBuildFixture(t *testing.T, repos map[string]map[string]string) (buildFixture, map[string]string) {
 	t.Helper()
-	requireDocker(t)
+	dockertest.Require(t)
 	fake := gitlabtest.New(t)
 	fake.AddToken("glpat-good", gitlabtest.Token{Username: "bot", Scopes: []string{"api"}, Projects: []gitlab.Project{
 		{ID: 1, PathWithNamespace: "acme/good", DefaultBranch: "main", Visibility: "private"},
 		{ID: 2, PathWithNamespace: "acme/bad", DefaultBranch: "main", Visibility: "private"},
 	}})
-	for project, sha := range commits {
-		id := map[string]int64{"acme/good": 1, "acme/bad": 2}[project]
-		fake.AddCommit(id, "main", gitlab.Commit{ID: sha, Message: "Sample commit"})
+	git := gittest.New(t, fake, "glpat-good")
+	commits := map[string]string{}
+	for path, files := range repos {
+		sha := git.AddRepo(t, path, files)
+		commits[path] = sha
+		fake.AddCommit(map[string]int64{"acme/good": 1, "acme/bad": 2}[path], "main", gitlab.Commit{ID: sha, Message: "Sample commit"})
 	}
-	url := gitServer(t, fake, "glpat-good", repos)
-	host := startRegistry(t)
+	url := git.URL
+	host := dockertest.StartRegistry(t)
 
 	env := apitest.New(t, func(cfg *config.Config) { cfg.PublicURL = "https://forgedeck.example.com" })
 	owner, _ := env.NewUser("owner@example.com")
@@ -107,7 +75,7 @@ func newBuildFixture(t *testing.T, repos map[string]string, commits map[string]s
 		cancel()
 		<-done
 	})
-	return buildFixture{env: env, owner: owner, projectID: projectID, connID: conn.ID, registry: registry, host: host}
+	return buildFixture{env: env, owner: owner, projectID: projectID, connID: conn.ID, registry: registry, host: host}, commits
 }
 
 func (f buildFixture) build(t *testing.T, repositoryID, name, testCommand string) jobs.Job {
@@ -166,17 +134,15 @@ func registryHas(t *testing.T, host, repository string) bool {
 // fail must fail the job and push nothing.
 func TestSampleRepositoryBuilds(t *testing.T) {
 	dockerfile := "FROM busybox:1.37\nCOPY app.sh /app.sh\nCMD [\"sh\", \"/app.sh\"]\n"
-	goodSource, goodSHA := sourceRepo(t, map[string]string{"Dockerfile": dockerfile, "app.sh": "echo hello\n"})
-	badSource, badSHA := sourceRepo(t, map[string]string{"Dockerfile": dockerfile, "app.sh": "echo hello\n"})
-	f := newBuildFixture(t,
-		map[string]string{"acme/good.git": strings.TrimPrefix(goodSource, "file://"), "acme/bad.git": strings.TrimPrefix(badSource, "file://")},
-		map[string]string{"acme/good": goodSHA, "acme/bad": badSHA})
+	files := map[string]string{"Dockerfile": dockerfile, "app.sh": "echo hello\n"}
+	f, commits := newBuildFixture(t, map[string]map[string]string{"acme/good": files, "acme/bad": files})
+	goodSHA := commits["acme/good"]
 
 	good := f.build(t, "1", "good", "sh /app.sh | grep -q hello && echo tests-passed")
 	if good.Status != jobs.StatusSucceeded {
 		t.Fatalf("good build %+v\n%s", good.Error, f.logs(t, good))
 	}
-	var result BuildResult
+	var result agentproto.BuildResult
 	if err := json.Unmarshal(good.Result, &result); err != nil {
 		t.Fatal(err)
 	}

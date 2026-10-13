@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/procexec"
 )
 
 var validCommit = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
@@ -16,7 +17,7 @@ var validCommit = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
 // reaches git as an HTTP header through GIT_CONFIG_* variables, never as a
 // command argument or in the remote URL, so it does not appear in process
 // listings or .git/config.
-func checkout(ctx context.Context, exec *executor, dir string, git agentproto.GitCredentials, commit, protocols string) error {
+func checkout(ctx context.Context, exec *procexec.Executor, dir string, git agentproto.GitCredentials, commit, protocols string) error {
 	basic := base64.StdEncoding.EncodeToString([]byte(git.Username + ":" + git.Password))
 	env := []string{
 		"GIT_TERMINAL_PROMPT=0",
@@ -36,11 +37,11 @@ func checkout(ctx context.Context, exec *executor, dir string, git agentproto.Gi
 		{"-C", dir, "checkout", "--quiet", "--detach", "FETCH_HEAD"},
 	}
 	for _, args := range steps {
-		if err := exec.run(ctx, command{name: "git", args: args, env: env}); err != nil {
+		if err := exec.Run(ctx, procexec.Command{Name: "git", Args: args, Env: env}); err != nil {
 			return fmt.Errorf("git %s: %w", args[len(args)-1], err)
 		}
 	}
-	head, err := exec.output(ctx, command{name: "git", args: []string{"-C", dir, "rev-parse", "HEAD"}, env: env})
+	head, err := exec.Output(ctx, procexec.Command{Name: "git", Args: []string{"-C", dir, "rev-parse", "HEAD"}, Env: env})
 	if err != nil {
 		return fmt.Errorf("read checked out commit: %w", err)
 	}

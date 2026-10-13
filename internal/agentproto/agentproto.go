@@ -5,9 +5,12 @@ package agentproto
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/jakkayy/ForgeDeck/internal/servicecfg"
 )
 
 // ProtocolVersion is the Agent protocol spoken by this build.
@@ -107,6 +110,28 @@ type Job struct {
 	// Credentials are minted for this attempt of a build job. They are sent
 	// only in the claim response, never stored or logged.
 	Credentials *BuildCredentials `json:"credentials,omitempty"`
+	// Deploy is added to a claimed deploy_image job. It is never stored.
+	Deploy *DeployContext `json:"deploy,omitempty"`
+}
+
+// DeployContext is what an Agent needs to run one deployment beyond its payload.
+type DeployContext struct {
+	// Registry holds credentials for the one registry that hosts the image,
+	// and for no other. It is nil when the project has no registry for that
+	// host, in which case the Agent pulls anonymously.
+	Registry *RegistryCredentials `json:"registry,omitempty"`
+	// Previous is the environment's current release when the job was
+	// claimed. If the new version does not become healthy, the Agent
+	// restores it.
+	Previous *PreviousRelease `json:"previous,omitempty"`
+}
+
+// PreviousRelease is a release the Agent can restore.
+type PreviousRelease struct {
+	ReleaseID uuid.UUID         `json:"release_id"`
+	CommitSHA string            `json:"commit_sha"`
+	ImageRef  string            `json:"image_ref"`
+	Config    servicecfg.Config `json:"config"`
 }
 
 // BuildCredentials let a Runner fetch one repository and push its image.
@@ -191,12 +216,66 @@ type CompleteRequest struct {
 	ErrorMessage string          `json:"error_message,omitempty"`
 }
 
-// Job types. Agents run container jobs; Runners run builds.
+// Job types. Agents run container and deployment jobs; Runners run builds.
 const (
 	JobContainerAction = "container_action"
 	JobFetchLogs       = "fetch_logs"
+	JobDeployImage     = "deploy_image"
 	JobBuild           = "build"
 )
+
+// BuildResult is a successful build's job result. Deployments use
+// ImageRef, which pins the exact image pushed.
+type BuildResult struct {
+	CommitSHA string `json:"commit_sha"`
+	Image     string `json:"image"`     // e.g. ghcr.io/acme/shop-api
+	Tag       string `json:"tag"`       // short commit SHA
+	Digest    string `json:"digest"`    // sha256:…
+	ImageRef  string `json:"image_ref"` // Image@Digest
+}
+
+// Stages of a deployment. The Agent tags the log lines of each stage
+// ("[pull] Pulling …") so the Control Plane can show progress while the job
+// runs.
+const (
+	StagePull        = "pull"
+	StageStart       = "start"
+	StageHealthCheck = "health_check"
+)
+
+// StageLine formats a system log line that belongs to a deployment stage.
+func StageLine(stage, message string) string {
+	return "[" + stage + "] " + message
+}
+
+// StageOfLine returns the stage a StageLine belongs to, or "" for other lines.
+func StageOfLine(line string) string {
+	for _, stage := range []string{StagePull, StageStart, StageHealthCheck} {
+		if strings.HasPrefix(line, "["+stage+"] ") {
+			return stage
+		}
+	}
+	return ""
+}
+
+// DeployResult is a successful deploy_image job's result.
+type DeployResult struct {
+	ImageRef    string `json:"image_ref"`
+	ContainerID string `json:"container_id"`
+}
+
+// DeployImagePayload deploys one image digest to one environment on the
+// Agent's server. It never carries secrets: registry credentials are added
+// to the claimed job, not stored in the payload. The Agent re-validates
+// Config before rendering it.
+type DeployImagePayload struct {
+	DeploymentID  uuid.UUID         `json:"deployment_id"`
+	EnvironmentID uuid.UUID         `json:"environment_id"`
+	ApplicationID uuid.UUID         `json:"application_id"`
+	CommitSHA     string            `json:"commit_sha"`
+	ImageRef      string            `json:"image_ref"` // registry/repo@sha256:…
+	Config        servicecfg.Config `json:"config"`
+}
 
 // BuildPayload builds and pushes an image for one commit. The Runner checks
 // out exactly CommitSHA, never the moving branch.
@@ -211,7 +290,17 @@ type BuildPayload struct {
 	DockerfilePath     string    `json:"dockerfile_path"`
 	BuildContext       string    `json:"build_context"`
 	TestCommand        *string   `json:"test_command,omitempty"`
+	// Trigger says why the build exists: TriggerPush, TriggerManual (branch
+	// head), or TriggerCommit (an explicit commit, which is not auto-deployed).
+	Trigger string `json:"trigger,omitempty"`
 }
+
+// Build triggers.
+const (
+	TriggerPush   = "push"
+	TriggerManual = "manual"
+	TriggerCommit = "commit"
+)
 
 // Container actions accepted by JobContainerAction.
 const (

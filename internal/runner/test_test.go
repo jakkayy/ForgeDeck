@@ -6,10 +6,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jakkayy/ForgeDeck/internal/dockertest"
 )
 
 func TestRunTestsIsolatesAndReportsFailure(t *testing.T) {
-	requireDocker(t)
+	dockertest.Require(t)
 	ws, _ := newWorkspace(t.TempDir())
 	t.Cleanup(func() { _ = ws.remove() })
 	image := "busybox:1.37"
@@ -36,7 +38,7 @@ func TestRunTestsIsolatesAndReportsFailure(t *testing.T) {
 }
 
 func TestRunTestsRemovesContainerWhenCancelled(t *testing.T) {
-	requireDocker(t)
+	dockertest.Require(t)
 	ws, _ := newWorkspace(t.TempDir())
 	t.Cleanup(func() { _ = ws.remove() })
 	name := "forgedeck-test-cancelled"

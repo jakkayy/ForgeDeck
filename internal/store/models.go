@@ -37,6 +37,25 @@ type Application struct {
 	ImageRepository      *string
 }
 
+type Deployment struct {
+	ID               uuid.UUID
+	EnvironmentID    uuid.UUID
+	JobID            *uuid.UUID
+	SourceBuildJobID *uuid.UUID
+	SourceReleaseID  *uuid.UUID
+	CommitSha        string
+	ImageRef         string
+	Config           json.RawMessage
+	Status           string
+	Stage            *string
+	ErrorCode        *string
+	ErrorMessage     *string
+	CreatedBy        *uuid.UUID
+	CreatedAt        time.Time
+	StartedAt        *time.Time
+	FinishedAt       *time.Time
+}
+
 type EnrollmentToken struct {
 	ID         uuid.UUID
 	ProjectID  uuid.UUID
@@ -47,6 +66,19 @@ type EnrollmentToken struct {
 	ExpiresAt  time.Time
 	UsedAt     *time.Time
 	ServerID   *uuid.UUID
+}
+
+type Environment struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	Name          string
+	ServerID      uuid.UUID
+	AutoDeploy    bool
+	Config        json.RawMessage
+	PublishedPort *int32
+	CreatedBy     *uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type GitConnection struct {
@@ -135,6 +167,17 @@ type RegistryConnection struct {
 	PasswordKeyID      string
 	CreatedBy          *uuid.UUID
 	CreatedAt          time.Time
+}
+
+type Release struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	EnvironmentID uuid.UUID
+	DeploymentID  uuid.UUID
+	CommitSha     string
+	ImageRef      string
+	Config        json.RawMessage
+	CreatedAt     time.Time
 }
 
 type Runner struct {

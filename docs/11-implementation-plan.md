@@ -287,6 +287,19 @@ Added during Phase 3 (each shipped inside the commit of the item it supports, no
 | 4.17 | E2E: golden path ครบ | `test: add golden path end-to-end test` |
 | 4.18 | เอกสารความเสี่ยงของ persistent volume และ DB migration | `docs: document volume and migration rollback risks` |
 
+Added during Phase 4 (each shipped inside the commit of the item it supports, except the last):
+
+| # | งาน | อยู่ใน commit ของ |
+|---|---|---|
+| 4.2b | แพ็กเกจ `internal/servicecfg` (config ของ service + validation ที่ Control Plane และ Agent ใช้ร่วมกัน) | 4.3 |
+| 4.5b | `jobs.EnqueueIn` (enqueue ใน transaction ของผู้เรียก) และ `jobs.OnSucceeded` (hook ที่รันใน transaction เดียวกับการบันทึกผล job); permission `deployments.run` (developer ขึ้นไป); `deploy_image` retry 2 ครั้ง | 4.5 |
+| 4.6b | field `trigger` ใน build payload (`push`/`manual`/`commit`) และ guard กัน build เก่ามาทับ build ใหม่ | 4.6 |
+| 4.8b | ย้าย `BuildResult` ไป `agentproto`; แยก `internal/procexec` (ตัวรันคำสั่งที่ Runner กับ Agent ใช้ร่วมกัน), `worker.NewRedactingLog`, และตัวช่วยเทสต์ `internal/dockertest`, `internal/gittest` | 4.9, 4.17 |
+| 4.9b | ตัด label ต่อ deployment ออกจาก Compose file (ทำให้ container ถูก restart ทุกครั้งที่ deploy ซ้ำ ซึ่งเทสต์กับ Docker จริงจับได้) | 4.9 |
+| 4.11b | `GET /environments/{id}/releases`, `stage` ของ deployment (จาก log ที่ Agent แท็ก `[pull]`…) และ `release_id` | 4.11 |
+| 4.12b | ตรวจ port ชนกับ environment อื่นก่อน rollback (`409 port_in_use`) | 4.12 |
+| 4.17b | แก้บั๊ก UI ที่พบตอนตรวจในเบราว์เซอร์: "Running now" และ Release history ค้างข้อมูลเก่าหลัง deployment สำเร็จ | `fix(web): refresh releases when a deployment finishes` |
+
 ---
 
 ## Phase 5 — Production hardening

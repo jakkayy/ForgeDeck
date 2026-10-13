@@ -25,7 +25,7 @@ var (
 
 // NewJob describes the build of one commit of app. Webhook builds add an
 // idempotency key so a redelivered push is built once.
-func NewJob(app store.Application, branch, commitSHA, commitMessage string) jobs.NewJob {
+func NewJob(app store.Application, branch, commitSHA, commitMessage, trigger string) jobs.NewJob {
 	return jobs.NewJob{
 		ProjectID:     app.ProjectID,
 		ApplicationID: &app.ID,
@@ -42,6 +42,7 @@ func NewJob(app store.Application, branch, commitSHA, commitMessage string) jobs
 			DockerfilePath:     app.DockerfilePath,
 			BuildContext:       app.BuildContext,
 			TestCommand:        app.TestCommand,
+			Trigger:            trigger,
 		},
 	}
 }
@@ -100,7 +101,11 @@ func (s *Service) Trigger(ctx context.Context, userID, applicationID uuid.UUID, 
 		return Queued{}, fmt.Errorf("find active build: %w", err)
 	}
 
-	job := NewJob(app, app.Branch, commit.SHA, firstLine(commit.Message))
+	trigger := agentproto.TriggerManual
+	if commitSHA != "" {
+		trigger = agentproto.TriggerCommit
+	}
+	job := NewJob(app, app.Branch, commit.SHA, firstLine(commit.Message), trigger)
 	job.CreatedBy = &userID
 	stored, err := s.jobs.Enqueue(ctx, job)
 	if err != nil {

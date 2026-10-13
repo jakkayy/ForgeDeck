@@ -118,7 +118,7 @@ func TestWorkerRunsHandlersAndReportsOutcome(t *testing.T) {
 	if crash := f.waitForJob(t, f.enqueue(t, "crash")); crash.Error == nil || crash.Error.Code != "worker_error" {
 		t.Fatalf("crash job %+v", crash)
 	}
-	if unknown := f.waitForJob(t, f.enqueue(t, "deploy_image")); unknown.Error == nil || unknown.Error.Code != "unsupported_job_type" {
+	if unknown := f.waitForJob(t, f.enqueue(t, "rotate_certificates")); unknown.Error == nil || unknown.Error.Code != "unsupported_job_type" {
 		t.Fatalf("unknown job %+v", unknown)
 	}
 	if len(afterJobs) != 4 {

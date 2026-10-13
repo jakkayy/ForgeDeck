@@ -139,11 +139,12 @@ Credentials are not checked when stored; the Runner's first push reports a bad p
 - `application_id UUID NOT NULL REFERENCES applications(id)`
 - `name TEXT NOT NULL`
 - `server_id UUID REFERENCES servers(id)`
-- `compose_config` or a validated configuration reference
-- `health_check_config JSONB`
+- `auto_deploy BOOLEAN NOT NULL DEFAULT false`
+- `config JSONB NOT NULL` — the validated service configuration ([15](15-deployments.md)); there is no user-supplied Compose file
+- `published_port` and `server_id` back a unique index so two environments cannot claim the same host port
 - `created_at`, `updated_at`
 
-Use a unique constraint for environment name within an application.
+Use a unique constraint for environment name within an application. The server must belong to the application's project.
 
 ### `servers`
 
@@ -258,20 +259,34 @@ Record each attempt separately so retries do not erase prior failures:
 
 Ensure ordering and duplicate handling. Define retention/cleanup; logs can grow quickly.
 
-### `releases`
+### `deployments`
+
+One attempt to put an image digest into an environment; every attempt is kept ([15](15-deployments.md)).
 
 - `id UUID PRIMARY KEY`
-- `application_id UUID NOT NULL REFERENCES applications(id)`
-- `environment_id UUID NOT NULL REFERENCES environments(id)`
-- `job_id UUID REFERENCES jobs(id)`
+- `environment_id UUID NOT NULL REFERENCES environments(id) ON DELETE CASCADE`
+- `job_id UUID UNIQUE REFERENCES jobs(id) ON DELETE SET NULL` — the `deploy_image` job
+- `source_build_job_id UUID`, `source_release_id UUID` — a succeeded build, or an earlier release when rolling back
 - `commit_sha TEXT NOT NULL`
-- `image_reference TEXT NOT NULL`
-- `image_digest TEXT`
-- `status TEXT NOT NULL`
-- `deployed_at TIMESTAMPTZ`
+- `image_ref TEXT NOT NULL` — must end in `@sha256:<64 hex>`; a mutable tag is never deployed
+- `config JSONB NOT NULL` — the service configuration this deployment applies
+- `status` (`queued`, `running`, `succeeded`, `failed`, `cancelled`), `stage` (`pull`, `start`, `health_check`), `error_code`, `error_message`
+- `created_by`, `created_at`, `started_at`, `finished_at`
+
+### `releases`
+
+A deployment that passed its health check. Immutable; a failed deployment is never a release. A rollback restores the release's image and `config` snapshot.
+
+- `id UUID PRIMARY KEY`
+- `application_id UUID NOT NULL REFERENCES applications(id) ON DELETE CASCADE`
+- `environment_id UUID NOT NULL REFERENCES environments(id) ON DELETE CASCADE`
+- `deployment_id UUID NOT NULL UNIQUE REFERENCES deployments(id) ON DELETE CASCADE`
+- `commit_sha TEXT NOT NULL`
+- `image_ref TEXT NOT NULL` — `registry/repo@sha256:…`
+- `config JSONB NOT NULL` — snapshot
 - `created_at TIMESTAMPTZ NOT NULL`
 
-Rollback should target a previously recorded immutable image digest when possible.
+The current release of an environment is its newest row. Rollback targets a previously recorded immutable digest.
 
 ### `webhook_events`
 
@@ -336,5 +351,5 @@ Do not delete release records that are required for rollback without an explicit
 - Whether projects are owned by a user or by an explicit organization table. (Servers belong to projects in MVP; moving them to organization scope later requires a migration.)
 - Exact schema for encrypted Git provider credentials.
 - Whether logs begin in PostgreSQL or use an append-only file/object storage backend.
-- How environment variables are versioned and associated with releases.
+- How environment variables are versioned and associated with releases. *(Resolved for plain variables: each release stores a configuration snapshot, see [15](15-deployments.md). Secrets follow in Phase 5.)*
 - Whether server metrics are stored historically or only current values are retained.

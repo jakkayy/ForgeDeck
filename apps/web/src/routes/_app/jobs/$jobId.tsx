@@ -26,6 +26,7 @@ function JobPage() {
     <div className="flex h-[calc(100dvh-8rem)] flex-col gap-4">
       <JobHeader job={job} />
       {job.type === "build" && <BuildSummary job={job} />}
+      {job.type === "deploy_image" && <DeploySummary job={job} />}
       {job.error && (
         <Alert status="danger">
           <Alert.Content>
@@ -76,6 +77,28 @@ function BuildSummary({ job }: { job: Job }) {
       </p>
       {result && <CopyField label="image reference" value={result.image_ref} />}
     </div>
+  );
+}
+
+type DeployPayload = { environment_id: string; commit_sha: string; image_ref: string };
+
+/** What a deployment ships and where, with a way back to its environment. */
+function DeploySummary({ job }: { job: Job }) {
+  const payload = job.payload as DeployPayload;
+  return (
+    <p className="text-sm">
+      <Link
+        to="/environments/$environmentId"
+        params={{ environmentId: payload.environment_id }}
+        className="text-[var(--muted)] hover:text-[var(--foreground)] hover:underline"
+      >
+        Environment
+      </Link>
+      <span className="text-[var(--muted)]"> · </span>
+      <code className="font-mono">{payload.commit_sha.slice(0, 12)}</code>
+      <span className="text-[var(--muted)]"> · </span>
+      <code className="break-all font-mono text-xs">{payload.image_ref}</code>
+    </p>
   );
 }
 

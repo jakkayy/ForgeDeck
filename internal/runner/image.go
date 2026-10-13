@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/jakkayy/ForgeDeck/internal/procexec"
 )
 
 // buildImage builds the application's Dockerfile with BuildKit and tags the
 // result as tag. BuildKit runs RUN steps in containers without host mounts.
-func buildImage(ctx context.Context, exec *executor, src, dockerfile, buildContext, commit, tag string) error {
+func buildImage(ctx context.Context, exec *procexec.Executor, src, dockerfile, buildContext, commit, tag string) error {
 	dockerfilePath, err := resolveInside(src, dockerfile)
 	if err != nil {
 		return fmt.Errorf("dockerfile: %w", err)
@@ -20,16 +22,16 @@ func buildImage(ctx context.Context, exec *executor, src, dockerfile, buildConte
 	if err != nil {
 		return fmt.Errorf("build context: %w", err)
 	}
-	return exec.run(ctx, command{
-		name: "docker",
-		args: []string{
+	return exec.Run(ctx, procexec.Command{
+		Name: "docker",
+		Args: []string{
 			"build", "--progress=plain",
 			"--file", dockerfilePath,
 			"--tag", tag,
 			"--label", "org.opencontainers.image.revision=" + commit,
 			"--", contextPath,
 		},
-		env: []string{"DOCKER_BUILDKIT=1"},
+		Env: []string{"DOCKER_BUILDKIT=1"},
 	})
 }
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 	"time"
+
+	"github.com/jakkayy/ForgeDeck/internal/procexec"
 )
 
 // TestLimits bound a test container.
@@ -23,15 +25,15 @@ const removeContainerTimeout = 30 * time.Second
 // capabilities, and bounded CPU, memory, and processes. It is named so it
 // can be removed even when the job is cancelled mid-run, which only kills
 // the docker CLI.
-func runTests(ctx context.Context, exec *executor, image, name, testCommand string, limits TestLimits) error {
+func runTests(ctx context.Context, exec *procexec.Executor, image, name, testCommand string, limits TestLimits) error {
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeContainerTimeout)
 		defer cancel()
-		_, _ = exec.output(cleanup, command{name: "docker", args: []string{"rm", "--force", name}})
+		_, _ = exec.Output(cleanup, procexec.Command{Name: "docker", Args: []string{"rm", "--force", name}})
 	}()
-	return exec.run(ctx, command{
-		name: "docker",
-		args: []string{
+	return exec.Run(ctx, procexec.Command{
+		Name: "docker",
+		Args: []string{
 			"run", "--rm", "--name", name,
 			"--network", "none",
 			"--cpus", limits.CPUs,

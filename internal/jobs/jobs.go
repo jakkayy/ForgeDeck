@@ -43,12 +43,25 @@ const NotifyChannel = "forgedeck_jobs"
 
 const runnerNotifyKey = "runner"
 
+// SuccessHook runs inside the transaction that records a job's successful
+// outcome, so what it creates exists exactly when the outcome does. A hook
+// that can fail for reasons of its own must isolate that failure (for
+// example with a savepoint): a returned error aborts the completion.
+type SuccessHook func(ctx context.Context, tx pgx.Tx, job store.Job) error
+
 // Service implements the job queue.
 type Service struct {
-	pool    *pgxpool.Pool
-	queries *store.Queries
-	authz   *authz.Authorizer
-	now     func() time.Time
+	pool        *pgxpool.Pool
+	queries     *store.Queries
+	authz       *authz.Authorizer
+	now         func() time.Time
+	onSucceeded []SuccessHook
+}
+
+// OnSucceeded registers a hook for jobs that succeed. Call it while wiring
+// the application, before the Service handles requests.
+func (s *Service) OnSucceeded(hook SuccessHook) {
+	s.onSucceeded = append(s.onSucceeded, hook)
 }
 
 // NewService returns a job Service; now is time.Now outside tests.
@@ -83,6 +96,29 @@ func (s *Service) Enqueue(ctx context.Context, job NewJob) (store.Job, error) {
 
 // EnqueueOnce is Enqueue that also reports whether a new job was created.
 func (s *Service) EnqueueOnce(ctx context.Context, job NewJob) (store.Job, bool, error) {
+	var stored store.Job
+	isNew := true
+	err := database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		stored, isNew, err = s.enqueue(ctx, s.queries.WithTx(tx), job)
+		return err
+	})
+	return stored, isNew, err
+}
+
+// EnqueueIn queues job inside the caller's transaction, so the job exists
+// exactly when the caller's own rows do. Workers are woken when tx commits.
+// Idempotency keys are not supported here: callers that need them use
+// EnqueueOnce.
+func (s *Service) EnqueueIn(ctx context.Context, tx pgx.Tx, job NewJob) (store.Job, error) {
+	if job.IdempotencyKey != "" {
+		return store.Job{}, errors.New("EnqueueIn does not support idempotency keys")
+	}
+	stored, _, err := s.enqueue(ctx, s.queries.WithTx(tx), job)
+	return stored, err
+}
+
+func (s *Service) enqueue(ctx context.Context, q *store.Queries, job NewJob) (store.Job, bool, error) {
 	payload, err := json.Marshal(job.Payload)
 	if err != nil {
 		return store.Job{}, false, fmt.Errorf("encode job payload: %w", err)
@@ -92,33 +128,28 @@ func (s *Service) EnqueueOnce(ctx context.Context, job NewJob) (store.Job, bool,
 		key = &job.IdempotencyKey
 	}
 
-	var stored store.Job
-	isNew := true
-	err = database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
-		q := s.queries.WithTx(tx)
-		var err error
-		stored, err = q.InsertJob(ctx, store.InsertJobParams{
-			ProjectID:      job.ProjectID,
-			ApplicationID:  job.ApplicationID,
-			Type:           job.Type,
-			WorkerKind:     string(job.WorkerKind),
-			TargetServerID: job.TargetServerID,
-			Payload:        payload,
-			MaxAttempts:    maxAttempts(job.Type, job.MaxAttempts),
-			IdempotencyKey: key,
-			CreatedBy:      job.CreatedBy,
-		})
-		if errors.Is(err, pgx.ErrNoRows) && key != nil {
-			isNew = false
-			stored, err = q.GetJobByIdempotencyKey(ctx, store.GetJobByIdempotencyKeyParams{ProjectID: job.ProjectID, IdempotencyKey: key})
-			return err
-		}
-		if err != nil {
-			return fmt.Errorf("insert job: %w", err)
-		}
-		return q.NotifyWorkers(ctx, store.NotifyWorkersParams{Channel: NotifyChannel, Payload: notifyKey(job)})
+	stored, err := q.InsertJob(ctx, store.InsertJobParams{
+		ProjectID:      job.ProjectID,
+		ApplicationID:  job.ApplicationID,
+		Type:           job.Type,
+		WorkerKind:     string(job.WorkerKind),
+		TargetServerID: job.TargetServerID,
+		Payload:        payload,
+		MaxAttempts:    maxAttempts(job.Type, job.MaxAttempts),
+		IdempotencyKey: key,
+		CreatedBy:      job.CreatedBy,
 	})
-	return stored, isNew, err
+	if errors.Is(err, pgx.ErrNoRows) && key != nil {
+		existing, err := q.GetJobByIdempotencyKey(ctx, store.GetJobByIdempotencyKeyParams{ProjectID: job.ProjectID, IdempotencyKey: key})
+		return existing, false, err
+	}
+	if err != nil {
+		return store.Job{}, false, fmt.Errorf("insert job: %w", err)
+	}
+	if err := q.NotifyWorkers(ctx, store.NotifyWorkersParams{Channel: NotifyChannel, Payload: notifyKey(job)}); err != nil {
+		return store.Job{}, false, err
+	}
+	return stored, true, nil
 }
 
 func notifyKey(job NewJob) string {

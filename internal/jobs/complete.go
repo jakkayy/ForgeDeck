@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
@@ -52,8 +53,26 @@ func (s *Service) Complete(ctx context.Context, lease Lease, req agentproto.Comp
 		if err != nil {
 			return err
 		}
+		if req.Outcome == agentproto.OutcomeSucceeded && len(s.onSucceeded) > 0 {
+			if err := s.runSuccessHooks(ctx, tx, q, lease.JobID); err != nil {
+				return err
+			}
+		}
 		return notifyJob(ctx, q, lease.JobID)
 	})
+}
+
+func (s *Service) runSuccessHooks(ctx context.Context, tx pgx.Tx, q *store.Queries, jobID uuid.UUID) error {
+	job, err := q.GetJob(ctx, jobID)
+	if err != nil {
+		return fmt.Errorf("load completed job: %w", err)
+	}
+	for _, hook := range s.onSucceeded {
+		if err := hook(ctx, tx, job); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) checkAlreadyCompleted(ctx context.Context, q *store.Queries, lease Lease, outcome string) error {

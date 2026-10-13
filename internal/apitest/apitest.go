@@ -21,6 +21,8 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/app"
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/config"
+	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab"
+	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab/gitlabtest"
 	"github.com/jakkayy/ForgeDeck/internal/keyring"
 	"github.com/jakkayy/ForgeDeck/internal/runners"
 	"github.com/jakkayy/ForgeDeck/internal/safehttp"
@@ -51,7 +53,11 @@ func New(t testing.TB, options ...Option) *Env {
 		t.Fatal(err)
 	}
 	// Fakes for Git providers listen on 127.0.0.1, which production blocks.
-	cfg := config.Config{CookieSecure: false, Keyring: keys, Outbound: safehttp.Policy{AllowLoopback: true}}
+	cfg := config.Config{
+		CookieSecure: false, Keyring: keys, Outbound: safehttp.Policy{AllowLoopback: true},
+		// GitLab applications register a webhook that points here.
+		PublicURL: "https://forgedeck.example.com",
+	}
 	for _, option := range options {
 		option(&cfg)
 	}
@@ -239,6 +245,29 @@ func (e *Env) NewRunner(name string) Runner {
 	client := e.Anonymous()
 	client.bearer = credential
 	return Runner{Credential: credential, Client: client}
+}
+
+// CreateApplication creates an application named name in projectID, backed by
+// a fake GitLab with one repository, and returns its ID. The caller must be
+// an admin of the project.
+func (e *Env) CreateApplication(owner *Client, projectID uuid.UUID, name string) uuid.UUID {
+	e.t.Helper()
+	fake := gitlabtest.New(e.t)
+	fake.AddToken("glpat-test", gitlabtest.Token{Username: "bot", Scopes: []string{"api"}, Projects: []gitlab.Project{
+		{ID: 77, PathWithNamespace: "acme/shop", DefaultBranch: "main", Visibility: "private"},
+	}})
+	base := "/api/v1/projects/" + projectID.String()
+	var conn struct {
+		ID uuid.UUID `json:"id"`
+	}
+	owner.Do(http.MethodPost, base+"/git-connections/gitlab", map[string]string{"base_url": fake.URL, "token": "glpat-test"}).
+		RequireStatus(http.StatusCreated).Decode(&conn)
+	var app struct {
+		ID uuid.UUID `json:"id"`
+	}
+	owner.Do(http.MethodPost, base+"/applications", map[string]any{"name": name, "git_connection_id": conn.ID, "repository_id": "77"}).
+		RequireStatus(http.StatusCreated).Decode(&app)
+	return app.ID
 }
 
 // CreateProject creates a project owned by the client's user and returns its ID.

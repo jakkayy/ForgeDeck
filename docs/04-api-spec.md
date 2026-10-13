@@ -75,6 +75,20 @@ See [13 — Git Providers](13-git-providers.md) for provider setup.
 
 An application's image destination is `registry_connection_id` plus `image_repository` (e.g. `acme/shop-api`, no host or tag), set together on create or update; `"image_repository": ""` removes both. The registry must belong to the application's project. Registry passwords are write-only.
 
+### Environments
+
+See [15 — Deployments](15-deployments.md) for the model and the `config` fields.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/applications/{applicationID}/environments` | List environments |
+| POST | `/applications/{applicationID}/environments` | Create: `name`, `server_id`, optional `auto_deploy`, optional `config` (admin) |
+| GET | `/environments/{environmentID}` | Get |
+| PATCH | `/environments/{environmentID}` | Change `name`, `server_id`, `auto_deploy`, or replace `config` (admin) |
+| DELETE | `/environments/{environmentID}` | Delete; volumes on the server are left in place (admin) |
+
+`config` is validated and returned with defaults filled (loopback bind, `unless-stopped`, a health check). The server must belong to the application's project, and a published port may be used once per server (`422` otherwise). A server with environments cannot be removed (`409 server_in_use`). Unknown `config` fields are rejected.
+
 ## 6. Servers and containers
 
 Servers belong to a project. Every server-scoped endpoint resolves the project through `servers.project_id` and checks the caller's membership and role.
@@ -158,7 +172,7 @@ Never accept a client-supplied Docker socket, host address, or Docker API path.
 
 Follow it like any job (`GET /jobs/{jobID}`, `/events`). A succeeded build's `result` holds `image`, `tag`, `digest`, and `image_ref` ([14](14-runner.md)).
 
-A deployment request should specify a validated commit or previously built image, target environment, and optional safe configuration overrides. Do not accept arbitrary shell commands as a deployment payload.
+`POST /environments/{environmentID}/deployments` (developer or higher) takes `{ "build_job_id": "<uuid>" }`: a **succeeded build of the same application**, whose result holds an image digest. The deployment uses the environment's current configuration and the image's digest, never a tag. It returns `202` with the deployment (`status: queued`) and queues a `deploy_image` job for the environment's server, in one transaction. `422` if the build is not usable (still running, failed, another application's, or without a digest). A deployment follows its job: `queued → running → succeeded | failed`, with `error.code` and `error.message` on failure. While it runs, `stage` is the newest of `pull`, `start`, `health_check` that the Agent reported (its log lines are tagged `[pull] …`); once it failed, `stage` is where, taken from the error code (`registry_login_failed`/`pull_failed` → `pull`, `start_failed` → `start`, `health_check_failed` → `health_check`). A deployment that passed its health check gets a `release_id`. `GET /deployments/{deploymentID}` and `GET /environments/{environmentID}/deployments` (paginated, newest first) read it. Environments with `auto_deploy` also get a deployment whenever a build succeeds ([15](15-deployments.md)); such a deployment has no `created_by`. `GET /environments/{environmentID}/releases` lists releases newest first (paginated); each has `commit_sha`, `image_ref`, the `config` snapshot it ran with, and `current: true` for the newest. A release is recorded in the same transaction that records the successful `deploy_image` job, so a release exists exactly when its deployment became healthy. `POST /releases/{releaseID}/rollback` (developer or higher) redeploys a release's digest and configuration snapshot as a new deployment (`202`, same shape as a deployment, with `source_release_id`). `409 port_in_use` if another environment on the server now publishes the release's port. See [15](15-deployments.md#rollback). Arbitrary shell commands are never accepted as a deployment payload.
 
 ## 8. Webhooks
 

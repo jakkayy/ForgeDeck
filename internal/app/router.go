@@ -17,6 +17,8 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/builds"
 	"github.com/jakkayy/ForgeDeck/internal/config"
+	"github.com/jakkayy/ForgeDeck/internal/deployments"
+	"github.com/jakkayy/ForgeDeck/internal/environments"
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
 	"github.com/jakkayy/ForgeDeck/internal/health"
@@ -46,7 +48,6 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	notifier := jobs.NewNotifier(pool, logger)
 	go notifier.Run(ctx)
 	go jobService.RunRecovery(ctx, logger)
-	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier)
 	var githubClient *github.Client
 	if cfg.GitHub != nil {
 		githubClient = github.NewClient(*cfg.GitHub, time.Now)
@@ -62,6 +63,13 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		Credentials: builds.NewCredentials(store.New(pool), gitService, registryService), Logger: logger,
 	})
 	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService, registryService))
+
+	deploymentService := deployments.NewService(pool, authorizer, jobService)
+	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier,
+		agentapi.WithDeployContext(deployments.NewContextMinter(store.New(pool), registryService), logger))
+	deploymentHandler := deployments.NewHandler(deploymentService)
+	jobService.OnSucceeded(deploymentService.AutoDeploy(logger))
+	jobService.OnSucceeded(deploymentService.RecordRelease)
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, middleware.GetHead)
@@ -86,6 +94,8 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			gitHandler.Routes(signedIn)
 			appHandler.Routes(signedIn)
 			registries.NewHandler(registryService).Routes(signedIn)
+			deploymentHandler.Routes(signedIn)
+			environments.NewHandler(environments.NewService(store.New(pool), authorizer)).Routes(signedIn)
 			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)
 		})
 	})

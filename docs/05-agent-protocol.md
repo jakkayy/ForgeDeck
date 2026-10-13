@@ -139,23 +139,39 @@ Prefer typed payloads. Phase 1 needs two Agent job types.
 - Apply secret redaction before sending.
 - Live tail is out of scope for Phase 1.
 
-Later phases add deployment jobs such as:
+`deploy_image` (Phase 4; the model is in [15 — Deployments](15-deployments.md)):
 
 ```json
 {
-  "type": "deploy_image",
-  "application_id": "uuid",
+  "deployment_id": "uuid",
   "environment_id": "uuid",
-  "image": "registry.example/app",
-  "digest": "sha256:...",
-  "health_check": {
-    "path": "/health",
-    "timeout_seconds": 30
+  "application_id": "uuid",
+  "commit_sha": "0123…",
+  "image_ref": "ghcr.io/acme/shop-api@sha256:…",
+  "config": { "container_port": 8080, "published_port": 18080, "bind_address": "127.0.0.1",
+              "env": {}, "volumes": [], "restart": "unless-stopped",
+              "health_check": { "type": "tcp", "timeout_seconds": 60, "interval_seconds": 2 } }
+}
+```
+
+- `image_ref` always ends in a digest. The payload carries no secrets and no shell commands.
+- The Agent re-validates `config` (`internal/servicecfg`) before rendering anything, and refuses a payload that fails validation.
+
+When an Agent **claims** a `deploy_image` job, the claim response adds a `deploy` object. It is built per attempt, never stored in the job, and never logged:
+
+```json
+{
+  "deploy": {
+    "registry": { "host": "ghcr.io", "username": "bot", "password": "…" },
+    "previous": { "release_id": "uuid", "commit_sha": "…", "image_ref": "…@sha256:…", "config": { } }
   }
 }
 ```
 
-This is illustrative. Define a versioned schema before implementation. Do not include arbitrary shell command strings as the normal job interface.
+- `registry` is the credential of the one project registry whose host matches the image (the application's own registry first), and of no other registry. It is absent when the project has none for that host; the Agent then pulls anonymously. The Agent writes it to a per-job Docker config that it deletes afterwards.
+- `previous` is the environment's current release at claim time, which the Agent restores if the new version is not healthy.
+- Log lines of a deployment stage are tagged `[pull]`, `[start]` or `[health_check]` at the start of a `system` line, so the Control Plane can show the stage while the job runs. A job that finishes with `succeeded` has passed its health check: that is what records a release.
+- If the claim cannot be prepared (the environment was deleted, registry credentials cannot be read), the Control Plane fails the attempt immediately with a code such as `environment_not_found` or `registry_credentials_unavailable` and hands the Agent the next job instead.
 
 ## 9. Lease and heartbeat
 
@@ -205,4 +221,4 @@ Include a protocol version. The Control Plane should reject unsupported incompat
 - Mechanism for live tail of container logs.
 - Credential format and rotation mechanism.
 - Agent package distribution and supported Linux platforms.
-- How to apply Compose updates safely when persistent volumes are present.
+- How to apply Compose updates safely when persistent volumes are present. *(Resolved in [15](15-deployments.md): recreate with named volumes kept.)*

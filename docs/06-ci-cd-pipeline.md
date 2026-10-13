@@ -136,6 +136,7 @@ Retry policy (Phase 2): a job is retried only when its worker is lost (the lease
 | `container_action` | 1 | A restart that looked lost may have happened; repeating could restart twice |
 | `fetch_logs` | 2 | Read-only |
 | `build` | 2 | Pinned to one commit and keyed by it, so rebuilding is safe |
+| `deploy_image` | 2 | Pull plus `compose up` converges to the same state, so repeating is safe |
 
 A job that fails on its own (tests fail, Docker error) is not retried automatically.
 
@@ -164,7 +165,9 @@ Avoid building a general-purpose CI YAML language in the first version.
 
 ## 13. Open decisions
 
-- Whether deploy starts automatically after a successful build or requires approval in production.
+Resolved in [15 — Deployments and Releases](15-deployments.md): automatic deploy is a per-environment opt-in (default off); rollback after a failed health check is automatic; deployment and release are separate records.
+
+- Whether deploy starts automatically after a successful build or requires approval in production. *(Resolved: opt-in per environment.)*
 - How Compose files are provided, validated, and versioned.
 - Whether to support multiple services in one application in MVP.
 - Rollback policy after health-check failure.

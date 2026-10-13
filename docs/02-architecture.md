@@ -124,5 +124,5 @@ Each installation runs its own Control Plane and database. A basic installation 
 
 - Exact process topology for Runner: same host as Control Plane or separate host.
 - Whether log chunks live in PostgreSQL initially or move to object storage later.
-- Supported Compose deployment/update strategy for services with persistent volumes.
+- Supported Compose deployment/update strategy for services with persistent volumes. *(Resolved: recreate with named volumes kept, see [15](15-deployments.md).)*
 - How image registry credentials are delivered to Runner and Agent.

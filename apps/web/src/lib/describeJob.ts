@@ -12,6 +12,13 @@ export function describeJob(job: Job): string {
       const action = String(p.action ?? "");
       return `${action.charAt(0).toUpperCase()}${action.slice(1)} container ${short(p.container_id, 12)}`;
     }
+    case "deploy_image":
+      return `Deploy ${short(p.commit_sha, 7)} · ${
+        String(p.image_ref ?? "")
+          .split("/")
+          .pop()
+          ?.split("@")[0] ?? ""
+      }`;
     case "fetch_logs":
       return `Fetch logs of container ${short(p.container_id, 12)}`;
     default:
