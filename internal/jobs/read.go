@@ -37,6 +37,8 @@ type Job struct {
 	CreatedAt      time.Time       `json:"created_at"`
 	StartedAt      *time.Time      `json:"started_at"`
 	FinishedAt     *time.Time      `json:"finished_at"`
+	// LogsExpired says the job's output was removed by the retention job.
+	LogsExpired bool `json:"logs_expired"`
 }
 
 // JobError explains why a job failed.
@@ -140,7 +142,7 @@ func toJob(j store.Job) Job {
 		ID: j.ID, ProjectID: j.ProjectID, Type: j.Type, Status: Status(j.Status),
 		TargetServerID: j.TargetServerID, Payload: j.Payload, Result: j.Result,
 		AttemptCount: j.AttemptCount, MaxAttempts: j.MaxAttempts,
-		CreatedAt: j.CreatedAt, StartedAt: j.StartedAt, FinishedAt: j.FinishedAt,
+		CreatedAt: j.CreatedAt, StartedAt: j.StartedAt, FinishedAt: j.FinishedAt, LogsExpired: j.LogsExpiredAt != nil,
 	}
 	if j.ErrorCode != nil {
 		job.Error = &JobError{Code: *j.ErrorCode}

@@ -119,3 +119,25 @@ func TestTrustedProxiesAcceptAddressesAndRanges(t *testing.T) {
 		t.Fatalf("default %v, %v", cfg.TrustedProxies, err)
 	}
 }
+
+func TestRetentionDefaultsAndOverrides(t *testing.T) {
+	cfg, err := Load(baseEnv(nil))
+	if err != nil || cfg.Retention.JobLogDays != 30 || cfg.Retention.JobDays != 180 || cfg.Retention.WebhookDays != 30 || cfg.Retention.AuditDays != 365 {
+		t.Fatalf("defaults %+v, %v", cfg.Retention, err)
+	}
+	cfg, err = Load(baseEnv(map[string]string{
+		"FORGEDECK_RETENTION_JOB_LOGS_DAYS": "7", "FORGEDECK_RETENTION_JOBS_DAYS": "0", "FORGEDECK_RETENTION_AUDIT_DAYS": "730",
+	}))
+	if err != nil || cfg.Retention.JobLogDays != 7 || cfg.Retention.JobDays != 0 || cfg.Retention.AuditDays != 730 {
+		t.Fatalf("overrides %+v, %v", cfg.Retention, err)
+	}
+	for name, vars := range map[string]map[string]string{
+		"not a number":            {"FORGEDECK_RETENTION_JOBS_DAYS": "a month"},
+		"negative":                {"FORGEDECK_RETENTION_AUDIT_DAYS": "-1"},
+		"logs outlive their jobs": {"FORGEDECK_RETENTION_JOB_LOGS_DAYS": "90", "FORGEDECK_RETENTION_JOBS_DAYS": "30"},
+	} {
+		if _, err := Load(baseEnv(vars)); err == nil || !strings.Contains(err.Error(), "FORGEDECK_RETENTION") {
+			t.Errorf("%s: accepted (%v)", name, err)
+		}
+	}
+}

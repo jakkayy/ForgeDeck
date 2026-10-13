@@ -27,6 +27,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/projects"
 	"github.com/jakkayy/ForgeDeck/internal/registries"
+	"github.com/jakkayy/ForgeDeck/internal/retention"
 	"github.com/jakkayy/ForgeDeck/internal/runnerapi"
 	"github.com/jakkayy/ForgeDeck/internal/runners"
 	"github.com/jakkayy/ForgeDeck/internal/secrets"
@@ -35,6 +36,9 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/webhooks"
 	"github.com/jakkayy/ForgeDeck/internal/webui"
 )
+
+// retentionInterval is how often old data is cleaned up.
+const retentionInterval = 6 * time.Hour
 
 // NewRouter wires every module and returns the root HTTP handler. It also
 // starts background work (job notifier, lease recovery) that stops when ctx
@@ -51,6 +55,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	notifier := jobs.NewNotifier(pool, logger)
 	go notifier.Run(ctx)
 	go jobService.RunRecovery(ctx, logger)
+	go retention.NewService(store.New(pool), cfg.Retention, time.Now).Run(ctx, logger, retentionInterval)
 	var githubClient *github.Client
 	if cfg.GitHub != nil {
 		githubClient = github.NewClient(*cfg.GitHub, time.Now)

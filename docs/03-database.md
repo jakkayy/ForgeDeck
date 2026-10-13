@@ -339,14 +339,22 @@ To support long-poll claims without busy queries, inserting a queued job may iss
 
 ## 6. Retention
 
-Define configurable retention for:
-- Job logs (including `fetch_logs` output, which can use a shorter retention).
-- Old job attempts.
-- Webhook event records.
-- Audit logs (audit retention may need to be longer).
-- Historical metrics.
+A background pass removes data that has outlived its use. It runs about a minute after the Control Plane starts and then every 6 hours, deletes in batches of 2000 so a backlog never holds a long lock, and logs how much it removed. Every step is a delete by age, so running it twice, or from two processes, is harmless.
 
-Do not delete release records that are required for rollback without an explicit retention policy.
+| Data | Kept for (default) | Setting | What is removed |
+|---|---|---|---|
+| Job log lines | 30 days after the job finished | `FORGEDECK_RETENTION_JOB_LOGS_DAYS` | The lines only. The job stays, marked `logs_expired`, and the dashboard says the output was removed. |
+| Finished jobs | 180 days | `FORGEDECK_RETENTION_JOBS_DAYS` | The job, its attempts and its logs. Jobs that are queued or running are never removed. |
+| Webhook deliveries | 30 days | `FORGEDECK_RETENTION_WEBHOOKS_DAYS` | Delivery records. Providers redeliver within days, so this window still deduplicates. |
+| Audit events | 365 days | `FORGEDECK_RETENTION_AUDIT_DAYS` | Audit rows. |
+| Sessions | 1 day after they expire | not configurable | Expired sessions. |
+| Enrollment tokens | 7 days after use or expiry | not configurable | Used and expired tokens. |
+
+`0` keeps a kind forever; negative or non-numeric values, and keeping job logs longer than the jobs themselves, are rejected at start-up.
+
+**Never removed automatically:** releases and deployments. A release is what a rollback restores, and the deployment history is small. Deleting a *job* does not touch them: deployments only lose the link to a job that no longer exists (and keep their own status and error), and releases do not depend on jobs at all. The one consequence is that a build older than the job retention can no longer be picked for a new deployment from its job; deploying a release again (rollback) is unaffected.
+
+Not stored, so nothing to remove: container snapshots are replaced on every report, and server metrics keep only the latest values.
 
 ## 7. Open decisions
 

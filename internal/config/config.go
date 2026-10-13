@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jakkayy/ForgeDeck/internal/retention"
+
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
 	"github.com/jakkayy/ForgeDeck/internal/keyring"
 	"github.com/jakkayy/ForgeDeck/internal/safehttp"
@@ -34,6 +36,8 @@ type Config struct {
 	// TrustedProxies are the reverse proxies whose X-Forwarded-For header is
 	// believed when finding a client's address (FORGEDECK_TRUSTED_PROXIES).
 	TrustedProxies []netip.Prefix
+	// Retention says how long old data is kept; zero keeps a kind forever.
+	Retention retention.Policy
 	// Outbound limits requests to user-supplied URLs such as a self-hosted
 	// GitLab. FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS opens private networks.
 	Outbound safehttp.Policy
@@ -60,6 +64,15 @@ func Load(lookup LookupFunc) (Config, error) {
 	cfg.PublicURL = strings.TrimRight(env.string("FORGEDECK_PUBLIC_URL", ""), "/")
 	cfg.GitHub, cfg.GitHubWebhookSecret = env.gitHubApp()
 	cfg.TrustedProxies = env.prefixes("FORGEDECK_TRUSTED_PROXIES")
+	cfg.Retention = retention.Policy{
+		JobLogDays:  env.days("FORGEDECK_RETENTION_JOB_LOGS_DAYS", retention.DefaultPolicy.JobLogDays),
+		JobDays:     env.days("FORGEDECK_RETENTION_JOBS_DAYS", retention.DefaultPolicy.JobDays),
+		WebhookDays: env.days("FORGEDECK_RETENTION_WEBHOOKS_DAYS", retention.DefaultPolicy.WebhookDays),
+		AuditDays:   env.days("FORGEDECK_RETENTION_AUDIT_DAYS", retention.DefaultPolicy.AuditDays),
+	}
+	if err := cfg.Retention.Validate(); err != nil {
+		env.errs = append(env.errs, fmt.Errorf("FORGEDECK_RETENTION_*: %w", err))
+	}
 	cfg.Outbound = safehttp.Policy{AllowPrivate: env.bool("FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS", false)}
 
 	if err := errors.Join(append(env.errs, cfg.validate())...); err != nil {
@@ -154,6 +167,20 @@ func (r *reader) required(key string) string {
 		r.errs = append(r.errs, fmt.Errorf("%s is required when the GitHub App is configured", key))
 	}
 	return value
+}
+
+// days reads a whole number of days, 0 meaning "keep forever".
+func (r *reader) days(key string, fallback int) int {
+	raw, ok := r.lookup(key)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n < 0 {
+		r.errs = append(r.errs, fmt.Errorf("%s: %q must be a number of days, 0 or more (0 keeps it forever)", key, raw))
+		return fallback
+	}
+	return n
 }
 
 // prefixes reads a comma-separated list of addresses or CIDR ranges.

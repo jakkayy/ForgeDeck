@@ -40,7 +40,11 @@ function JobPage() {
       )}
       {lines.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">
-          {ended ? "This job produced no output." : "Waiting for output…"}
+          {job.logs_expired
+            ? "This job's output was removed to save space; ForgeDeck keeps job output for a limited time."
+            : ended
+              ? "This job produced no output."
+              : "Waiting for output…"}
         </p>
       ) : (
         <LogView lines={lines} />

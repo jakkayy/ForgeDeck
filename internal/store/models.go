@@ -135,6 +135,7 @@ type Job struct {
 	StartedAt      *time.Time
 	FinishedAt     *time.Time
 	ApplicationID  *uuid.UUID
+	LogsExpiredAt  *time.Time
 }
 
 type JobAttempt struct {
