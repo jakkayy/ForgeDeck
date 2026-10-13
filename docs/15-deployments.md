@@ -92,3 +92,48 @@ Applying a deployment is idempotent: render, `docker compose pull`, `docker comp
 ### Registry access for pulls
 
 The Agent pulls with credentials the Control Plane adds to the claim response of a `deploy_image` job ([05 §8](05-agent-protocol.md)). They are scoped to the one registry that hosts the image, built per attempt, never stored in the job payload or logs, and written to a per-job Docker config that is deleted afterwards.
+
+## 3. Risks: volumes and database migrations (4.18)
+
+A rollback changes **code and configuration, not data**. Everything below follows from that.
+
+### What a rollback does and does not undo
+
+| Restored by a rollback | Not restored |
+|---|---|
+| The image (by digest) | Files a newer version wrote to a **named volume** |
+| The service configuration snapshot (ports, environment variables, volume mounts, restart policy, health check) | Changes a newer version made to an **external database** (migrations, new rows) |
+| | Anything the newer version sent to other systems |
+
+If version N+1 migrated a schema or rewrote a data file, version N may fail to start, start and misbehave, or corrupt the new data. ForgeDeck cannot tell which; the health check only proves the old version answers, not that it reads its data correctly.
+
+### Writing releases that can be rolled back
+
+- **Expand, then contract.** Ship schema changes in two releases: first one that works with both the old and the new schema (add columns and tables, write both, read the old), later one that drops what nothing uses any more. Never rename or drop in the same release that stops using the old shape. This is what makes "roll back one release" safe.
+- Make migrations **backward compatible with the previous release**. Before relying on a rollback, ask whether the previous image can run on the schema as it is now.
+- Prefer **application-level compatibility** (the old code ignores new columns) to down-migrations. Down-migrations run on production data that has changed since they were written.
+- Do not run destructive migrations automatically at container start. Run them as a deliberate step after the release has proven healthy.
+
+### Back up before changing data
+
+ForgeDeck does not back up volumes or databases (see Phase 5 for the Control Plane's own backup). Before a release that changes data, take a backup you have tested restoring:
+
+- A volume: `docker run --rm -v <volume>:/data -v "$PWD":/backup busybox tar czf /backup/<volume>.tgz -C /data .` (the volume's real name is `forgedeck-<environment id>_<volume name>`).
+- A database: the database's own dump tool, to a place that is not the volume it protects.
+
+A rollback after a bad migration is then a restore, not a redeploy.
+
+### Volumes
+
+- Deployments recreate the container but keep named volumes. Nothing in ForgeDeck deletes a volume: not a rollback, not a failed deployment, not deleting the environment (which stops managing the service but leaves it running with its data).
+- To remove a service and its data on purpose, on the server: `docker compose --project-name forgedeck-<environment id> down --volumes`.
+- **Two containers must not share one volume** unless the application supports it. A deployment replaces the old container before starting the new one, so the two do not overlap; do not mount the same volume into a second environment.
+- A configuration restored by a rollback mounts the volumes it listed then. If a newer release added a volume, the rolled-back service no longer mounts it (the volume stays on the server).
+
+### Downtime
+
+A deployment stops the old container and starts the new one, so the service is down for a few seconds to the length of its start-up. If the new version fails its health check, the previous release is restored, which adds the same gap again. Zero-downtime strategies (blue/green, canary) are out of scope for the MVP, as is running several replicas of one environment.
+
+### Secrets and configuration
+
+Environment variables are stored in the environment's configuration and in each release's snapshot, and are visible to project members. They are not for secrets. A rollback restores the variables the old release had, which can include a value that has since been rotated. Secret references arrive in Phase 5.
