@@ -254,6 +254,8 @@ data: {"status":"building"}
 
 `GET /jobs/{jobID}/events` sends `status` events (the whole job, whenever its status changes), `log` events with id `<attempt>.<sequence>`, keepalive comments every 15 seconds, and a final `end` event once the job has finished and every line was sent. A reconnecting `EventSource` sends `Last-Event-ID` and resumes after that line; `?after=<attempt>.<sequence>` does the same for clients that cannot set headers. Streams stop when the client disconnects or the server shuts down.
 
+A stream of a running job wakes the server every few seconds, so clients should not leave them open unattended. The dashboard closes its stream when the page is left, and when a tab has been hidden for a minute; when the tab is shown again it opens a new one with `?after=` set to the last line it received, so nothing is lost or repeated.
+
 ## 11. API quality requirements
 
 - Consistent pagination, filtering, and sort behavior.
