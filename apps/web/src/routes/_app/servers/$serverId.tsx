@@ -142,17 +142,20 @@ function Containers({ list, serverId, projectId, isOnline }: ContainersProps) {
                 container={container}
                 actions={
                   <div className="flex items-center gap-2">
-                    <ContainerLogs
-                      serverId={serverId}
-                      container={container}
-                      isDisabled={!isOnline}
-                    />
+                    {/* Container output can hold sensitive data: developers and above. */}
                     {canOperate && (
-                      <ContainerActions
-                        serverId={serverId}
-                        container={container}
-                        isDisabled={!isOnline}
-                      />
+                      <>
+                        <ContainerLogs
+                          serverId={serverId}
+                          container={container}
+                          isDisabled={!isOnline}
+                        />
+                        <ContainerActions
+                          serverId={serverId}
+                          container={container}
+                          isDisabled={!isOnline}
+                        />
+                      </>
                     )}
                   </div>
                 }

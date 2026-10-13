@@ -122,7 +122,7 @@ Servers belong to a project. Every server-scoped endpoint resolves the project t
 | DELETE | `/servers/{serverID}` | Remove/revoke server access |
 | GET | `/servers/{serverID}/containers` | List containers from the latest snapshot |
 | POST | `/servers/{serverID}/containers/{containerID}/actions` | Queue start/stop/restart (`container_action` job) |
-| POST | `/servers/{serverID}/containers/{containerID}/logs` | Queue a bounded log fetch (`fetch_logs` job) |
+| POST | `/servers/{serverID}/containers/{containerID}/logs` | Queue a bounded log fetch (`fetch_logs` job); developer or higher, as is reading the job's `/logs` and `/events` |
 
 The server record is created when an Agent enrolls with a project-bound token; there is no separate server registration endpoint in MVP.
 

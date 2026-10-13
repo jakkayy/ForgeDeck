@@ -19,11 +19,13 @@ var errGitHubNotConfigured = apperr.Conflict("github_not_configured",
 // StartGitHubInstall returns the GitHub URL where the user installs the
 // ForgeDeck App for projectID.
 func (s *Service) StartGitHubInstall(ctx context.Context, userID, projectID uuid.UUID) (string, error) {
-	if s.github == nil {
-		return "", errGitHubNotConfigured
-	}
+	// Authorize first: whether this installation has a GitHub App is not for
+	// non-members to learn.
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ManageGit); err != nil {
 		return "", err
+	}
+	if s.github == nil {
+		return "", errGitHubNotConfigured
 	}
 	state := sealState(s.keyring, installState{
 		ProjectID: projectID,

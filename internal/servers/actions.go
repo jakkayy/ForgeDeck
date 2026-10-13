@@ -89,5 +89,5 @@ func (s *Service) RequestContainerLogs(ctx context.Context, userID, serverID uui
 	payload := agentproto.FetchLogsPayload{
 		ContainerID: containerID, TailLines: tail, Since: req.Since, Timestamps: req.Timestamps,
 	}
-	return s.enqueueContainerJob(ctx, userID, serverID, containerID, authz.ViewProject, agentproto.JobFetchLogs, payload)
+	return s.enqueueContainerJob(ctx, userID, serverID, containerID, authz.ViewLogs, agentproto.JobFetchLogs, payload)
 }

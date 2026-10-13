@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apperr"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/store"
@@ -86,7 +87,7 @@ func (c LogCursor) String() string { return fmt.Sprintf("%d.%d", c.Attempt, c.Se
 
 // Logs returns up to limit log lines after cursor, in order.
 func (s *Service) Logs(ctx context.Context, userID, jobID uuid.UUID, after LogCursor, limit int32) ([]LogLine, error) {
-	if _, err := s.authorizeJob(ctx, userID, jobID); err != nil {
+	if err := s.authorizeJobOutput(ctx, userID, jobID); err != nil {
 		return nil, err
 	}
 	rows, err := s.queries.ListJobLogs(ctx, store.ListJobLogsParams{
@@ -100,6 +101,21 @@ func (s *Service) Logs(ctx context.Context, userID, jobID uuid.UUID, after LogCu
 		lines[i] = LogLine{Attempt: r.AttemptNumber, Sequence: r.SequenceNumber, Stream: r.Stream, Message: r.Content, CreatedAt: r.CreatedAt}
 	}
 	return lines, nil
+}
+
+// authorizeJobOutput is authorizeJob for reading a job's log lines. The lines
+// of a fetch_logs job are a container's output, which can hold sensitive
+// data, so reading them takes the same role as fetching them; the output of
+// builds and deployments is for every member.
+func (s *Service) authorizeJobOutput(ctx context.Context, userID, jobID uuid.UUID) error {
+	job, err := s.authorizeJob(ctx, userID, jobID)
+	if err != nil {
+		return err
+	}
+	if job.Type == agentproto.JobFetchLogs {
+		_, err = s.authz.Require(ctx, userID, job.ProjectID, authz.ViewLogs)
+	}
+	return err
 }
 
 func (s *Service) authorizeJob(ctx context.Context, userID, jobID uuid.UUID) (store.Job, error) {

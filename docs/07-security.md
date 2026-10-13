@@ -140,3 +140,22 @@ Security-relevant changes are recorded in an append-only audit log that project 
 **Properties.** A failed request records nothing (an event says something happened). An event is written after the action; if writing fails it is logged at error level and the action stands. The actor is stored as text, so the record outlives the user. The log has no foreign key to the project, so deleting a project keeps the record of who deleted it; only the retention job removes rows. Reading it requires the admin role.
 
 **Not covered.** There is no source IP in the record (ForgeDeck often sits behind a proxy, and a forwarded address is attacker-controlled unless the proxy is trusted); the request ID ties an event to the access log, which has the client address. Tampering by someone with database access is not detected: ship the log to a store they cannot write if that matters.
+
+## Roles and permissions
+
+Roles rank Viewer < Developer < Admin < Owner, and each role has everything below it. A caller who is not a member of a project gets **404** for anything in it (so membership cannot be probed); a member whose role is too low gets **403**; no session gets **401**.
+
+| Capability | Viewer | Developer | Admin | Owner |
+|---|---|---|---|---|
+| See the project, members, servers, container list, Git connections, registries, secret **names**, applications, environments, deployments, releases, jobs and the output of builds and deployments | ✓ | ✓ | ✓ | ✓ |
+| Start a build; deploy a build; roll back a release; cancel a job; restart, stop or start a container; fetch container logs and read them | | ✓ | ✓ | ✓ |
+| Create, change or delete applications, environments, registries, Git connections and secrets; add or remove members; enroll or remove servers; read the audit log; change the project | | | ✓ | ✓ |
+| Delete the project | | | | ✓ |
+
+Notes on the choices:
+
+- **Container output is for developers.** A fetched container log can hold sensitive data, so fetching it and reading it (the job's `/logs` and `/events`) need the developer role. Viewers can see that the job ran. This is stricter than the first version, which let viewers fetch logs.
+- **Secret values are in no row of this table.** Nobody can read one back, including owners; admins can only replace or delete.
+- A few routes belong to no project: listing one's own projects, servers and jobs (each returns only what the caller's memberships allow), creating a project (the creator becomes its owner), the caller's own user, sign-in and sign-out, the GitHub install redirect (verified by a sealed state and OAuth), the health check, and the embedded UI. Machine endpoints are authenticated by an Agent credential, a Runner credential, or a webhook signature.
+
+**How this is enforced.** `internal/app/rbac_test.go` walks the real router. Every route must be classified there with its minimum role (or listed as not project-scoped, with a reason), or the test fails. For each project route it then calls the route as an anonymous caller (401), a non-member (404), a member one role below the minimum (403), and a member with exactly the minimum role (must not be refused), against real resources of every kind. Adding an endpoint without deciding who may call it fails the build. The review that introduced this test found three problems, now fixed: viewers could fetch container logs; the GitHub install route reported whether a GitHub App is configured before checking the caller's role, which told non-members about the installation; and fetched container logs were readable by viewers through the job endpoints.
