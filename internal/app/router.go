@@ -77,11 +77,11 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	jobService.OnSucceeded(deploymentService.RecordRelease)
 
 	router := chi.NewRouter()
-	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, middleware.GetHead)
+	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, httpx.SecurityHeaders(cfg.CookieSecure), middleware.GetHead)
 	router.Get("/healthz", health.Handler(map[string]health.Check{"database": pool.Ping}))
 
 	router.Route("/api/v1", func(api chi.Router) {
-		api.Use(httpx.CSRF)
+		api.Use(httpx.CSRF, httpx.NoStore)
 		api.NotFound(httpx.Handle(func(http.ResponseWriter, *http.Request) error {
 			return httpx.NotFound("No API endpoint at this path.")
 		}))

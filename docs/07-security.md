@@ -159,3 +159,23 @@ Notes on the choices:
 - A few routes belong to no project: listing one's own projects, servers and jobs (each returns only what the caller's memberships allow), creating a project (the creator becomes its owner), the caller's own user, sign-in and sign-out, the GitHub install redirect (verified by a sealed state and OAuth), the health check, and the embedded UI. Machine endpoints are authenticated by an Agent credential, a Runner credential, or a webhook signature.
 
 **How this is enforced.** `internal/app/rbac_test.go` walks the real router. Every route must be classified there with its minimum role (or listed as not project-scoped, with a reason), or the test fails. For each project route it then calls the route as an anonymous caller (401), a non-member (404), a member one role below the minimum (403), and a member with exactly the minimum role (must not be refused), against real resources of every kind. Adding an endpoint without deciding who may call it fails the build. The review that introduced this test found three problems, now fixed: viewers could fetch container logs; the GitHub install route reported whether a GitHub App is configured before checking the caller's role, which told non-members about the installation; and fetched container logs were readable by viewers through the job endpoints.
+
+## Browser security headers
+
+Every response carries these headers (`internal/httpx/headers.go`):
+
+| Header | Value | Why |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'none'; script-src 'self'; style-src 'self' 'sha256-…'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'` | A cross-site scripting bug cannot load attacker code or send data to another origin. No inline script, no `unsafe-inline`, no `unsafe-eval`, no third-party origin. |
+| `X-Frame-Options` | `DENY` | Clickjacking (also covered by `frame-ancestors` in browsers that support it). |
+| `X-Content-Type-Options` | `nosniff` | A response is never reinterpreted as a script or stylesheet. |
+| `Referrer-Policy` | `no-referrer` | Dashboard URLs contain resource IDs; they are not sent to other sites. |
+| `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` | `same-origin` | Other origins cannot hold a reference to the dashboard window or embed its responses. |
+| `Permissions-Policy` | camera, microphone, geolocation, payment, USB, interest-cohort off | The dashboard uses none of them. |
+| `Strict-Transport-Security` | two years, `includeSubDomains` | Only when `FORGEDECK_COOKIE_SECURE=true` (an HTTPS deployment). A browser that sees it refuses plain HTTP to the host for that long, so it is never sent over HTTP. |
+
+API responses also carry `Cache-Control: no-store`: they hold session-scoped data. Static assets keep their own cache headers.
+
+**The one inline style.** react-aria (HeroUI's behavior layer) adds a single `<style>` element at run time that sets `touch-action` for pressable elements. The policy allows exactly that text by hash rather than `unsafe-inline`, so every other inline style stays blocked, and the dashboard's own CSS contains the same rule so nothing depends on the hash. If a react-aria upgrade changes the text, the browser console reports a blocked style with the new hash: update `reactAriaPressStyle`. The theme script that used to be inline in `index.html` is now `/theme.js`, which still runs before first paint.
+
+**Verified.** The dashboard was loaded in Chrome under this policy and exercised (sign-in, every project tab, dialogs, dropdowns, the audit log); no policy violation is reported. Unit tests pin the policy: no `unsafe-inline`, `unsafe-eval`, wildcard or `http(s):` source, exactly one style hash, HSTS only when enabled.

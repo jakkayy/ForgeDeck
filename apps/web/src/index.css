@@ -56,3 +56,14 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/*
+ * react-aria adds this same rule in an inline <style> at run time. The
+ * Content-Security-Policy allows that one inline text by hash, and this copy
+ * keeps the behavior if an upgrade changes the text and the hash stops matching.
+ */
+@layer base {
+  [data-react-aria-pressable] {
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+}
