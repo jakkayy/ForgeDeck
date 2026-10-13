@@ -121,6 +121,8 @@ Avoid querying expensive Docker stats continuously. Make metric freshness visibl
 - Escape log content; do not render it as HTML.
 - Redact secrets before they reach the browser.
 
+How the log view does it: only the rows in view (plus a margin) are in the DOM, measured individually so wrapped lines keep their height. A job with 200,000 lines (measured with Chrome against the development server) keeps about 60 rows in the DOM, and fully replaying it over SSE takes about 6 seconds. Lines that arrive within 100 ms are added in one render. The view follows new output while it is at the bottom; scrolling up pauses that, and *Jump to latest* resumes it. The browser can only select the rows that exist, so selecting across a long log is replaced by **Copy all**, which copies every line (with its timestamp) as plain text.
+
 ## 10. Design system
 
 Use HeroUI components consistently for:
