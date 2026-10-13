@@ -13,7 +13,8 @@ ForgeDeck จัดการ Application, Docker server, Git repository แล�
 | 0–1 | โครงโปรเจกต์, Auth, Project, Server + Agent, จัดการ container | เสร็จ |
 | 2 | Git integration (GitHub/GitLab), webhook, job queue | เสร็จ |
 | 3 | Runner แยกจาก production: checkout → build → test → push | เสร็จ |
-| 4–6 | Deployment/release/rollback, secrets, hardening | ยังไม่เริ่ม |
+| 4 | Environment, deploy ผ่าน Agent + Compose, health check, release, rollback | เสร็จ |
+| 5–6 | Secrets, hardening, production readiness | ยังไม่เริ่ม |
 
 รายละเอียดของแต่ละข้อดูที่ [docs/11-implementation-plan.md](docs/11-implementation-plan.md)
 
@@ -79,7 +80,14 @@ FORGEDECK_RUNNER_CREDENTIAL=fdr_... make run-runner URL=http://localhost:8080
 3. แท็บ **Applications** สร้าง Application: เลือก repo, registry และชื่อ image
 4. เปิดหน้า Application แล้วกด **Build** หรือ push โค้ดเข้า branch นั้น
 
-ผล build คือ image reference แบบ `host/image@sha256:...` ที่ Phase 4 จะใช้ deploy
+ผล build คือ image reference แบบ `host/image@sha256:...` ที่ใช้ deploy ต่อ
+
+## Deploy ครั้งแรก
+
+1. เพิ่ม server ที่ **Servers** แล้วติดตั้ง Agent บนเครื่องนั้น (ต้องมี Docker และ Docker Compose plugin)
+2. ในหน้า Application กด **New environment**: เลือก server, ใส่ container port / host port และ health check (ใต้ *Advanced*) เปิด *Deploy every successful build* ถ้าต้องการให้ build ที่สำเร็จขึ้น environment นี้เอง
+3. กด **Deploy** จะเอา build ที่สำเร็จล่าสุดขึ้น ดูความคืบหน้า `Queued → Pulling → Starting → Health check → Healthy` ที่หน้า environment
+4. ถ้าเวอร์ชันใหม่ไม่ healthy ระบบกู้เวอร์ชันก่อนหน้าให้เอง และกด **Roll back** ที่ Release history เพื่อกลับไป release เก่าได้ (**ข้อมูลใน volume และ database ไม่ถูกย้อน** ดู [docs/15-deployments.md](docs/15-deployments.md))
 
 ## ตัวแปรสำคัญ
 
