@@ -31,6 +31,8 @@
 @import "@heroui/styles/components/drawer.css" layer(components);
 @import "@heroui/styles/components/tabs.css" layer(components);
 @import "@heroui/styles/components/disclosure.css" layer(components);
+@import "@heroui/styles/components/switch.css" layer(components);
+@import "@heroui/styles/components/textarea.css" layer(components);
 
 /*
  * ForgeDeck design tokens on top of the HeroUI theme (unlayered, so they

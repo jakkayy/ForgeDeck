@@ -42,6 +42,7 @@ Keep global navigation stable and avoid deeply nested menus.
 
 - The project page has **Applications · Git · Registries · Members** tabs. Registries holds the places images are pushed; an application chooses one and an image path.
 - An application page shows its image destination, a **Build <branch>** button (developer and up; disabled until an image is set), and recent builds. A row shows the short commit, its message, status, the pushed digest or the failure code, and the duration. The list refreshes every 5 seconds only while a build is queued or running.
+- The application page also lists **environments**: for each, its server and port mapping, what it runs now (short commit and image digest, since when), the last deployment's status, and **Deploy** (developer and up), **Edit** and **Delete** (admin). Deploy ships the newest successful build and asks for confirmation first, saying that the service restarts briefly and that an unhealthy version is rolled back. The environment form keeps the common fields (name, server, ports, auto-deploy) up front and tucks bind address, health check, environment variables, volumes, restart policy and memory under *Advanced*. Auto-deploy is off by default.
 - A build's job page shows the commit, the exact `image@sha256:…` reference with a copy button once pushed, and the streamed log.
 
 ## 4. Overview page

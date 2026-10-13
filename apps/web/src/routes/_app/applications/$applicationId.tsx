@@ -15,6 +15,7 @@ import { registriesQuery } from "../../../api/registries";
 import type { Job } from "../../../api/types";
 import { ApiForm } from "../../../components/ApiForm";
 import { ImageFields, type ImageValue } from "../../../components/application/ImageFields";
+import { EnvironmentsSection } from "../../../components/environment/EnvironmentsSection";
 import { JobStatusChip } from "../../../components/JobStatusChip";
 import { QueryError } from "../../../components/QueryError";
 import { duration } from "../../../lib/describeJob";
@@ -43,6 +44,7 @@ function ApplicationPage() {
     <div className="flex flex-col gap-6">
       <ApplicationHeader app={app.data} />
       <ImageCard app={app.data} />
+      <EnvironmentsSection applicationId={app.data.id} projectId={app.data.project_id} />
       <BuildHistory app={app.data} />
     </div>
   );
