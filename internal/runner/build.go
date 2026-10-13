@@ -19,9 +19,14 @@ type BuildConfig struct {
 	TestLimits TestLimits
 }
 
-// BuildResult is a successful build's job result.
+// BuildResult is a successful build's job result. Deployments use
+// ImageRef, which pins the exact image pushed.
 type BuildResult struct {
 	CommitSHA string `json:"commit_sha"`
+	Image     string `json:"image"`     // e.g. ghcr.io/acme/shop-api
+	Tag       string `json:"tag"`       // short commit SHA
+	Digest    string `json:"digest"`    // sha256:…
+	ImageRef  string `json:"image_ref"` // Image@Digest
 }
 
 var (
@@ -30,6 +35,7 @@ var (
 	errCheckout     = &worker.JobError{Code: "checkout_failed", Message: "The commit could not be fetched. See the build log."}
 	errImageBuild   = &worker.JobError{Code: "image_build_failed", Message: "The Docker image could not be built. See the build log."}
 	errTests        = &worker.JobError{Code: "tests_failed", Message: "The test command failed. See the build log."}
+	errPush         = &worker.JobError{Code: "image_push_failed", Message: "The image could not be pushed to the registry. Check the registry credentials and the build log."}
 )
 
 // BuildHandler runs build jobs in a fresh workspace that is removed when the
@@ -89,7 +95,16 @@ func (b *build) run(ctx context.Context) (any, error) {
 			return nil, errTests
 		}
 	}
-	return BuildResult{CommitSHA: b.payload.CommitSHA}, nil
+
+	image, tag := b.credentials.Image, b.payload.CommitSHA[:12]
+	b.log.Log("system", "Pushing "+image+":"+tag)
+	digest, err := pushImage(ctx, b.exec, b.credentials.Registry, b.localTag(), image, tag)
+	if err != nil {
+		b.log.Log("system", err.Error())
+		return nil, errPush
+	}
+	b.log.Log("system", "Pushed "+image+"@"+digest)
+	return BuildResult{CommitSHA: b.payload.CommitSHA, Image: image, Tag: tag, Digest: digest, ImageRef: image + "@" + digest}, nil
 }
 
 // testContainer names the test container of this build.

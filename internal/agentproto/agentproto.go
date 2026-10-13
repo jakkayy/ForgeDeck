@@ -109,9 +109,19 @@ type Job struct {
 	Credentials *BuildCredentials `json:"credentials,omitempty"`
 }
 
-// BuildCredentials let a Runner fetch one repository.
+// BuildCredentials let a Runner fetch one repository and push its image.
 type BuildCredentials struct {
-	Git GitCredentials `json:"git"`
+	Git      GitCredentials      `json:"git"`
+	Registry RegistryCredentials `json:"registry"`
+	// Image is the repository the build is pushed to, e.g. ghcr.io/acme/shop-api.
+	Image string `json:"image"`
+}
+
+// RegistryCredentials authenticate docker login to one registry.
+type RegistryCredentials struct {
+	Host     string `json:"host"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // GitCredentials authenticate an HTTPS clone with HTTP Basic auth.

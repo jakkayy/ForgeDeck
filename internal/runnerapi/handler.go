@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/builds"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/runners"
@@ -160,7 +161,8 @@ func (h *Handler) claim(w http.ResponseWriter, r *http.Request) error {
 }
 
 // claimWithCredentials claims the next job and mints its build credentials.
-// An attempt whose credentials cannot be minted fails at once, so the Runner
+// An attempt that cannot start (no image destination, credentials cannot be
+// minted) fails at once, so the Runner
 // is never handed a build it cannot start; the next job is tried instead.
 func (h *Handler) claimWithCredentials(ctx context.Context, workerID string) (*jobs.Claimed, *agentproto.BuildCredentials, error) {
 	for {
@@ -172,12 +174,14 @@ func (h *Handler) claimWithCredentials(ctx context.Context, workerID string) (*j
 		if err == nil {
 			return job, credentials, nil
 		}
-		h.logger.WarnContext(ctx, "minting build credentials failed", "job_id", job.ID, "error", err)
+		h.logger.WarnContext(ctx, "build cannot start", "job_id", job.ID, "error", err)
+		var buildErr *builds.Error
+		if !errors.As(err, &buildErr) {
+			buildErr = &builds.Error{Code: "build_credentials_unavailable", Message: "ForgeDeck could not prepare credentials for this build."}
+		}
 		lease := jobs.Lease{JobID: job.ID, Attempt: job.Attempt, WorkerKind: jobs.WorkerRunner, WorkerID: workerID}
 		if err := h.jobs.Complete(ctx, lease, agentproto.CompleteRequest{
-			Outcome:      agentproto.OutcomeFailed,
-			ErrorCode:    "build_credentials_unavailable",
-			ErrorMessage: "ForgeDeck could not get access to the repository for this build. Check the application's Git connection.",
+			Outcome: agentproto.OutcomeFailed, ErrorCode: buildErr.Code, ErrorMessage: buildErr.Message,
 		}); err != nil {
 			return nil, nil, err
 		}

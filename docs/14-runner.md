@@ -43,7 +43,14 @@ checkout → build → test → push
 1. **Checkout** — a fresh temporary workspace; `git fetch --depth 1 <url> <commit>` and check out exactly that commit. The token reaches git as an `http.extraHeader` through `GIT_CONFIG_*` environment variables, not command arguments or the remote URL; redirects are not followed. Git may only use the protocols in `--git-protocols` (default `https`).
 2. **Build** — `docker build` with BuildKit, using the application's Dockerfile and build context, tagged `<image>:<short sha>`.
 3. **Test** — if the application has a test command, it runs inside the image just built: `docker run --rm --network none` with CPU, memory, and process limits. Tests never run directly on the build host. If the final image lacks test tooling, add a test stage to the Dockerfile and make it the target, or move the tests into a `RUN` step.
-4. **Push** — only after tests pass. The pushed image's **digest** (`repo@sha256:…`) is the build's result and what deployments use.
+4. **Push** — only after tests pass: `docker login --password-stdin` into the job's own `DOCKER_CONFIG`, then push `<image>:<12-char sha>`. The pushed image's **digest** is the build's result and what deployments use:
+
+```json
+{ "commit_sha": "…", "image": "ghcr.io/acme/shop-api", "tag": "0123456789ab",
+  "digest": "sha256:…", "image_ref": "ghcr.io/acme/shop-api@sha256:…" }
+```
+
+The image destination is read from the application when the build is claimed; an application without a registry and image fails with `no_image_destination`.
 
 Build commands run with a minimal environment (`PATH`, a per-job `HOME` and `DOCKER_CONFIG`, and `DOCKER_HOST`/`DOCKER_TLS_VERIFY`/`DOCKER_CERT_PATH` if set), so they never see the Runner's credential.
 
