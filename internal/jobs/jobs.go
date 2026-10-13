@@ -65,8 +65,9 @@ type NewJob struct {
 	WorkerKind     WorkerKind
 	TargetServerID *uuid.UUID
 	Payload        any
-	MaxAttempts    int32
-	CreatedBy      *uuid.UUID
+	// MaxAttempts overrides the retry policy for the job type when > 0.
+	MaxAttempts int32
+	CreatedBy   *uuid.UUID
 	// IdempotencyKey, when set, makes Enqueue return the existing job for the
 	// same key in the project instead of queueing a duplicate.
 	IdempotencyKey string
@@ -103,7 +104,7 @@ func (s *Service) EnqueueOnce(ctx context.Context, job NewJob) (store.Job, bool,
 			WorkerKind:     string(job.WorkerKind),
 			TargetServerID: job.TargetServerID,
 			Payload:        payload,
-			MaxAttempts:    max(job.MaxAttempts, 1),
+			MaxAttempts:    maxAttempts(job.Type, job.MaxAttempts),
 			IdempotencyKey: key,
 			CreatedBy:      job.CreatedBy,
 		})

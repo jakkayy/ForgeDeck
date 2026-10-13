@@ -129,6 +129,16 @@ Pipeline stages can be represented as events or a stage field:
 
 Keep job state transitions valid and auditable. Cancellation may not be possible for every stage; communicate that clearly.
 
+Retry policy (Phase 2): a job is retried only when its worker is lost (the lease expires). A lost attempt may still have done its work, so attempts depend on whether repeating is safe:
+
+| Job type | Attempts | Why |
+|---|---|---|
+| `container_action` | 1 | A restart that looked lost may have happened; repeating could restart twice |
+| `fetch_logs` | 2 | Read-only |
+| `build` | 2 | Pinned to one commit and keyed by it, so rebuilding is safe |
+
+A job that fails on its own (tests fail, Docker error) is not retried automatically.
+
 ## 11. Failure behavior
 
 - Checkout failure: report repository/commit context without leaking credentials.
