@@ -66,7 +66,9 @@ func run(args []string) error {
 	}
 
 	cfg := runner.Config{ControlPlaneURL: *controlPlaneURL, Credential: credential, Version: version}
-	handlers := runner.Handlers(runner.BuildConfig{WorkDir: *workDir, GitProtocols: *gitProtocols})
+	handlers := runner.Handlers(runner.BuildConfig{
+		WorkDir: *workDir, GitProtocols: *gitProtocols, TestLimits: runner.DefaultTestLimits,
+	})
 	return runner.Run(ctx, cfg, handlers, runner.DockerStatus, logger)
 }
 

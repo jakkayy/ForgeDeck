@@ -15,6 +15,8 @@ type BuildConfig struct {
 	WorkDir string
 	// GitProtocols is GIT_ALLOW_PROTOCOL for checkouts, e.g. "https".
 	GitProtocols string
+	// TestLimits bound the test container.
+	TestLimits TestLimits
 }
 
 // BuildResult is a successful build's job result.
@@ -27,6 +29,7 @@ var (
 	errNoCredential = &worker.JobError{Code: "missing_credentials", Message: "The Control Plane sent no repository credentials. Upgrade the Control Plane."}
 	errCheckout     = &worker.JobError{Code: "checkout_failed", Message: "The commit could not be fetched. See the build log."}
 	errImageBuild   = &worker.JobError{Code: "image_build_failed", Message: "The Docker image could not be built. See the build log."}
+	errTests        = &worker.JobError{Code: "tests_failed", Message: "The test command failed. See the build log."}
 )
 
 // BuildHandler runs build jobs in a fresh workspace that is removed when the
@@ -78,7 +81,20 @@ func (b *build) run(ctx context.Context) (any, error) {
 		b.log.Log("system", err.Error())
 		return nil, errImageBuild
 	}
+
+	if b.payload.TestCommand != nil {
+		b.log.Log("system", "Running tests in the built image (no network)")
+		if err := runTests(ctx, b.exec, b.localTag(), b.testContainer(), *b.payload.TestCommand, b.cfg.TestLimits); err != nil {
+			b.log.Log("system", err.Error())
+			return nil, errTests
+		}
+	}
 	return BuildResult{CommitSHA: b.payload.CommitSHA}, nil
+}
+
+// testContainer names the test container of this build.
+func (b *build) testContainer() string {
+	return "forgedeck-test-" + filepath.Base(b.ws.root)
 }
 
 // localTag names the image on the build host until it is pushed. It is
