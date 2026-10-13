@@ -9,6 +9,7 @@ import {
   releasesQuery,
 } from "../../../api/environments";
 import { serversQuery } from "../../../api/servers";
+import { DeploymentFailure } from "../../../components/environment/DeploymentFailure";
 import { DeploymentStages } from "../../../components/environment/DeploymentStages";
 import { ReleaseHistory } from "../../../components/environment/ReleaseHistory";
 import { JobStatusChip } from "../../../components/JobStatusChip";
@@ -162,9 +163,7 @@ function DeploymentRow({ deployment }: { deployment: Deployment }) {
         )}
       </div>
       <DeploymentStages deployment={deployment} />
-      {deployment.error && (
-        <p className="text-sm text-[var(--danger)]">{deployment.error.message}</p>
-      )}
+      <DeploymentFailure deployment={deployment} />
     </li>
   );
 }
