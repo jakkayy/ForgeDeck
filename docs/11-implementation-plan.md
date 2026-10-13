@@ -222,6 +222,13 @@ Found while building and testing the dashboard; not in the original list.
 | 2.22 | Test: webhook ซ้ำไม่สร้าง build ซ้ำ | `test(api): add duplicate webhook delivery test` |
 | 2.23 | Test: lease หมดแล้ว job กลับมาทำต่อได้ | `test(api): add lease expiry recovery test` |
 
+Added during Phase 2:
+
+| # | งาน | Commit |
+|---|---|---|
+| 2.11b | ลงทะเบียน/ลบ webhook บน GitLab ตาม lifecycle ของ application | `feat(api): register GitLab webhooks for applications` |
+| 2.21b | ขยาย CSS budget เป็น 20 KB (เหตุผลใน 08) | `ci: raise web CSS budget to 20 KB` |
+
 ---
 
 ## Phase 3 — Isolated CI Runner
