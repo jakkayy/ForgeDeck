@@ -185,7 +185,7 @@ event: status
 data: {"status":"building"}
 ```
 
-SSE handlers should support reconnect/resume where practical, using a sequence/event ID. Apply authorization before streaming and stop streams when the client disconnects.
+`GET /jobs/{jobID}/events` sends `status` events (the whole job, whenever its status changes), `log` events with id `<attempt>.<sequence>`, keepalive comments every 15 seconds, and a final `end` event once the job has finished and every line was sent. A reconnecting `EventSource` sends `Last-Event-ID` and resumes after that line; `?after=<attempt>.<sequence>` does the same for clients that cannot set headers. Streams stop when the client disconnects or the server shuts down.
 
 ## 11. API quality requirements
 

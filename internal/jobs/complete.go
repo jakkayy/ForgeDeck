@@ -44,10 +44,14 @@ func (s *Service) CompleteAgentJob(ctx context.Context, lease AgentLease, req ag
 		if updated == 0 {
 			return s.checkAlreadyCompleted(ctx, q, lease, req.Outcome)
 		}
-		return q.FinishJobAttempt(ctx, store.FinishJobAttemptParams{
+		err = q.FinishJobAttempt(ctx, store.FinishJobAttemptParams{
 			JobID: lease.JobID, AttemptNumber: lease.Attempt, Status: req.Outcome, Now: now,
 			ErrorCode: optional(req.ErrorCode), ErrorSummary: optional(req.ErrorMessage),
 		})
+		if err != nil {
+			return err
+		}
+		return notifyJob(ctx, q, lease.JobID)
 	})
 }
 

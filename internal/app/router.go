@@ -72,7 +72,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			signedIn.Use(authHandler.RequireUser)
 			projectHandler.Routes(signedIn)
 			serverHandler.Routes(signedIn)
-			jobs.NewHandler(jobService).Routes(signedIn)
+			jobs.NewHandler(ctx, jobService, notifier).Routes(signedIn)
 			gitHandler.Routes(signedIn)
 			appHandler.Routes(signedIn)
 		})

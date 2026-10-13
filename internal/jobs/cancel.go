@@ -31,5 +31,8 @@ func (s *Service) Cancel(ctx context.Context, userID, jobID uuid.UUID) (Job, err
 	if previous != string(StatusQueued) && previous != string(StatusRunning) {
 		return Job{}, errJobFinished
 	}
+	if err := notifyJob(ctx, s.queries, jobID); err != nil {
+		return Job{}, err
+	}
 	return s.Get(ctx, userID, jobID)
 }

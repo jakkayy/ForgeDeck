@@ -36,7 +36,7 @@ func (s *Service) AppendAgentLogs(ctx context.Context, lease AgentLease, events 
 	if _, err := s.queries.AppendJobLogs(ctx, params); err != nil {
 		return fmt.Errorf("append job logs: %w", err)
 	}
-	return nil
+	return notifyJob(ctx, s.queries, lease.JobID)
 }
 
 func (s *Service) requireActive(ctx context.Context, lease AgentLease) error {

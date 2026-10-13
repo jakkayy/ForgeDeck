@@ -23,6 +23,9 @@ func (s *Service) RecoverExpiredLeases(ctx context.Context) (requeued, failed in
 		return 0, 0, fmt.Errorf("recover expired leases: %w", err)
 	}
 	for _, row := range rows {
+		if err := notifyJob(ctx, s.queries, row.ID); err != nil {
+			return requeued, failed, err
+		}
 		if Status(row.Status) == StatusFailed {
 			failed++
 			continue

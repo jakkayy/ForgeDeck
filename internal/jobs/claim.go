@@ -53,6 +53,9 @@ func (s *Service) ClaimForAgent(ctx context.Context, serverID uuid.UUID, workerI
 		if err != nil {
 			return fmt.Errorf("record attempt: %w", err)
 		}
+		if err := notifyJob(ctx, q, job.ID); err != nil {
+			return err
+		}
 		claimed = &Claimed{
 			ID: job.ID, Type: job.Type, Attempt: job.AttemptCount,
 			Payload: job.Payload, LeaseExpiresAt: *job.LeaseExpiresAt,

@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -13,12 +14,15 @@ import (
 // Handler serves the user-facing /jobs endpoints. Routes must be mounted
 // behind auth.RequireUser.
 type Handler struct {
-	svc *Service
+	svc      *Service
+	notifier *Notifier
+	shutdown context.Context
 }
 
-// NewHandler returns job endpoints.
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+// NewHandler returns job endpoints. Event streams end when shutdown is
+// cancelled so they do not hold up a graceful stop.
+func NewHandler(shutdown context.Context, svc *Service, notifier *Notifier) *Handler {
+	return &Handler{svc: svc, notifier: notifier, shutdown: shutdown}
 }
 
 // Routes mounts the job endpoints on r.
@@ -27,6 +31,37 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/jobs/{jobID}", httpx.Handle(h.get))
 	r.Get("/jobs/{jobID}/logs", httpx.Handle(h.logs))
 	r.Post("/jobs/{jobID}/cancel", httpx.Handle(h.cancel))
+	r.Get("/jobs/{jobID}/events", h.events)
+}
+
+// events streams logs and status as SSE. Resume position comes from the
+// Last-Event-ID header (set by EventSource on reconnect) or ?after=.
+func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
+	jobID, err := httpx.UUIDParam(r, "jobID")
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	resume := r.Header.Get("Last-Event-ID")
+	if resume == "" {
+		resume = r.URL.Query().Get("after")
+	}
+	after, ok := ParseLogCursor(resume)
+	if !ok {
+		httpx.WriteError(w, r, httpx.BadRequest("invalid_cursor", "Resume position must look like <attempt>.<sequence>."))
+		return
+	}
+	userID := auth.UserFrom(r.Context()).ID
+	if _, err := h.svc.authorizeJob(r.Context(), userID, jobID); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	defer context.AfterFunc(h.shutdown, cancel)()
+	// Errors after the stream starts can only end it; the client reconnects.
+	_ = h.svc.Stream(ctx, userID, jobID, after, h.notifier, httpx.NewSSE(w))
 }
 
 func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) error {

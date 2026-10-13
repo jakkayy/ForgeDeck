@@ -231,6 +231,24 @@ func (c *Client) CreateProject(name string) uuid.UUID {
 	return p.ID
 }
 
+// Stream opens a GET for a long-lived response (SSE) and returns it unread.
+// The caller closes the body.
+func (c *Client) Stream(path string, headers map[string]string) *http.Response {
+	c.t.Helper()
+	req, err := http.NewRequestWithContext(c.t.Context(), http.MethodGet, c.base+path, nil)
+	if err != nil {
+		c.t.Fatalf("apitest: new request: %v", err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatalf("apitest: GET %s: %v", path, err)
+	}
+	return resp
+}
+
 // RequireStatus fails the test unless the response has the given status.
 func (r *Response) RequireStatus(want int) *Response {
 	r.t.Helper()
