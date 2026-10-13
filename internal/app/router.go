@@ -76,8 +76,10 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	jobService.OnSucceeded(deploymentService.AutoDeploy(logger))
 	jobService.OnSucceeded(deploymentService.RecordRelease)
 
+	limits := newLimiters(time.Now)
 	router := chi.NewRouter()
-	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, httpx.SecurityHeaders(cfg.CookieSecure), middleware.GetHead)
+	router.Use(httpx.RequestID, httpx.TrustedProxies(cfg.TrustedProxies), httpx.AccessLog(logger), httpx.Recover,
+		httpx.SecurityHeaders(cfg.CookieSecure), middleware.GetHead)
 	router.Get("/healthz", health.Handler(map[string]health.Check{"database": pool.Ping}))
 
 	router.Route("/api/v1", func(api chi.Router) {
@@ -90,15 +92,21 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			authHandler.Routes(authRoutes)
 		})
 		api.Group(func(agentRoutes chi.Router) {
-			agentRoutes.Use(auditRecorder.Middleware)
+			agentRoutes.Use(limits.enrollment, httpx.ThrottleFailures(limits.failures), auditRecorder.Middleware)
 			agentHandler.Routes(agentRoutes)
 		})
-		runnerHandler.Routes(api)
+		api.Group(func(runnerRoutes chi.Router) {
+			runnerRoutes.Use(httpx.ThrottleFailures(limits.failures))
+			runnerHandler.Routes(runnerRoutes)
+		})
 		gitHandler.PublicRoutes(api)
-		webhooks.NewHandler(cfg.GitHubWebhookSecret, gitService, store.New(pool), jobService, auditRecorder).Routes(api)
+		api.Group(func(webhookRoutes chi.Router) {
+			webhookRoutes.Use(httpx.ThrottleFailures(limits.failures))
+			webhooks.NewHandler(cfg.GitHubWebhookSecret, gitService, store.New(pool), jobService, auditRecorder).Routes(webhookRoutes)
+		})
 
 		api.Group(func(signedIn chi.Router) {
-			signedIn.Use(authHandler.RequireUser, auditRecorder.Middleware)
+			signedIn.Use(authHandler.RequireUser, limits.userMutations, auditRecorder.Middleware)
 			projectHandler.Routes(signedIn)
 			serverHandler.Routes(signedIn)
 			jobs.NewHandler(ctx, jobService, notifier).Routes(signedIn)

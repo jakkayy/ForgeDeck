@@ -53,3 +53,33 @@ func TestLimiterEvictsIdleKeys(t *testing.T) {
 		t.Fatal("idle key not evicted")
 	}
 }
+
+func TestBlockedAndFailCountOnlyFailures(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	l := New(10*time.Second, 3, func() time.Time { return now })
+
+	// Successful work consumes nothing: checking never uses a token.
+	for range 10 {
+		if blocked, _ := l.Blocked("1.2.3.4"); blocked {
+			t.Fatal("blocked before any failure")
+		}
+	}
+	for range 3 {
+		l.Fail("1.2.3.4")
+	}
+	blocked, wait := l.Blocked("1.2.3.4")
+	if !blocked || wait <= 0 || wait > 10*time.Second {
+		t.Fatalf("after 3 failures: blocked=%v wait=%v", blocked, wait)
+	}
+	if blocked, _ := l.Blocked("5.6.7.8"); blocked {
+		t.Fatal("another key was blocked")
+	}
+
+	// Further failures do not extend the block beyond what the bucket holds.
+	l.Fail("1.2.3.4")
+	l.Fail("1.2.3.4")
+	now = now.Add(10 * time.Second)
+	if blocked, _ := l.Blocked("1.2.3.4"); blocked {
+		t.Fatal("still blocked one refill interval after the last failure")
+	}
+}

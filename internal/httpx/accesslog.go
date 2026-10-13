@@ -24,6 +24,7 @@ func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 			}
 			attrs := []slog.Attr{
 				slog.String("request_id", RequestIDFrom(ctx)),
+				slog.String("client_ip", ClientIP(r)),
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", status),

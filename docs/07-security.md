@@ -179,3 +179,25 @@ API responses also carry `Cache-Control: no-store`: they hold session-scoped dat
 **The one inline style.** react-aria (HeroUI's behavior layer) adds a single `<style>` element at run time that sets `touch-action` for pressable elements. The policy allows exactly that text by hash rather than `unsafe-inline`, so every other inline style stays blocked, and the dashboard's own CSS contains the same rule so nothing depends on the hash. If a react-aria upgrade changes the text, the browser console reports a blocked style with the new hash: update `reactAriaPressStyle`. The theme script that used to be inline in `index.html` is now `/theme.js`, which still runs before first paint.
 
 **Verified.** The dashboard was loaded in Chrome under this policy and exercised (sign-in, every project tab, dialogs, dropdowns, the audit log); no policy violation is reported. Unit tests pin the policy: no `unsafe-inline`, `unsafe-eval`, wildcard or `http(s):` source, exactly one style hash, HSTS only when enabled.
+
+
+## Rate limiting
+
+The limits are per process and in memory (ForgeDeck runs as one Control Plane process). They stop abuse; they are not quotas, and they reset when the process restarts.
+
+| What | Limit | Key |
+|---|---|---|
+| Sign-in | 20 in a burst then one per 3 s per address; 10 then one per 30 s per email | client address, email |
+| Agent enrollment | 10 in a burst, then one per 6 s | client address |
+| Bad credentials on Agent, Runner and webhook endpoints | 20 failures in a burst, then one per 6 s; further requests get `429` until it refills | client address |
+| A signed-in user changing something (POST, PUT, PATCH, DELETE) | 60 in a burst, then one per second | user |
+| Adding a member, creating an enrollment token, connecting Git, creating a project | 10 in a burst, then one per 6 s | user |
+| Starting a build, setting a secret | 30 in a burst, then one per 2 s | user |
+
+Reads are not limited. A refused request gets `429` with `Retry-After`.
+
+**Failures only for machines.** Agents and Runners report every few seconds, often many from one NAT address, so their endpoints are not limited per request. Only `401` responses count, so a client that authenticates correctly is never throttled while one guessing credentials is. (Credentials are long random strings, so this is a second line of defense against guessing and against noise, not the first.)
+
+**The client address behind a proxy.** The address a limit uses is the TCP peer unless `FORGEDECK_TRUSTED_PROXIES` lists the reverse proxies in front of ForgeDeck (addresses or CIDR ranges, comma separated). Then, and only when the peer is one of them, `X-Forwarded-For` is read from the right and the first address that is not itself a trusted proxy is the client; everything left of it was supplied by the client and is ignored. A malformed hop makes ForgeDeck fall back to the peer. **Set it when you run behind a proxy.** Without it every request looks like it comes from the proxy, so a limit per address is one bucket shared by everyone, and one caller can lock the others out. Never list addresses that clients can reach directly: they could then claim to be anyone. The access log records `client_ip`.
+
+**Not covered.** A distributed attacker with many addresses is slowed, not stopped; account lockout is not implemented (it would let an attacker lock a user out). Put a WAF or a limiting reverse proxy in front for volumetric abuse.

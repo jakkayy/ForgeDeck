@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"slices"
 	"strconv"
@@ -30,6 +31,9 @@ type Config struct {
 	GitHub *github.Config
 	// GitHubWebhookSecret verifies GitHub App webhook deliveries.
 	GitHubWebhookSecret string
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For header is
+	// believed when finding a client's address (FORGEDECK_TRUSTED_PROXIES).
+	TrustedProxies []netip.Prefix
 	// Outbound limits requests to user-supplied URLs such as a self-hosted
 	// GitLab. FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS opens private networks.
 	Outbound safehttp.Policy
@@ -55,6 +59,7 @@ func Load(lookup LookupFunc) (Config, error) {
 	cfg.Keyring = keys
 	cfg.PublicURL = strings.TrimRight(env.string("FORGEDECK_PUBLIC_URL", ""), "/")
 	cfg.GitHub, cfg.GitHubWebhookSecret = env.gitHubApp()
+	cfg.TrustedProxies = env.prefixes("FORGEDECK_TRUSTED_PROXIES")
 	cfg.Outbound = safehttp.Policy{AllowPrivate: env.bool("FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS", false)}
 
 	if err := errors.Join(append(env.errs, cfg.validate())...); err != nil {
@@ -149,6 +154,29 @@ func (r *reader) required(key string) string {
 		r.errs = append(r.errs, fmt.Errorf("%s is required when the GitHub App is configured", key))
 	}
 	return value
+}
+
+// prefixes reads a comma-separated list of addresses or CIDR ranges.
+func (r *reader) prefixes(key string) []netip.Prefix {
+	raw, ok := r.lookup(key)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var out []netip.Prefix
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		prefix, err := netip.ParsePrefix(item)
+		if err != nil {
+			addr, addrErr := netip.ParseAddr(item)
+			if addrErr != nil {
+				r.errs = append(r.errs, fmt.Errorf("%s: %q is not an IP address or CIDR range", key, item))
+				continue
+			}
+			prefix = netip.PrefixFrom(addr.Unmap(), addr.Unmap().BitLen())
+		}
+		out = append(out, prefix.Masked())
+	}
+	return out
 }
 
 func (r *reader) bool(key string, fallback bool) bool {
