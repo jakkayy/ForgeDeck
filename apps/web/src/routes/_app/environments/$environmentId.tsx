@@ -6,6 +6,7 @@ import {
   type Deployment,
   deploymentsQuery,
   environmentQuery,
+  isDeploymentActive,
   releasesQuery,
 } from "../../../api/environments";
 import { serversQuery } from "../../../api/servers";
@@ -18,6 +19,7 @@ import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { duration } from "../../../lib/describeJob";
 import { shortImage } from "../../../lib/serviceConfig";
 import { timeAgo } from "../../../lib/time";
+import { useRefreshReleases } from "../../../lib/useRefreshReleases";
 
 export const Route = createFileRoute("/_app/environments/$environmentId")({
   loader: ({ context, params }) =>
@@ -112,6 +114,7 @@ function CurrentRelease({ environmentId }: { environmentId: string }) {
 
 function Deployments({ environmentId }: { environmentId: string }) {
   const deployments = useQuery(deploymentsQuery(environmentId));
+  useRefreshReleases(environmentId, deployments.data?.items.some(isDeploymentActive) ?? false);
   return (
     <section aria-label="Deployments" className="flex flex-col gap-3">
       <h2 className="text-base font-semibold">Deployments</h2>

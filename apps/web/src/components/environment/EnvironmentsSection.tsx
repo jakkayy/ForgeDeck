@@ -8,6 +8,7 @@ import {
   deploymentsQuery,
   type Environment,
   environmentsQuery,
+  isDeploymentActive,
   releasesQuery,
 } from "../../api/environments";
 import { listJobs } from "../../api/jobs";
@@ -15,6 +16,7 @@ import { serversQuery } from "../../api/servers";
 import { shortImage } from "../../lib/serviceConfig";
 import { timeAgo } from "../../lib/time";
 import { useHasRole } from "../../lib/useHasRole";
+import { useRefreshReleases } from "../../lib/useRefreshReleases";
 import { JobStatusChip } from "../JobStatusChip";
 import { QueryError } from "../QueryError";
 import { EnvironmentDialog } from "./EnvironmentDialog";
@@ -87,6 +89,7 @@ function EnvironmentRow({ environment, applicationId, projectId, latestBuild }: 
   const serverName = servers.data?.items.find((s) => s.id === environment.server_id)?.name;
   const release = useQuery(releasesQuery(environment.id, 1));
   const deployments = useQuery(deploymentsQuery(environment.id, 1));
+  useRefreshReleases(environment.id, deployments.data?.items.some(isDeploymentActive) ?? false);
   const current = release.data?.items[0];
   const last: Deployment | undefined = deployments.data?.items[0];
   const { published_port, container_port, bind_address } = environment.config;
