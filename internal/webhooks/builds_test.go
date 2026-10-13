@@ -130,3 +130,31 @@ func TestGitHubPushBuildsInEveryConnectedProject(t *testing.T) {
 		t.Fatalf("%d builds, want one per project", n)
 	}
 }
+
+func TestPushBuildsAreAuditedOncePerBuild(t *testing.T) {
+	p := newGitLabProject(t)
+	commit := "0123456789abcdef0123456789abcdef01234567"
+	p.push(t, "d-1", "main", commit).RequireStatus(http.StatusAccepted)
+	p.push(t, "d-2", "main", commit).RequireStatus(http.StatusAccepted) // same commit again: no new build
+
+	rows, err := p.env.Pool.Query(t.Context(), `SELECT actor, target_name, metadata FROM audit_logs WHERE action = 'build.queue'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var events int
+	for rows.Next() {
+		var actor, name string
+		var metadata map[string]any
+		if err := rows.Scan(&actor, &name, &metadata); err != nil {
+			t.Fatal(err)
+		}
+		if actor != "webhook" || name != "API" || metadata["commit"] != commit || metadata["branch"] != "main" {
+			t.Fatalf("event %s %s %v", actor, name, metadata)
+		}
+		events++
+	}
+	if events != 1 {
+		t.Fatalf("%d build.queue events for one build", events)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/audit"
 	"github.com/jakkayy/ForgeDeck/internal/builds"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
@@ -26,6 +27,11 @@ func (h *Handler) queueBuilds(ctx context.Context, apps []store.Application, pus
 		}
 		if created {
 			queued++
+			h.audit.Record(ctx, audit.Event{
+				ProjectID: &app.ProjectID, Actor: audit.ActorWebhook, Action: "build.queue", TargetType: "application",
+				TargetID: app.ID.String(), TargetName: app.Name,
+				Metadata: map[string]any{"commit": push.CommitSHA, "branch": push.Branch, "trigger": agentproto.TriggerPush},
+			})
 		}
 	}
 	return fmt.Sprintf("queued %d of %d builds for %s", queued, len(apps), push.CommitSHA[:12]), nil

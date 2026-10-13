@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/audit"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
@@ -79,8 +80,17 @@ func (s *Service) autoDeployOne(ctx context.Context, tx pgx.Tx, env store.Enviro
 	if err != nil {
 		return err
 	}
-	_, err = s.startIn(ctx, sp, nil, env, app, source{
+	deployment, err := s.startIn(ctx, sp, nil, env, app, source{
 		BuildJobID: &job.ID, CommitSHA: result.CommitSHA, ImageRef: result.ImageRef, Config: config,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	// Recorded in the same transaction, so the event exists exactly when the deployment does.
+	s.audit.RecordIn(ctx, sp, audit.Event{
+		ProjectID: &app.ProjectID, Actor: audit.ActorSystem, Action: "deployment.start", TargetType: "environment",
+		TargetID: env.ID.String(), TargetName: env.Name,
+		Metadata: map[string]any{"trigger": "auto_deploy", "deployment_id": deployment.ID.String(), "commit": result.CommitSHA},
+	})
+	return nil
 }

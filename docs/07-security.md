@@ -127,3 +127,16 @@ Audit metadata must not contain secret values. Document how to revoke provider c
 - Whether external Runner hosts are supported in the first release.
 - Network policy for build jobs.
 - Secret rotation and incident response procedures.
+
+
+## Audit log
+
+Security-relevant changes are recorded in an append-only audit log that project admins read through `GET /projects/{id}/audit-logs` (see [03](03-database.md) and [04](04-api-spec.md)).
+
+**What is recorded.** Every route that changes data is listed in `internal/audit/rules.go` as either *audited* or *exempt with a reason*, and a test walks the real router and fails if a route is in neither, so an endpoint cannot be added without deciding. Audited: projects and members, secrets (set, replace, delete), registries, Git connections, applications, builds, environments, deployments and rollbacks, job cancellation, server removal, enrollment tokens, container actions and log fetches, signing in. Recorded outside HTTP: an Agent enrolling (`server.enroll`, actor `agent`), a push that queues a build (`build.queue`, actor `webhook`), and an automatic deployment (`deployment.start`, actor `system`, written in the same transaction as the deployment). Exempt: heartbeats, claims, log events and completions from Agents and Runners (machine traffic; the work they do was audited when it was requested) and signing out.
+
+**What is never recorded.** Secret values, passwords, tokens and credentials. Route rules copy only fields named in the rule (such as a role or a commit), the response is read only for the identifying fields `id`, `name`, `email` and a few like them (never an enrollment token or a session), and metadata values under keys that look like credentials are replaced with `[redacted]` as a last defense. Tests assert that known secret values appear nowhere in the log.
+
+**Properties.** A failed request records nothing (an event says something happened). An event is written after the action; if writing fails it is logged at error level and the action stands. The actor is stored as text, so the record outlives the user. The log has no foreign key to the project, so deleting a project keeps the record of who deleted it; only the retention job removes rows. Reading it requires the admin role.
+
+**Not covered.** There is no source IP in the record (ForgeDeck often sits behind a proxy, and a forwarded address is attacker-controlled unless the proxy is trusted); the request ID ties an event to the access log, which has the client address. Tampering by someone with database access is not detected: ship the log to a store they cannot write if that matters.

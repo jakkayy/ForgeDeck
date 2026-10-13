@@ -11,8 +11,10 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
+	"github.com/jakkayy/ForgeDeck/internal/audit"
 	"github.com/jakkayy/ForgeDeck/internal/deployments"
 	"github.com/jakkayy/ForgeDeck/internal/environments"
+	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
 )
 
@@ -340,5 +342,45 @@ func TestDeploymentFailsAtClaimWhenAListedSecretIsGone(t *testing.T) {
 	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&job)
 	if job.Status != jobs.StatusFailed || job.Error == nil || job.Error.Code != "secret_not_found" || !strings.Contains(job.Error.Message, "DATABASE_PASSWORD") {
 		t.Fatalf("job %+v", job)
+	}
+}
+
+// auditEvents returns the project's audit entries of one action, newest first.
+func (f fixture) auditEvents(t *testing.T, action string) []audit.Entry {
+	t.Helper()
+	var page httpx.List[audit.Entry]
+	f.owner.Do(http.MethodGet, "/api/v1/projects/"+f.projectID.String()+"/audit-logs?limit=100&action="+action, nil).
+		RequireStatus(http.StatusOK).Decode(&page)
+	return page.Items
+}
+
+func TestDeploymentsAreAudited(t *testing.T) {
+	f := newAutoFixture(t)
+	f.setAutoDeploy(t, f.staging.ID, true)
+
+	// An automatic deployment is the system's, tied to the build that caused it.
+	f.queueBuild(t, agentproto.TriggerPush)
+	f.succeed(t, f.claim(t), imageRef)
+	auto := f.auditEvents(t, "deployment.start")
+	if len(auto) != 1 || auto[0].Actor != "system" || auto[0].TargetName == nil || *auto[0].TargetName != "staging" {
+		t.Fatalf("auto-deploy events %+v", auto)
+	}
+	var metadata map[string]any
+	_ = json.Unmarshal(auto[0].Metadata, &metadata)
+	if metadata["trigger"] != "auto_deploy" || metadata["deployment_id"] == nil {
+		t.Fatalf("metadata %v", metadata)
+	}
+
+	// A manual deployment and a rollback are the user's.
+	build := f.build(t, f.appID, "succeeded", goodResult())
+	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted)
+	manual := f.auditEvents(t, "deployment.start")
+	if len(manual) != 2 || manual[0].Actor != "owner@example.com" {
+		t.Fatalf("manual deployment events %+v", manual)
+	}
+	releaseID := f.recordRelease(t, f.staging.ID, refOf(digestA))
+	f.rollback(f.owner, releaseID).RequireStatus(http.StatusAccepted)
+	if rollbacks := f.auditEvents(t, "release.rollback"); len(rollbacks) != 1 || rollbacks[0].Actor != "owner@example.com" {
+		t.Fatalf("rollback events %+v", rollbacks)
 	}
 }

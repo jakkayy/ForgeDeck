@@ -44,6 +44,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	authHandler := auth.NewHandler(authService, cfg.CookieSecure)
 	authorizer := authz.New(store.New(pool))
 	projectHandler := projects.NewHandler(projects.NewService(pool, authorizer))
+	auditRecorder := audit.NewRecorder(store.New(pool), logger)
 	jobService := jobs.NewService(pool, authorizer, time.Now)
 	serverService := servers.NewService(pool, authorizer, jobService, time.Now)
 	serverHandler := servers.NewHandler(serverService)
@@ -68,7 +69,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	})
 	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService, registryService))
 
-	deploymentService := deployments.NewService(pool, authorizer, jobService)
+	deploymentService := deployments.NewService(pool, authorizer, jobService, auditRecorder)
 	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier,
 		agentapi.WithDeployContext(deployments.NewContextMinter(store.New(pool), registryService, secretService), logger))
 	deploymentHandler := deployments.NewHandler(deploymentService)
@@ -84,14 +85,20 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		api.NotFound(httpx.Handle(func(http.ResponseWriter, *http.Request) error {
 			return httpx.NotFound("No API endpoint at this path.")
 		}))
-		authHandler.Routes(api)
-		agentHandler.Routes(api)
+		api.Group(func(authRoutes chi.Router) {
+			authRoutes.Use(auditRecorder.Middleware)
+			authHandler.Routes(authRoutes)
+		})
+		api.Group(func(agentRoutes chi.Router) {
+			agentRoutes.Use(auditRecorder.Middleware)
+			agentHandler.Routes(agentRoutes)
+		})
 		runnerHandler.Routes(api)
 		gitHandler.PublicRoutes(api)
-		webhooks.NewHandler(cfg.GitHubWebhookSecret, gitService, store.New(pool), jobService).Routes(api)
+		webhooks.NewHandler(cfg.GitHubWebhookSecret, gitService, store.New(pool), jobService, auditRecorder).Routes(api)
 
 		api.Group(func(signedIn chi.Router) {
-			signedIn.Use(authHandler.RequireUser)
+			signedIn.Use(authHandler.RequireUser, auditRecorder.Middleware)
 			projectHandler.Routes(signedIn)
 			serverHandler.Routes(signedIn)
 			jobs.NewHandler(ctx, jobService, notifier).Routes(signedIn)

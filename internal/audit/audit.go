@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
@@ -22,6 +23,8 @@ const (
 	ActorSystem = "system"
 	ActorAgent  = "agent"
 	ActorRunner = "runner"
+	// ActorWebhook is a Git provider's push event.
+	ActorWebhook = "webhook"
 )
 
 // Event is one thing that happened. Metadata must hold non-sensitive details
@@ -61,10 +64,32 @@ func (r *Recorder) Record(ctx context.Context, e Event) {
 	}
 }
 
+// RecordIn stores e inside the caller's transaction, so it commits or rolls
+// back with what it describes. It runs in a savepoint: if the insert fails,
+// only the event is lost (and logged), and the caller's transaction stays usable.
+func (r *Recorder) RecordIn(ctx context.Context, tx pgx.Tx, e Event) {
+	sp, err := tx.Begin(ctx)
+	if err == nil {
+		err = r.writeWith(ctx, r.queries.WithTx(sp), e)
+		if err != nil {
+			_ = sp.Rollback(ctx)
+		} else {
+			err = sp.Commit(ctx)
+		}
+	}
+	if err != nil {
+		r.logger.ErrorContext(ctx, "audit event not recorded", "action", e.Action, "target", e.TargetID, "error", err)
+	}
+}
+
 func (r *Recorder) write(ctx context.Context, e Event) error {
+	return r.writeWith(ctx, r.queries, e)
+}
+
+func (r *Recorder) writeWith(ctx context.Context, q *store.Queries, e Event) error {
 	actor := e.Actor
 	if e.ActorUserID != nil {
-		user, err := r.queries.GetUserByID(ctx, *e.ActorUserID)
+		user, err := q.GetUserByID(ctx, *e.ActorUserID)
 		if err != nil {
 			return fmt.Errorf("look up actor: %w", err)
 		}
@@ -77,7 +102,7 @@ func (r *Recorder) write(ctx context.Context, e Event) error {
 	if err != nil {
 		return fmt.Errorf("encode metadata: %w", err)
 	}
-	return r.queries.InsertAuditLog(ctx, store.InsertAuditLogParams{
+	return q.InsertAuditLog(ctx, store.InsertAuditLogParams{
 		ProjectID: e.ProjectID, ActorUserID: e.ActorUserID, Actor: actor,
 		Action: e.Action, TargetType: e.TargetType, TargetID: optional(e.TargetID), TargetName: optional(e.TargetName),
 		Metadata: metadata, RequestID: optional(httpx.RequestIDFrom(ctx)),
