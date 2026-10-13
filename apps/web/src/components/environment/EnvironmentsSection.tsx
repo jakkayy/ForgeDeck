@@ -1,5 +1,6 @@
 import { AlertDialog, Button, Card, Chip, Spinner, toast } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
   type Deployment,
   deleteEnvironment,
@@ -94,7 +95,13 @@ function EnvironmentRow({ environment, applicationId, projectId, latestBuild }: 
     <li className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
       <div className="min-w-48 flex-1">
         <p className="flex items-center gap-2 font-medium">
-          {environment.name}
+          <Link
+            to="/environments/$environmentId"
+            params={{ environmentId: environment.id }}
+            className="hover:underline"
+          >
+            {environment.name}
+          </Link>
           {environment.auto_deploy && (
             <Chip size="sm" variant="soft">
               auto-deploy
