@@ -59,6 +59,7 @@ func BuildHandler(cfg BuildConfig) worker.Handler {
 		if job.Credentials == nil {
 			return nil, errNoCredential
 		}
+		log = newRedactingLog(log, secretsOf(*job.Credentials))
 		ws, err := newWorkspace(cfg.WorkDir)
 		if err != nil {
 			return nil, err

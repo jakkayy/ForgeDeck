@@ -65,7 +65,7 @@ Repository code, Dockerfiles, and test commands are untrusted.
 | Build steps reading the host | BuildKit runs `RUN` steps in containers without host mounts. The Runner never mounts the Docker socket into a build or test container. |
 | Tests attacking the network | Test containers run with `--network none`. |
 | Resource exhaustion | Test containers get `--cpus`, `--memory`, `--pids-limit`; every job has a timeout. Configure BuildKit's own limits on the build host for build steps. |
-| Credential theft | Credentials are per job and short-lived where the provider allows; docker login uses a per-job config directory; known secret values are replaced with `********` in logs. |
+| Credential theft | Credentials are per job and short-lived where the provider allows; docker login uses a per-job config directory; build commands do not inherit the Runner's environment. Every log line is scrubbed of the job's secret values and their HTTP Basic (base64) forms, replaced with `********`, before it leaves the Runner. Redaction cannot catch a secret a tool transforms in other ways, so do not echo credentials in build scripts. |
 | Reaching production | The build host has no Agent and no production Docker access. Images reach production only through the registry. |
 
 Container isolation is not a perfect boundary for hostile code. Run Runners on hosts that hold nothing else of value, and do not build untrusted forks on the same host as trusted code.
