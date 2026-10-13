@@ -25,6 +25,12 @@ Rules:
 - A release stores a **snapshot** of the configuration it ran with, so rolling back restores the old configuration together with the old image, not just the image.
 - Release records are kept as long as the environment exists. Deleting an environment deletes its history; there is no pruning in the MVP.
 
+### Rollback
+
+`POST /releases/{id}/rollback` (developer or higher) creates a deployment whose source is that release: the **same image digest and the configuration the release ran with**, never a rebuild of old source. The deployment follows the normal flow, including the health check and, if the old version no longer starts, the fall back to what ran before. When it is healthy it becomes the environment's newest release, so history keeps every release and nothing is rewritten. Any release can be chosen, including the current one (which re-applies it).
+
+The environment's own configuration is not changed, so later deployments keep using what the user set there. Before queuing, the Control Plane refuses a rollback whose host port another environment on the server has taken since (`409 port_in_use`). It does not check that the image is still in the registry or that volumes still match the old version: a missing image fails the pull (the running service stays up), and data compatibility is the risk documented in 4.18.
+
 ### Triggers
 
 - **Manual:** `POST /environments/{id}/deployments` with a build job ID or a release ID (developer role or higher).

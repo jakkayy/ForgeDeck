@@ -29,3 +29,9 @@ DELETE FROM environments WHERE id = $1;
 SELECT * FROM environments
 WHERE application_id = $1 AND auto_deploy
 ORDER BY name, id;
+
+-- name: FindPortConflict :one
+-- Another environment on the server that publishes the port.
+SELECT id FROM environments
+WHERE server_id = @server_id AND published_port = @published_port AND id <> @except_id
+LIMIT 1;

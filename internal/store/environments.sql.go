@@ -63,6 +63,26 @@ func (q *Queries) DeleteEnvironment(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const findPortConflict = `-- name: FindPortConflict :one
+SELECT id FROM environments
+WHERE server_id = $1 AND published_port = $2 AND id <> $3
+LIMIT 1
+`
+
+type FindPortConflictParams struct {
+	ServerID      uuid.UUID
+	PublishedPort *int32
+	ExceptID      uuid.UUID
+}
+
+// Another environment on the server that publishes the port.
+func (q *Queries) FindPortConflict(ctx context.Context, arg FindPortConflictParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findPortConflict, arg.ServerID, arg.PublishedPort, arg.ExceptID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getEnvironment = `-- name: GetEnvironment :one
 SELECT id, application_id, name, server_id, auto_deploy, config, published_port, created_by, created_at, updated_at FROM environments WHERE id = $1
 `

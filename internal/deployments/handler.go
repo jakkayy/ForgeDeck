@@ -26,6 +26,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Post("/environments/{environmentID}/deployments", httpx.Handle(h.deploy))
 	r.Get("/deployments/{deploymentID}", httpx.Handle(h.get))
 	r.Get("/environments/{environmentID}/releases", httpx.Handle(h.listReleases))
+	r.Post("/releases/{releaseID}/rollback", httpx.Handle(h.rollback))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
@@ -90,4 +91,16 @@ func (h *Handler) listReleases(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.WriteJSON(w, http.StatusOK, httpx.NewList(items, page))
+}
+
+func (h *Handler) rollback(w http.ResponseWriter, r *http.Request) error {
+	releaseID, err := httpx.UUIDParam(r, "releaseID")
+	if err != nil {
+		return err
+	}
+	deployment, err := h.svc.Rollback(r.Context(), auth.UserFrom(r.Context()).ID, releaseID)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusAccepted, deployment)
 }
