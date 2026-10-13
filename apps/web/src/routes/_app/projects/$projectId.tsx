@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { projectQuery } from "../../../api/projects";
+import { ApplicationsSection } from "../../../components/project/ApplicationsSection";
 import { GitSection } from "../../../components/project/GitSection";
 import { MembersSection } from "../../../components/project/MembersSection";
 import { QueryError } from "../../../components/QueryError";
 import { RoleChip } from "../../../components/RoleChip";
 
-const tabs = ["git", "members"] as const;
+const tabs = ["applications", "git", "members"] as const;
 type Tab = (typeof tabs)[number];
 
 const gitErrors: Record<string, string> = {
@@ -35,7 +36,7 @@ function ProjectPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const project = useQuery(projectQuery(projectId));
-  const tab = search.tab ?? "git";
+  const tab = search.tab ?? "applications";
 
   // Report the outcome of a GitHub install redirect once, then tidy the URL.
   useEffect(() => {
@@ -69,12 +70,18 @@ function ProjectPage() {
           <RoleChip role={project.data.role} />
         </div>
       </div>
+      {/* isolate keeps the tab indicator's z-index from rising above dialogs */}
       <Tabs
+        className="isolate"
         selectedKey={tab}
         onSelectionChange={(key) => navigate({ search: { tab: key as Tab }, replace: true })}
       >
         <Tabs.ListContainer>
           <Tabs.List aria-label="Project sections">
+            <Tabs.Tab id="applications">
+              Applications
+              <Tabs.Indicator />
+            </Tabs.Tab>
             <Tabs.Tab id="git">
               Git
               <Tabs.Indicator />
@@ -85,6 +92,9 @@ function ProjectPage() {
             </Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
+        <Tabs.Panel id="applications" className="pt-4">
+          <ApplicationsSection projectId={projectId} />
+        </Tabs.Panel>
         <Tabs.Panel id="git" className="pt-4">
           <GitSection projectId={projectId} />
         </Tabs.Panel>
