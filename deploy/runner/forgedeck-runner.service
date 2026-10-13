@@ -1,0 +1,40 @@
+[Unit]
+Description=ForgeDeck build Runner
+Documentation=https://github.com/jakkayy/ForgeDeck/blob/main/docs/14-runner.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=forgedeck-runner
+Group=forgedeck-runner
+EnvironmentFile=/etc/forgedeck-runner/runner.env
+# Rootless Docker for this user (see deploy/runner/README.md). If you use the
+# system daemon instead, remove this line: that gives the Runner root-equivalent
+# access to the build host.
+Environment=DOCKER_HOST=unix:///run/user/%U/docker.sock
+ExecStart=/usr/local/bin/forgedeck-runner run \
+    --url ${FORGEDECK_URL} \
+    --work-dir /var/lib/forgedeck-runner \
+    --build-timeout ${FORGEDECK_BUILD_TIMEOUT} \
+    --test-cpus ${FORGEDECK_TEST_CPUS} \
+    --test-memory ${FORGEDECK_TEST_MEMORY} \
+    --test-pids ${FORGEDECK_TEST_PIDS}
+Restart=on-failure
+RestartSec=5s
+# A build in progress is abandoned on stop; the Control Plane retries it.
+TimeoutStopSec=30s
+
+# Hardening. The Runner only needs its work directory and the network.
+StateDirectory=forgedeck-runner
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
