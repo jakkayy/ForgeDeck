@@ -44,6 +44,10 @@ func run(args []string) error {
 	credentialFile := flags.String("credential-file", "", "file holding the Runner credential (default: $FORGEDECK_RUNNER_CREDENTIAL)")
 	workDir := flags.String("work-dir", "/var/lib/forgedeck-runner", "directory for per-job build workspaces")
 	gitProtocols := flags.String("git-protocols", "https", "colon-separated protocols git may use, e.g. https:http for an internal GitLab")
+	buildTimeout := flags.Duration("build-timeout", runner.DefaultBuildTimeout, "stop builds that run longer")
+	testCPUs := flags.String("test-cpus", runner.DefaultTestLimits.CPUs, "CPUs for a test container (docker --cpus)")
+	testMemory := flags.String("test-memory", runner.DefaultTestLimits.Memory, "memory for a test container (docker --memory)")
+	testPIDs := flags.Int("test-pids", runner.DefaultTestLimits.PIDs, "process limit for a test container")
 	allowInsecure := flags.Bool("allow-insecure", false, "allow a non-HTTPS Control Plane URL")
 	logLevel := flags.String("log-level", "info", "debug, info, warn or error")
 	if err := flags.Parse(args[1:]); err != nil {
@@ -66,8 +70,12 @@ func run(args []string) error {
 	}
 
 	cfg := runner.Config{ControlPlaneURL: *controlPlaneURL, Credential: credential, Version: version}
+	if *buildTimeout <= 0 || *testPIDs <= 0 {
+		return errors.New("--build-timeout and --test-pids must be positive")
+	}
 	handlers := runner.Handlers(runner.BuildConfig{
-		WorkDir: *workDir, GitProtocols: *gitProtocols, TestLimits: runner.DefaultTestLimits,
+		WorkDir: *workDir, GitProtocols: *gitProtocols, Timeout: *buildTimeout,
+		TestLimits: runner.TestLimits{CPUs: *testCPUs, Memory: *testMemory, PIDs: *testPIDs},
 	})
 	return runner.Run(ctx, cfg, handlers, runner.DockerStatus, logger)
 }

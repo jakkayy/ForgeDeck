@@ -54,7 +54,7 @@ The image destination is read from the application when the build is claimed; an
 
 Build commands run with a minimal environment (`PATH`, a per-job `HOME` and `DOCKER_CONFIG`, and `DOCKER_HOST`/`DOCKER_TLS_VERIFY`/`DOCKER_CERT_PATH` if set), so they never see the Runner's credential.
 
-Each job has a timeout (default 20 minutes). The workspace and the job's Docker config directory are deleted afterwards, success or not.
+Each job has a timeout (`--build-timeout`, default 20 minutes); a build that exceeds it fails with `build_timeout`. Test containers are limited by `--test-cpus` (default 2), `--test-memory` (default `2g`, swap capped to the same), and `--test-pids` (default 512). The workspace, the job's Docker config directory, and the image tags the build created on the build host are deleted afterwards, success or not; the pushed image stays in the registry.
 
 ## Isolation and threat model
 

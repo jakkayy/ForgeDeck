@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/worker"
@@ -25,12 +26,25 @@ func buildJob(t *testing.T, url, commit string) *agentproto.Job {
 func TestBuildRemovesWorkspaceOnFailure(t *testing.T) {
 	url, _ := sourceRepo(t, map[string]string{"Dockerfile": "FROM scratch\n"})
 	workDir := t.TempDir()
-	handler := BuildHandler(BuildConfig{WorkDir: workDir, GitProtocols: "file"})
+	handler := BuildHandler(BuildConfig{WorkDir: workDir, GitProtocols: "file", Timeout: time.Minute})
 
 	_, err := handler(context.Background(), buildJob(t, url, "0123456789abcdef0123456789abcdef01234567"), &recordLog{})
 	var jobErr *worker.JobError
 	if !errors.As(err, &jobErr) || jobErr.Code != "checkout_failed" {
 		t.Fatalf("missing commit: %v", err)
+	}
+	requireEmptyDir(t, workDir)
+}
+
+func TestBuildTimeout(t *testing.T) {
+	url, commit := sourceRepo(t, map[string]string{"Dockerfile": "FROM scratch\n"})
+	workDir := t.TempDir()
+	handler := BuildHandler(BuildConfig{WorkDir: workDir, GitProtocols: "file", Timeout: time.Nanosecond})
+
+	_, err := handler(context.Background(), buildJob(t, url, commit), &recordLog{})
+	var jobErr *worker.JobError
+	if !errors.As(err, &jobErr) || jobErr.Code != "build_timeout" {
+		t.Fatalf("got %v, want build_timeout", err)
 	}
 	requireEmptyDir(t, workDir)
 }
@@ -43,7 +57,7 @@ func requireEmptyDir(t *testing.T, dir string) {
 }
 
 func TestBuildRejectsInvalidJobs(t *testing.T) {
-	handler := BuildHandler(BuildConfig{WorkDir: t.TempDir(), GitProtocols: "file"})
+	handler := BuildHandler(BuildConfig{WorkDir: t.TempDir(), GitProtocols: "file", Timeout: time.Minute})
 	noCredentials := buildJob(t, "file:///nowhere", "0123456789abcdef0123456789abcdef01234567")
 	noCredentials.Credentials = nil
 	cases := map[string]struct {

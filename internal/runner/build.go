@@ -3,7 +3,9 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
+	"time"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/worker"
@@ -17,7 +19,14 @@ type BuildConfig struct {
 	GitProtocols string
 	// TestLimits bound the test container.
 	TestLimits TestLimits
+	// Timeout stops a build that runs longer, whatever step it is in.
+	Timeout time.Duration
 }
+
+// DefaultBuildTimeout is the build time limit unless the operator sets one.
+const DefaultBuildTimeout = 20 * time.Minute
+
+const removeImagesTimeout = time.Minute
 
 // BuildResult is a successful build's job result. Deployments use
 // ImageRef, which pins the exact image pushed.
@@ -38,8 +47,9 @@ var (
 	errPush         = &worker.JobError{Code: "image_push_failed", Message: "The image could not be pushed to the registry. Check the registry credentials and the build log."}
 )
 
-// BuildHandler runs build jobs in a fresh workspace that is removed when the
-// job ends, whatever the outcome.
+// BuildHandler runs build jobs in a fresh workspace. The workspace and the
+// images the build created are removed when the job ends, whatever the
+// outcome, so a build host does not fill up.
 func BuildHandler(cfg BuildConfig) worker.Handler {
 	return func(ctx context.Context, job *agentproto.Job, log worker.Logger) (any, error) {
 		var payload agentproto.BuildPayload
@@ -60,7 +70,16 @@ func BuildHandler(cfg BuildConfig) worker.Handler {
 		}()
 
 		b := &build{cfg: cfg, ws: ws, exec: newExecutor(ws, log), log: log, payload: payload, credentials: *job.Credentials}
-		return b.run(ctx)
+		defer b.removeImages(ctx)
+
+		ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+		defer cancel()
+		result, err := b.run(ctx)
+		if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, &worker.JobError{Code: "build_timeout",
+				Message: "The build took longer than " + cfg.Timeout.String() + " and was stopped."}
+		}
+		return result, err
 	}
 }
 
@@ -105,6 +124,19 @@ func (b *build) run(ctx context.Context) (any, error) {
 	}
 	b.log.Log("system", "Pushed "+image+"@"+digest)
 	return BuildResult{CommitSHA: b.payload.CommitSHA, Image: image, Tag: tag, Digest: digest, ImageRef: image + "@" + digest}, nil
+}
+
+// removeImages deletes the build's tags from the build host. The pushed
+// image stays in the registry; layers shared with other images stay cached.
+func (b *build) removeImages(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeImagesTimeout)
+	defer cancel()
+	tags := []string{b.localTag()}
+	if b.credentials.Image != "" {
+		tags = append(tags, b.credentials.Image+":"+b.payload.CommitSHA[:12])
+	}
+	// Tags that were never created make docker exit non-zero; that is fine.
+	_, _ = b.exec.output(ctx, command{name: "docker", args: append([]string{"image", "rm", "--force"}, tags...)})
 }
 
 // testContainer names the test container of this build.
