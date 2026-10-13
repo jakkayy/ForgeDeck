@@ -65,7 +65,7 @@ docker compose restart api
 
 - **Back up** the database on a schedule and **check** that the backups restore: [16](../../docs/16-backup-restore.md). Here the database container is `forgedeck-prod-postgres-1`:
   `FORGEDECK_PG_CONTAINER=forgedeck-prod-postgres-1 ../backup/backup.sh -d /var/backups/forgedeck`
-- **Upgrade** by pulling the new version and running `docker compose up -d --build` again; migrations run on start.
+- **Upgrade:** back up and verify first, then check out the new version and run `docker compose up -d --build`; migrations run on start. The order, what happens to work in progress, and how to go back are in [17](../../docs/17-upgrade-guide.md).
 - **The GitHub App and other optional settings** go in `.env` (see the commented lines in `.env.example`); then `docker compose up -d`.
 
 ## Connecting machines

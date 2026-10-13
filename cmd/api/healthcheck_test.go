@@ -60,3 +60,9 @@ func TestHealthcheckAcceptsAWildcardListenAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestVersionIsSetAtBuildTime(t *testing.T) {
+	if version == "" {
+		t.Fatal("version is empty: `forgedeck-api version` would print nothing")
+	}
+}

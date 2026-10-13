@@ -128,4 +128,5 @@ FORGEDECK_RUNNER_CREDENTIAL=fdr_... make run-runner URL=http://localhost:8080
 | [12 Measurements](docs/12-measurements.md) · [13 Git Providers](docs/13-git-providers.md) | ผลวัดและการตั้งค่า provider |
 | [15 Deployments](docs/15-deployments.md) | environment, deployment, release, rollback |
 | [16 Backup and Restore](docs/16-backup-restore.md) | สำรองและกู้ข้อมูล, `FORGEDECK_SECRET_KEYS` ต้องเก็บแยก |
+| [17 Upgrade Guide](docs/17-upgrade-guide.md) | อัปเกรด, ย้อนกลับ, การเปลี่ยนแปลงที่ต้องทำตาม |
 | [AGENTS.md](AGENTS.md) | กฎสำหรับ AI coding agents |

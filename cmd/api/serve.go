@@ -11,6 +11,7 @@ import (
 )
 
 func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
+	logger.Info("forgedeck starting", "version", version, "addr", cfg.HTTPAddr)
 	if err := migrateUp(ctx, cfg, logger); err != nil {
 		return err
 	}
