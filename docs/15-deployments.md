@@ -71,7 +71,7 @@ Plus `timeout_seconds` (default 60, max 600) and `interval_seconds` (default 2).
 
 ### Rendering and applying
 
-For each environment the Agent keeps `compose.yml` under its state directory, with Compose project `forgedeck-<environment id>` and a single service `app`. It carries ForgeDeck labels (`forgedeck.environment`, `forgedeck.release`) and the standard Compose labels, so the dashboard's container list shows it.
+The file is **JSON** (valid YAML, which Compose reads), produced by the encoder, so no value can break out of its string; `$` in values is escaped as `$$` so Compose does not interpolate it. For each environment the Agent keeps `compose.yml` under its state directory, with Compose project `forgedeck-<environment id>` and a single service `app`. It carries ForgeDeck labels (`forgedeck.environment`, `forgedeck.release`) and the standard Compose labels, so the dashboard's container list shows it.
 
 Applying a deployment is idempotent: pull the digest, render, `docker compose up -d --remove-orphans`, then run the health check. Re-running the same deployment converges to the same state. The Agent needs the Docker Compose plugin on the host (documented as a requirement; the Agent reports it missing as `compose_unavailable`).
 
