@@ -91,7 +91,7 @@ func (s *Service) Deploy(ctx context.Context, userID, environmentID, buildJobID 
 		return Deployment{}, err
 	}
 
-	return s.start(ctx, userID, env, app, source{
+	return s.start(ctx, &userID, env, app, source{
 		BuildJobID: &build.ID, CommitSHA: result.CommitSHA, ImageRef: result.ImageRef, Config: config,
 	})
 }
@@ -107,49 +107,51 @@ type source struct {
 
 // start records the deployment and queues its job in one transaction, so a
 // deployment never exists without its job or the reverse.
-func (s *Service) start(ctx context.Context, userID uuid.UUID, env store.Environment, app store.Application, src source) (Deployment, error) {
-	config, err := servicecfg.Normalize(src.Config)
-	if err != nil {
-		return Deployment{}, err
-	}
-	encoded, err := json.Marshal(config)
-	if err != nil {
-		return Deployment{}, fmt.Errorf("encode config: %w", err)
-	}
-
-	deploymentID := uuid.New()
+func (s *Service) start(ctx context.Context, userID *uuid.UUID, env store.Environment, app store.Application, src source) (Deployment, error) {
 	var created store.Deployment
-	err = database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
-		job, err := s.jobs.EnqueueIn(ctx, tx, jobs.NewJob{
-			ProjectID:      app.ProjectID,
-			ApplicationID:  &app.ID,
-			Type:           agentproto.JobDeployImage,
-			WorkerKind:     jobs.WorkerAgent,
-			TargetServerID: &env.ServerID,
-			CreatedBy:      &userID,
-			Payload: agentproto.DeployImagePayload{
-				DeploymentID: deploymentID, EnvironmentID: env.ID, ApplicationID: app.ID,
-				CommitSHA: src.CommitSHA, ImageRef: src.ImageRef, Config: config,
-			},
-		})
-		if err != nil {
-			return err
-		}
-		created, err = s.queries.WithTx(tx).CreateDeployment(ctx, store.CreateDeploymentParams{
-			ID: deploymentID, EnvironmentID: env.ID, JobID: &job.ID,
-			SourceBuildJobID: src.BuildJobID, SourceReleaseID: src.ReleaseID,
-			CommitSha: src.CommitSHA, ImageRef: src.ImageRef, Config: encoded, CreatedBy: &userID,
-		})
+	err := database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		created, err = s.startIn(ctx, tx, userID, env, app, src)
 		return err
 	})
 	if err != nil {
 		return Deployment{}, fmt.Errorf("start deployment: %w", err)
 	}
-	return Deployment{
-		ID: created.ID, EnvironmentID: created.EnvironmentID, JobID: created.JobID,
-		SourceBuildJobID: created.SourceBuildJobID, SourceReleaseID: created.SourceReleaseID,
-		CommitSHA: created.CommitSha, ImageRef: created.ImageRef, Status: string(jobs.StatusQueued), CreatedAt: created.CreatedAt,
-	}, nil
+	return toDeployment(created, liveJob{}), nil
+}
+
+// startIn does the work of start inside the caller's transaction.
+func (s *Service) startIn(ctx context.Context, tx pgx.Tx, userID *uuid.UUID, env store.Environment, app store.Application, src source) (store.Deployment, error) {
+	config, err := servicecfg.Normalize(src.Config)
+	if err != nil {
+		return store.Deployment{}, err
+	}
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		return store.Deployment{}, fmt.Errorf("encode config: %w", err)
+	}
+
+	deploymentID := uuid.New()
+	job, err := s.jobs.EnqueueIn(ctx, tx, jobs.NewJob{
+		ProjectID:      app.ProjectID,
+		ApplicationID:  &app.ID,
+		Type:           agentproto.JobDeployImage,
+		WorkerKind:     jobs.WorkerAgent,
+		TargetServerID: &env.ServerID,
+		CreatedBy:      userID,
+		Payload: agentproto.DeployImagePayload{
+			DeploymentID: deploymentID, EnvironmentID: env.ID, ApplicationID: app.ID,
+			CommitSHA: src.CommitSHA, ImageRef: src.ImageRef, Config: config,
+		},
+	})
+	if err != nil {
+		return store.Deployment{}, err
+	}
+	return s.queries.WithTx(tx).CreateDeployment(ctx, store.CreateDeploymentParams{
+		ID: deploymentID, EnvironmentID: env.ID, JobID: &job.ID,
+		SourceBuildJobID: src.BuildJobID, SourceReleaseID: src.ReleaseID,
+		CommitSha: src.CommitSHA, ImageRef: src.ImageRef, Config: encoded, CreatedBy: userID,
+	})
 }
 
 // Get returns a deployment the user may view.
@@ -226,6 +228,10 @@ func buildResult(job store.Job, applicationID uuid.UUID) (agentproto.BuildResult
 		return agentproto.BuildResult{}, false
 	}
 	return result, true
+}
+
+func unmarshalPayload(job store.Job, into any) error {
+	return json.Unmarshal(job.Payload, into)
 }
 
 func decodeConfig(raw json.RawMessage) (servicecfg.Config, error) {

@@ -65,6 +65,10 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	})
 	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService, registryService))
 
+	deploymentService := deployments.NewService(pool, authorizer, jobService)
+	deploymentHandler := deployments.NewHandler(deploymentService)
+	jobService.OnSucceeded(deploymentService.AutoDeploy(logger))
+
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, middleware.GetHead)
 	router.Get("/healthz", health.Handler(map[string]health.Check{"database": pool.Ping}))
@@ -88,7 +92,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			gitHandler.Routes(signedIn)
 			appHandler.Routes(signedIn)
 			registries.NewHandler(registryService).Routes(signedIn)
-			deployments.NewHandler(deployments.NewService(pool, authorizer, jobService)).Routes(signedIn)
+			deploymentHandler.Routes(signedIn)
 			environments.NewHandler(environments.NewService(store.New(pool), authorizer)).Routes(signedIn)
 			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)
 		})

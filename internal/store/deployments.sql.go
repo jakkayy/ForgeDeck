@@ -120,6 +120,29 @@ func (q *Queries) GetDeployment(ctx context.Context, id uuid.UUID) (GetDeploymen
 	return i, err
 }
 
+const hasNewerDeployment = `-- name: HasNewerDeployment :one
+SELECT EXISTS (
+    SELECT 1 FROM deployments
+    JOIN jobs ON jobs.id = deployments.source_build_job_id
+    WHERE deployments.environment_id = $1
+      AND jobs.created_at > $2::timestamptz
+)
+`
+
+type HasNewerDeploymentParams struct {
+	EnvironmentID  uuid.UUID
+	BuildCreatedAt time.Time
+}
+
+// Whether the environment already deploys, or has queued, a build created
+// after the given time. A slower, older build must not replace a newer one.
+func (q *Queries) HasNewerDeployment(ctx context.Context, arg HasNewerDeploymentParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasNewerDeployment, arg.EnvironmentID, arg.BuildCreatedAt)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listDeployments = `-- name: ListDeployments :many
 SELECT deployments.id, deployments.environment_id, deployments.job_id, deployments.source_build_job_id, deployments.source_release_id, deployments.commit_sha, deployments.image_ref, deployments.config, deployments.status, deployments.stage, deployments.error_code, deployments.error_message, deployments.created_by, deployments.created_at, deployments.started_at, deployments.finished_at,
        jobs.status        AS job_status,

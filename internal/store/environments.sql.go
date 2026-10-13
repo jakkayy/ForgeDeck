@@ -85,6 +85,43 @@ func (q *Queries) GetEnvironment(ctx context.Context, id uuid.UUID) (Environment
 	return i, err
 }
 
+const listAutoDeployEnvironments = `-- name: ListAutoDeployEnvironments :many
+SELECT id, application_id, name, server_id, auto_deploy, config, published_port, created_by, created_at, updated_at FROM environments
+WHERE application_id = $1 AND auto_deploy
+ORDER BY name, id
+`
+
+func (q *Queries) ListAutoDeployEnvironments(ctx context.Context, applicationID uuid.UUID) ([]Environment, error) {
+	rows, err := q.db.Query(ctx, listAutoDeployEnvironments, applicationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Environment{}
+	for rows.Next() {
+		var i Environment
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationID,
+			&i.Name,
+			&i.ServerID,
+			&i.AutoDeploy,
+			&i.Config,
+			&i.PublishedPort,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEnvironments = `-- name: ListEnvironments :many
 SELECT id, application_id, name, server_id, auto_deploy, config, published_port, created_by, created_at, updated_at FROM environments
 WHERE application_id = $1

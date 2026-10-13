@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/builds"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
@@ -17,7 +18,7 @@ func (h *Handler) queueBuilds(ctx context.Context, apps []store.Application, pus
 	}
 	queued := 0
 	for _, app := range apps {
-		job := builds.NewJob(app, push.Branch, push.CommitSHA, push.CommitMessage)
+		job := builds.NewJob(app, push.Branch, push.CommitSHA, push.CommitMessage, agentproto.TriggerPush)
 		job.IdempotencyKey = "build:" + app.ID.String() + ":" + push.CommitSHA
 		_, created, err := h.jobs.EnqueueOnce(ctx, job)
 		if err != nil {

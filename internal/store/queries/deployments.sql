@@ -31,3 +31,13 @@ LEFT JOIN jobs ON jobs.id = deployments.job_id
 WHERE deployments.environment_id = @environment_id
 ORDER BY deployments.created_at DESC, deployments.id DESC
 LIMIT @page_limit OFFSET @page_offset;
+
+-- name: HasNewerDeployment :one
+-- Whether the environment already deploys, or has queued, a build created
+-- after the given time. A slower, older build must not replace a newer one.
+SELECT EXISTS (
+    SELECT 1 FROM deployments
+    JOIN jobs ON jobs.id = deployments.source_build_job_id
+    WHERE deployments.environment_id = @environment_id
+      AND jobs.created_at > @build_created_at::timestamptz
+);

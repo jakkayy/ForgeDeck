@@ -43,12 +43,25 @@ const NotifyChannel = "forgedeck_jobs"
 
 const runnerNotifyKey = "runner"
 
+// SuccessHook runs inside the transaction that records a job's successful
+// outcome, so what it creates exists exactly when the outcome does. A hook
+// that can fail for reasons of its own must isolate that failure (for
+// example with a savepoint): a returned error aborts the completion.
+type SuccessHook func(ctx context.Context, tx pgx.Tx, job store.Job) error
+
 // Service implements the job queue.
 type Service struct {
-	pool    *pgxpool.Pool
-	queries *store.Queries
-	authz   *authz.Authorizer
-	now     func() time.Time
+	pool        *pgxpool.Pool
+	queries     *store.Queries
+	authz       *authz.Authorizer
+	now         func() time.Time
+	onSucceeded []SuccessHook
+}
+
+// OnSucceeded registers a hook for jobs that succeed. Call it while wiring
+// the application, before the Service handles requests.
+func (s *Service) OnSucceeded(hook SuccessHook) {
+	s.onSucceeded = append(s.onSucceeded, hook)
 }
 
 // NewService returns a job Service; now is time.Now outside tests.

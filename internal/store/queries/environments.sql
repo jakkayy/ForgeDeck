@@ -24,3 +24,8 @@ RETURNING *;
 
 -- name: DeleteEnvironment :exec
 DELETE FROM environments WHERE id = $1;
+
+-- name: ListAutoDeployEnvironments :many
+SELECT * FROM environments
+WHERE application_id = $1 AND auto_deploy
+ORDER BY name, id;

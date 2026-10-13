@@ -237,7 +237,17 @@ type BuildPayload struct {
 	DockerfilePath     string    `json:"dockerfile_path"`
 	BuildContext       string    `json:"build_context"`
 	TestCommand        *string   `json:"test_command,omitempty"`
+	// Trigger says why the build exists: TriggerPush, TriggerManual (branch
+	// head), or TriggerCommit (an explicit commit, which is not auto-deployed).
+	Trigger string `json:"trigger,omitempty"`
 }
+
+// Build triggers.
+const (
+	TriggerPush   = "push"
+	TriggerManual = "manual"
+	TriggerCommit = "commit"
+)
 
 // Container actions accepted by JobContainerAction.
 const (

@@ -30,6 +30,8 @@ Rules:
 - **Manual:** `POST /environments/{id}/deployments` with a build job ID or a release ID (developer role or higher).
 - **Automatic:** an environment with `auto_deploy = true` deploys every succeeded build of its application. It defaults to **false**, so production changes only when someone opts in; staging environments typically turn it on.
 
+  The deployment is created in the same transaction that records the build's success. It is skipped for builds of an **explicit commit** (`trigger: commit`, such as rebuilding an old SHA), and for a build **older than what the environment already deploys or has queued**, because builds can finish out of order and a slow old build must not replace a newer one. A problem in one environment (for example an invalid stored configuration) is logged and skipped; it does not fail the build or the other environments.
+
 ### Status and stages
 
 Deployment status: `queued → running → succeeded | failed | cancelled`. While running it reports a stage, shown in the UI as `Queued → Pulling → Starting → Health check → Healthy`: `pull`, `start`, `health_check`.
