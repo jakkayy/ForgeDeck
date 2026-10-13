@@ -38,7 +38,7 @@ Deployment status: `queued → running → succeeded | failed | cancelled`. Whil
 
 ### Failure and automatic rollback
 
-If the new service does not pass its health check, the Agent captures the new container's last log lines into the job log, then **restores the previous release's image and configuration** (when there is one) and checks that it is healthy. The deployment is `failed` with `health_check_failed`; the environment keeps running its previous release. With no previous release, the failed service is left stopped for inspection. Other failures (pull, start) leave the previous service untouched where possible. Cancelling a running deployment is not supported in the MVP.
+If the new service does not pass its health check, the Agent captures the new container's last log lines into the job log, then **restores the previous release's image and configuration** (when there is one, taken from the claim, see [05 §8](05-agent-protocol.md)) and checks that it is healthy. Restoring tolerates a failed pull because the image is normally still on the host. A previous configuration that no longer validates is not restored. The deployment is `failed` with `health_check_failed`, and its message says which state the environment is in: the previous release restored and running, restoring failed too (the service may be down), or no previous release (the failed service was stopped so it does not crash-loop). Other failures (pull, start) leave the previous service untouched where possible. Cancelling a running deployment is not supported in the MVP.
 
 ## 2. Service configuration (4.2)
 
@@ -67,7 +67,9 @@ Not configurable, by design: `privileged`, `network_mode: host`, capabilities, d
 | `tcp` | A TCP connection to `<published_port>` succeeds. Requires `published_port`. |
 | `docker` | The image's own `HEALTHCHECK` reports `healthy`. |
 
-Plus `timeout_seconds` (default 60, max 600) and `interval_seconds` (default 2). The check runs from the Agent on the server, polls until it passes or the timeout is reached, and requires the container to stay running. A container that is merely running is not healthy. The default is `docker` when no published port is set and `tcp` otherwise.
+Plus `timeout_seconds` (default 60, max 600) and `interval_seconds` (default 2). The check runs from the Agent on the server (so the Agent must run on the host, or in a container that shares the host network; otherwise use `docker`). It polls until the check has **passed twice in a row** (one lucky answer between restarts of a crash-looping container is not health) or the timeout is reached, and fails at once if the container stops running or restarts. A container that is merely running is not healthy. A `docker` check needs an image `HEALTHCHECK` and says so when there is none. The default is `docker` when no published port is set and `tcp` otherwise.
+
+When the check fails, the Agent writes the last 50 lines of the container's output to the job log. All job logs have the registry password and the configuration's environment values masked.
 
 ### Rendering and applying
 

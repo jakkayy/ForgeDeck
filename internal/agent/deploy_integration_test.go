@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -19,17 +20,17 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/dockertest"
 	"github.com/jakkayy/ForgeDeck/internal/servicecfg"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// pushWebImage builds a tiny web server image, pushes it to a throwaway
-// registry, and returns its digest reference.
-func pushWebImage(t *testing.T) string {
+// pushImage builds an image from dockerfile, pushes it to the registry at
+// host, and returns its digest reference.
+func pushImage(t *testing.T, host, name, dockerfile string) string {
 	t.Helper()
-	host := dockertest.StartRegistry(t)
-	tag := host + "/e2e/web:1"
+	tag := host + "/e2e/" + name + ":1"
 	dockertest.RemoveImage(t, tag)
 	build := exec.CommandContext(t.Context(), "docker", "build", "--quiet", "--tag", tag, "-") //nolint:gosec // test
-	build.Stdin = strings.NewReader("FROM busybox:1.37\nRUN mkdir /www && echo deployed > /www/index.html\nCMD [\"httpd\", \"-f\", \"-p\", \"8080\", \"-h\", \"/www\"]\n")
+	build.Stdin = strings.NewReader(dockerfile)
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
@@ -42,6 +43,12 @@ func pushWebImage(t *testing.T) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+// webServer answers "deployed" on port 8080; silentServer runs but never listens.
+const (
+	webServer    = "FROM busybox:1.37\nRUN mkdir /www && echo deployed > /www/index.html\nCMD [\"httpd\", \"-f\", \"-p\", \"8080\", \"-h\", \"/www\"]\n"
+	silentServer = "FROM busybox:1.37\nCMD [\"sleep\", \"3600\"]\n"
+)
 
 func freePort(t *testing.T) int {
 	t.Helper()
@@ -72,7 +79,7 @@ func httpBody(t *testing.T, port int) string {
 
 func TestDeployWithRealDockerCompose(t *testing.T) {
 	dockertest.Require(t)
-	image := pushWebImage(t)
+	image := pushImage(t, dockertest.StartRegistry(t), "web", webServer)
 	d := DeployImageHandler(filepath.Join(t.TempDir(), "deployments"))
 
 	environmentID := uuid.New()
@@ -114,5 +121,48 @@ func TestDeployWithRealDockerCompose(t *testing.T) {
 	}
 	if body := httpBody(t, port); body != "deployed" {
 		t.Fatalf("service answered %q after the update", body)
+	}
+}
+
+func TestFailedDeploymentRestoresThePreviousReleaseWithRealDocker(t *testing.T) {
+	dockertest.Require(t)
+	host := dockertest.StartRegistry(t)
+	good := pushImage(t, host, "good", webServer)
+	broken := pushImage(t, host, "broken", silentServer)
+	d := DeployImageHandler(filepath.Join(t.TempDir(), "deployments"))
+
+	environmentID := uuid.New()
+	port, container := freePort(t), 8080
+	config := servicecfg.Config{ContainerPort: &container, PublishedPort: &port,
+		HealthCheck: servicecfg.HealthCheck{Type: servicecfg.HealthHTTP, Path: "/", TimeoutSeconds: 8, IntervalSeconds: 1}}
+	t.Cleanup(func() {
+		_ = exec.CommandContext(context.Background(), "docker", "compose", "--project-name", compose.ProjectName(environmentID), "down", "--volumes").Run() //nolint:gosec // test
+	})
+	deploy := func(image string, previous *agentproto.PreviousRelease) (*logRecorder, error) {
+		raw, _ := json.Marshal(agentproto.DeployImagePayload{DeploymentID: uuid.New(), EnvironmentID: environmentID,
+			ApplicationID: uuid.New(), CommitSHA: "abc", ImageRef: image, Config: config})
+		job := &agentproto.Job{Type: agentproto.JobDeployImage, Payload: raw}
+		if previous != nil {
+			job.Deploy = &agentproto.DeployContext{Previous: previous}
+		}
+		log := &logRecorder{}
+		_, err := d(context.Background(), job, log)
+		return log, err
+	}
+
+	if log, err := deploy(good, nil); err != nil {
+		t.Fatalf("first deployment: %v\n%s", err, log)
+	}
+	if body := httpBody(t, port); body != "deployed" {
+		t.Fatalf("service answered %q", body)
+	}
+
+	log, err := deploy(broken, &agentproto.PreviousRelease{ReleaseID: uuid.New(), CommitSHA: "old", ImageRef: good, Config: config})
+	var jobErr *worker.JobError
+	if !errors.As(err, &jobErr) || jobErr.Code != "health_check_failed" || !strings.Contains(jobErr.Message, "previous release was restored") {
+		t.Fatalf("broken deployment: %v\n%s", err, log)
+	}
+	if body := httpBody(t, port); body != "deployed" {
+		t.Fatalf("after the restore the service answered %q\n%s", body, log)
 	}
 }
