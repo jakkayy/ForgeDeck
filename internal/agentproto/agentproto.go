@@ -104,6 +104,21 @@ type Job struct {
 	Attempt        int32           `json:"attempt"`
 	Payload        json.RawMessage `json:"payload"`
 	LeaseExpiresAt time.Time       `json:"lease_expires_at"`
+	// Credentials are minted for this attempt of a build job. They are sent
+	// only in the claim response, never stored or logged.
+	Credentials *BuildCredentials `json:"credentials,omitempty"`
+}
+
+// BuildCredentials let a Runner fetch one repository.
+type BuildCredentials struct {
+	Git GitCredentials `json:"git"`
+}
+
+// GitCredentials authenticate an HTTPS clone with HTTP Basic auth.
+type GitCredentials struct {
+	URL      string `json:"url"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // LeaseRequest renews the lease on a claimed job attempt.

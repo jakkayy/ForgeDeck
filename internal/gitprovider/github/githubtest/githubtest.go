@@ -36,6 +36,12 @@ type Server struct {
 	repositories  map[int64][]github.Repository // installation -> repos
 	codes         map[string][]int64            // OAuth code -> installations the user can access
 	tokensIssued  int
+	tokens        map[string]issuedToken
+}
+
+type issuedToken struct {
+	installation int64
+	scope        TokenScope
 }
 
 // New starts a fake GitHub that is closed when the test ends.
@@ -50,6 +56,7 @@ func New(t testing.TB) *Server {
 		installations: map[int64]string{},
 		repositories:  map[int64][]github.Repository{},
 		codes:         map[string][]int64{},
+		tokens:        map[string]issuedToken{},
 	}
 	s.Server = httptest.NewServer(http.HandlerFunc(s.route))
 	t.Cleanup(s.Close)
@@ -84,6 +91,21 @@ func (s *Server) AddOAuthCode(code string, installations ...int64) {
 	s.codes[code] = installations
 }
 
+// TokenScope is what an installation token was restricted to when minted.
+// Zero values mean the token covers the whole installation.
+type TokenScope struct {
+	RepositoryIDs []int64           `json:"repository_ids"`
+	Permissions   map[string]string `json:"permissions"`
+}
+
+// TokenScope returns how token was scoped, and whether the fake issued it.
+func (s *Server) TokenScope(token string) (TokenScope, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	issued, ok := s.tokens[token]
+	return issued.scope, ok
+}
+
 // TokensIssued counts installation tokens minted so far.
 func (s *Server) TokensIssued() int {
 	s.mu.Lock()
@@ -107,7 +129,11 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && strings.HasPrefix(path, "/app/installations/") && strings.HasSuffix(path, "/access_tokens"):
 		s.withApp(w, r, func(id int64) {
 			s.tokensIssued++
-			writeJSON(w, map[string]any{"token": fmt.Sprintf("ghs_%d", id), "expires_at": time.Now().Add(time.Hour)})
+			var scope TokenScope
+			_ = json.NewDecoder(r.Body).Decode(&scope)
+			token := fmt.Sprintf("ghs_%d_%d", id, s.tokensIssued)
+			s.tokens[token] = issuedToken{installation: id, scope: scope}
+			writeJSON(w, map[string]any{"token": token, "expires_at": time.Now().Add(time.Hour)})
 		})
 	case r.Method == http.MethodGet && path == "/installation/repositories":
 		s.installationRepos(w, r)
@@ -180,11 +206,12 @@ func (s *Server) userInstallations(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) installationRepos(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(strings.TrimPrefix(r.Header.Get("Authorization"), "token ghs_"), 10, 64)
-	if err != nil {
+	issued, ok := s.tokens[strings.TrimPrefix(r.Header.Get("Authorization"), "token ")]
+	if !ok {
 		http.Error(w, `{"message":"Bad credentials"}`, http.StatusUnauthorized)
 		return
 	}
+	id := issued.installation
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	perPage, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
 	repos := s.repositories[id]

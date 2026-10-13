@@ -37,7 +37,7 @@ func fetch(t *testing.T, engine *fakeLogs, payload agentproto.FetchLogsPayload) 
 	t.Helper()
 	raw, _ := json.Marshal(payload)
 	log := &streamLog{}
-	result, err := FetchLogsHandler(engine)(context.Background(), raw, log)
+	result, err := FetchLogsHandler(engine)(context.Background(), &agentproto.Job{Payload: raw}, log)
 	if err != nil {
 		return FetchLogsResult{}, log, err
 	}

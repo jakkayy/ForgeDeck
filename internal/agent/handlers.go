@@ -36,7 +36,8 @@ func ContainerActionHandler(engine ContainerOperator, selfID string) worker.Hand
 		agentproto.ActionStop:    engine.Stop,
 		agentproto.ActionRestart: engine.Restart,
 	}
-	return func(ctx context.Context, raw json.RawMessage, log worker.Logger) (any, error) {
+	return func(ctx context.Context, job *agentproto.Job, log worker.Logger) (any, error) {
+		raw := job.Payload
 		var p agentproto.ContainerActionPayload
 		if err := json.Unmarshal(raw, &p); err != nil || !shortContainerID.MatchString(p.ContainerID) {
 			return nil, errInvalidPayload

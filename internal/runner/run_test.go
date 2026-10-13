@@ -2,7 +2,6 @@ package runner_test
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"testing"
@@ -21,7 +20,7 @@ func noDocker(context.Context) (agentproto.Docker, *agentproto.Resources) {
 	return agentproto.Docker{}, nil
 }
 
-func TestRunnerClaimsAndCompletesBuildJobs(t *testing.T) {
+func TestRunnerClaimsAndCompletesJobs(t *testing.T) {
 	env := apitest.New(t)
 	owner, _ := env.NewUser("owner@example.com")
 	projectID := owner.CreateProject("Shop")
@@ -30,7 +29,7 @@ func TestRunnerClaimsAndCompletesBuildJobs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	handlers := map[string]worker.Handler{
-		agentproto.JobBuild: func(_ context.Context, _ json.RawMessage, log worker.Logger) (any, error) {
+		"echo": func(_ context.Context, _ *agentproto.Job, log worker.Logger) (any, error) {
 			log.Log("stdout", "built")
 			return map[string]string{"image_digest": "sha256:abc"}, nil
 		},
@@ -47,7 +46,7 @@ func TestRunnerClaimsAndCompletesBuildJobs(t *testing.T) {
 	})
 
 	svc := jobs.NewService(env.Pool, authz.New(store.New(env.Pool)), time.Now)
-	job, err := svc.Enqueue(t.Context(), jobs.NewJob{ProjectID: projectID, Type: agentproto.JobBuild,
+	job, err := svc.Enqueue(t.Context(), jobs.NewJob{ProjectID: projectID, Type: "echo",
 		WorkerKind: jobs.WorkerRunner, Payload: map[string]string{}})
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +59,7 @@ func TestRunnerClaimsAndCompletesBuildJobs(t *testing.T) {
 			break
 		}
 		if got.Status == jobs.StatusFailed || time.Now().After(deadline) {
-			t.Fatalf("build job %+v", got)
+			t.Fatalf("job %+v", got)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -71,7 +70,7 @@ func TestRunnerStopsWhenDeleted(t *testing.T) {
 	cfg := runner.Config{ControlPlaneURL: env.Server.URL, Credential: "fdr_unknown", Version: "test"}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := runner.Run(ctx, cfg, runner.Handlers(), noDocker, slog.New(slog.DiscardHandler)); err == nil || ctx.Err() != nil {
+	if err := runner.Run(ctx, cfg, map[string]worker.Handler{}, noDocker, slog.New(slog.DiscardHandler)); err == nil || ctx.Err() != nil {
 		t.Fatalf("Run = %v, want an unauthorized error before the timeout", err)
 	}
 }

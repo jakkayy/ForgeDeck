@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
@@ -84,17 +85,17 @@ func TestWorkerRunsHandlersAndReportsOutcome(t *testing.T) {
 	f := newWorkerFixture(t)
 	afterJobs := make(chan struct{}, 10)
 	startWorker(t, f, map[string]worker.Handler{
-		"echo": func(_ context.Context, payload json.RawMessage, log worker.Logger) (any, error) {
+		"echo": func(_ context.Context, job *agentproto.Job, log worker.Logger) (any, error) {
 			var p map[string]string
-			_ = json.Unmarshal(payload, &p)
+			_ = json.Unmarshal(job.Payload, &p)
 			log.Log("stdout", p["greeting"])
 			log.Log("system", "done")
 			return map[string]string{"echoed": p["greeting"]}, nil
 		},
-		"boom": func(context.Context, json.RawMessage, worker.Logger) (any, error) {
+		"boom": func(context.Context, *agentproto.Job, worker.Logger) (any, error) {
 			return nil, &worker.JobError{Code: "container_not_found", Message: "No such container."}
 		},
-		"crash": func(context.Context, json.RawMessage, worker.Logger) (any, error) {
+		"crash": func(context.Context, *agentproto.Job, worker.Logger) (any, error) {
 			return nil, errors.New("docker daemon unreachable")
 		},
 	}, func() { afterJobs <- struct{}{} })

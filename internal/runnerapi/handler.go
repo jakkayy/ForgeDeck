@@ -5,8 +5,10 @@ package runnerapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -21,17 +23,38 @@ import (
 
 var errUnauthorized = httpx.Unauthorized("Runner credential is invalid or the Runner was deleted.")
 
-// Handler serves /runner endpoints.
-type Handler struct {
-	shutdown context.Context
-	runners  *runners.Service
-	jobs     *jobs.Service
-	notifier *jobs.Notifier
+// CredentialMinter issues the credentials for one attempt of a build job.
+type CredentialMinter interface {
+	Mint(ctx context.Context, payload json.RawMessage) (*agentproto.BuildCredentials, error)
 }
 
-// NewHandler returns Runner endpoints. Long-polls end when shutdown is cancelled.
-func NewHandler(shutdown context.Context, runnerService *runners.Service, jobService *jobs.Service, notifier *jobs.Notifier) *Handler {
-	return &Handler{shutdown: shutdown, runners: runnerService, jobs: jobService, notifier: notifier}
+// Handler serves /runner endpoints.
+type Handler struct {
+	shutdown    context.Context
+	runners     *runners.Service
+	jobs        *jobs.Service
+	notifier    *jobs.Notifier
+	credentials CredentialMinter
+	logger      *slog.Logger
+}
+
+// Deps are the collaborators a Handler needs.
+type Deps struct {
+	// Shutdown ends open long-polls when cancelled.
+	Shutdown    context.Context
+	Runners     *runners.Service
+	Jobs        *jobs.Service
+	Notifier    *jobs.Notifier
+	Credentials CredentialMinter
+	Logger      *slog.Logger
+}
+
+// NewHandler returns Runner endpoints.
+func NewHandler(d Deps) *Handler {
+	return &Handler{
+		shutdown: d.Shutdown, runners: d.Runners, jobs: d.Jobs, notifier: d.Notifier,
+		credentials: d.Credentials, logger: d.Logger,
+	}
 }
 
 // Routes mounts the Runner endpoints on r.
@@ -112,9 +135,11 @@ func (h *Handler) claim(w http.ResponseWriter, r *http.Request) error {
 	defer context.AfterFunc(h.shutdown, cancel)()
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(maxWait + 10*time.Second))
 
-	identity := identityFrom(ctx)
+	var credentials *agentproto.BuildCredentials
 	claim := func(ctx context.Context) (*jobs.Claimed, error) {
-		return h.jobs.ClaimForRunner(ctx, identity.ID.String())
+		job, minted, err := h.claimWithCredentials(ctx, identityFrom(ctx).ID.String())
+		credentials = minted
+		return job, err
 	}
 	stillAuthorized := func(ctx context.Context) error {
 		_, err := h.authenticate(ctx, r)
@@ -130,7 +155,33 @@ func (h *Handler) claim(w http.ResponseWriter, r *http.Request) error {
 	}
 	return httpx.WriteJSON(w, http.StatusOK, agentproto.Job{
 		ID: job.ID, Type: job.Type, Attempt: job.Attempt, Payload: job.Payload, LeaseExpiresAt: job.LeaseExpiresAt,
+		Credentials: credentials,
 	})
+}
+
+// claimWithCredentials claims the next job and mints its build credentials.
+// An attempt whose credentials cannot be minted fails at once, so the Runner
+// is never handed a build it cannot start; the next job is tried instead.
+func (h *Handler) claimWithCredentials(ctx context.Context, workerID string) (*jobs.Claimed, *agentproto.BuildCredentials, error) {
+	for {
+		job, err := h.jobs.ClaimForRunner(ctx, workerID)
+		if err != nil || job == nil || job.Type != agentproto.JobBuild {
+			return job, nil, err
+		}
+		credentials, err := h.credentials.Mint(ctx, job.Payload)
+		if err == nil {
+			return job, credentials, nil
+		}
+		h.logger.WarnContext(ctx, "minting build credentials failed", "job_id", job.ID, "error", err)
+		lease := jobs.Lease{JobID: job.ID, Attempt: job.Attempt, WorkerKind: jobs.WorkerRunner, WorkerID: workerID}
+		if err := h.jobs.Complete(ctx, lease, agentproto.CompleteRequest{
+			Outcome:      agentproto.OutcomeFailed,
+			ErrorCode:    "build_credentials_unavailable",
+			ErrorMessage: "ForgeDeck could not get access to the repository for this build. Check the application's Git connection.",
+		}); err != nil {
+			return nil, nil, err
+		}
+	}
 }
 
 func (h *Handler) renewLease(w http.ResponseWriter, r *http.Request) error {

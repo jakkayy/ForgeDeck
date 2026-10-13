@@ -43,6 +43,7 @@ func run(args []string) error {
 	controlPlaneURL := flags.String("url", os.Getenv("FORGEDECK_URL"), "Control Plane URL, e.g. https://forgedeck.example.com")
 	credentialFile := flags.String("credential-file", "", "file holding the Runner credential (default: $FORGEDECK_RUNNER_CREDENTIAL)")
 	workDir := flags.String("work-dir", "/var/lib/forgedeck-runner", "directory for per-job build workspaces")
+	gitProtocols := flags.String("git-protocols", "https", "colon-separated protocols git may use, e.g. https:http for an internal GitLab")
 	allowInsecure := flags.Bool("allow-insecure", false, "allow a non-HTTPS Control Plane URL")
 	logLevel := flags.String("log-level", "info", "debug, info, warn or error")
 	if err := flags.Parse(args[1:]); err != nil {
@@ -65,7 +66,8 @@ func run(args []string) error {
 	}
 
 	cfg := runner.Config{ControlPlaneURL: *controlPlaneURL, Credential: credential, Version: version}
-	return runner.Run(ctx, cfg, runner.Handlers(), runner.DockerStatus, logger)
+	handlers := runner.Handlers(runner.BuildConfig{WorkDir: *workDir, GitProtocols: *gitProtocols})
+	return runner.Run(ctx, cfg, handlers, runner.DockerStatus, logger)
 }
 
 // loadCredential reads the credential from a file or the environment, never

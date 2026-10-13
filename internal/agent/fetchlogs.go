@@ -30,7 +30,8 @@ var errLogBudget = errors.New("log byte budget exhausted")
 // FetchLogsHandler streams a bounded range of past container output as job
 // logs. Limits are enforced here regardless of what the payload asks for.
 func FetchLogsHandler(engine LogReader) worker.Handler {
-	return func(ctx context.Context, raw json.RawMessage, log worker.Logger) (any, error) {
+	return func(ctx context.Context, job *agentproto.Job, log worker.Logger) (any, error) {
+		raw := job.Payload
 		var p agentproto.FetchLogsPayload
 		if err := json.Unmarshal(raw, &p); err != nil || !shortContainerID.MatchString(p.ContainerID) {
 			return nil, errInvalidPayload

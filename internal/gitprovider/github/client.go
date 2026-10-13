@@ -4,6 +4,7 @@
 package github
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"encoding/json"
@@ -159,12 +160,37 @@ func (c *Client) InstallationToken(ctx context.Context, installationID int64) (s
 		ExpiresAt time.Time `json:"expires_at"`
 	}
 	path := "/app/installations/" + strconv.FormatInt(installationID, 10) + "/access_tokens"
-	if err := c.send(ctx, http.MethodPost, c.cfg.APIURL+path, "Bearer "+jwt, nil, &resp); err != nil {
+	if err := c.send(ctx, http.MethodPost, c.cfg.APIURL+path, "Bearer "+jwt, nil, "", &resp); err != nil {
 		return "", fmt.Errorf("create installation token: %w", err)
 	}
 	c.mu.Lock()
 	c.tokens[installationID] = installationToken{value: resp.Token, expiresAt: resp.ExpiresAt}
 	c.mu.Unlock()
+	return resp.Token, nil
+}
+
+// RepositoryReadToken mints a fresh token that can only read the contents
+// of one repository. It is not cached: each build gets its own, and it
+// expires after an hour.
+func (c *Client) RepositoryReadToken(ctx context.Context, installationID, repositoryID int64) (string, error) {
+	jwt, err := appJWT(c.cfg.AppID, c.cfg.PrivateKey, c.now())
+	if err != nil {
+		return "", err
+	}
+	body, err := json.Marshal(map[string]any{
+		"repository_ids": []int64{repositoryID},
+		"permissions":    map[string]string{"contents": "read"},
+	})
+	if err != nil {
+		return "", err
+	}
+	var resp struct {
+		Token string `json:"token"`
+	}
+	path := "/app/installations/" + strconv.FormatInt(installationID, 10) + "/access_tokens"
+	if err := c.send(ctx, http.MethodPost, c.cfg.APIURL+path, "Bearer "+jwt, bytes.NewReader(body), "application/json", &resp); err != nil {
+		return "", fmt.Errorf("create repository token: %w", err)
+	}
 	return resp.Token, nil
 }
 
@@ -174,7 +200,8 @@ func (c *Client) exchangeCode(ctx context.Context, code string) (string, error) 
 		AccessToken string `json:"access_token"`
 		Error       string `json:"error_description"`
 	}
-	if err := c.send(ctx, http.MethodPost, c.cfg.WebURL+"/login/oauth/access_token", "", strings.NewReader(form.Encode()), &resp); err != nil {
+	if err := c.send(ctx, http.MethodPost, c.cfg.WebURL+"/login/oauth/access_token", "",
+		strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", &resp); err != nil {
 		return "", fmt.Errorf("exchange OAuth code: %w", err)
 	}
 	if resp.AccessToken == "" {
@@ -184,11 +211,11 @@ func (c *Client) exchangeCode(ctx context.Context, code string) (string, error) 
 }
 
 func (c *Client) get(ctx context.Context, path, authorization string, out any) error {
-	return c.send(ctx, http.MethodGet, c.cfg.APIURL+path, authorization, nil, out)
+	return c.send(ctx, http.MethodGet, c.cfg.APIURL+path, authorization, nil, "", out)
 }
 
-func (c *Client) send(ctx context.Context, method, target, authorization string, form io.Reader, out any) error {
-	req, err := http.NewRequestWithContext(ctx, method, target, form)
+func (c *Client) send(ctx context.Context, method, target, authorization string, body io.Reader, contentType string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
 		return err
 	}
@@ -197,16 +224,19 @@ func (c *Client) send(ctx context.Context, method, target, authorization string,
 	if authorization != "" {
 		req.Header.Set("Authorization", authorization)
 	}
-	if form != nil {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if contentType == "application/x-www-form-urlencoded" {
+		// GitHub's OAuth endpoint answers form posts with a form unless asked for JSON.
 		req.Header.Set("Accept", "application/json")
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
 		return err
 	}
@@ -214,9 +244,9 @@ func (c *Client) send(ctx context.Context, method, target, authorization string,
 	case resp.StatusCode == http.StatusNotFound:
 		return ErrNotFound
 	case resp.StatusCode >= 300:
-		return fmt.Errorf("GitHub returned %d: %s", resp.StatusCode, truncate(body))
+		return fmt.Errorf("GitHub returned %d: %s", resp.StatusCode, truncate(data))
 	}
-	return json.Unmarshal(body, out)
+	return json.Unmarshal(data, out)
 }
 
 func truncate(b []byte) string {

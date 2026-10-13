@@ -28,11 +28,11 @@ Lease ownership is checked by worker kind and worker ID (and, for Agents, the ta
 
 A claimed `build` job carries **build credentials** minted at claim time:
 
-- a Git clone URL and a token scoped to the repository (a fresh one-hour GitHub installation token, or the stored GitLab token);
+- a Git clone URL and a token scoped to the repository (a fresh one-hour GitHub installation token limited to `contents: read` on that one repository, or the stored GitLab token);
 - the registry host, username, and password;
 - the image repository to push to, e.g. `ghcr.io/acme/shop-api`.
 
-They are never written to job payloads or logs.
+They are never written to job payloads or logs. If they cannot be minted (connection removed, provider down), the attempt fails at claim time with `build_credentials_unavailable` and the Runner is handed the next job instead.
 
 ## Build steps
 
@@ -40,10 +40,12 @@ They are never written to job payloads or logs.
 checkout → build → test → push
 ```
 
-1. **Checkout** — a fresh temporary workspace; `git fetch --depth 1 <url> <commit>` and check out exactly that commit. The token reaches git through `GIT_CONFIG_*` environment variables, not command arguments.
+1. **Checkout** — a fresh temporary workspace; `git fetch --depth 1 <url> <commit>` and check out exactly that commit. The token reaches git as an `http.extraHeader` through `GIT_CONFIG_*` environment variables, not command arguments or the remote URL; redirects are not followed. Git may only use the protocols in `--git-protocols` (default `https`).
 2. **Build** — `docker build` with BuildKit, using the application's Dockerfile and build context, tagged `<image>:<short sha>`.
 3. **Test** — if the application has a test command, it runs inside the image just built: `docker run --rm --network none` with CPU, memory, and process limits. Tests never run directly on the build host. If the final image lacks test tooling, add a test stage to the Dockerfile and make it the target, or move the tests into a `RUN` step.
 4. **Push** — only after tests pass. The pushed image's **digest** (`repo@sha256:…`) is the build's result and what deployments use.
+
+Build commands run with a minimal environment (`PATH`, a per-job `HOME` and `DOCKER_CONFIG`, and `DOCKER_HOST`/`DOCKER_TLS_VERIFY`/`DOCKER_CERT_PATH` if set), so they never see the Runner's credential.
 
 Each job has a timeout (default 20 minutes). The workspace and the job's Docker config directory are deleted afterwards, success or not.
 

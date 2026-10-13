@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apperr"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab"
@@ -107,4 +109,38 @@ func (s *Service) FindRepository(ctx context.Context, userID, projectID, connect
 		}
 	}
 	return Repository{}, ErrRepositoryNotFound
+}
+
+// CloneCredentials returns an HTTPS clone URL and a short-lived (GitHub) or
+// stored (GitLab) credential that can read one repository. It does no user
+// authorization; it is for handing a build to a Runner.
+func (s *Service) CloneCredentials(ctx context.Context, connectionID uuid.UUID, repositoryID, fullName string) (agentproto.GitCredentials, error) {
+	row, err := s.queries.GetGitConnection(ctx, connectionID)
+	if err != nil {
+		return agentproto.GitCredentials{}, fmt.Errorf("get git connection: %w", err)
+	}
+	cloneURL := strings.TrimRight(row.BaseUrl, "/") + "/" + fullName + ".git"
+	switch row.Provider {
+	case "github":
+		if s.github == nil {
+			return agentproto.GitCredentials{}, errGitHubNotConfigured
+		}
+		id, err := strconv.ParseInt(repositoryID, 10, 64)
+		if err != nil {
+			return agentproto.GitCredentials{}, fmt.Errorf("github repository id %q: %w", repositoryID, err)
+		}
+		token, err := s.github.RepositoryReadToken(ctx, *row.InstallationID, id)
+		if err != nil {
+			return agentproto.GitCredentials{}, err
+		}
+		return agentproto.GitCredentials{URL: cloneURL, Username: "x-access-token", Password: token}, nil
+	case "gitlab":
+		token, err := s.keyring.Open(row.TokenCiphertext, *row.TokenKeyID, connectionAAD(row.ID, "token"))
+		if err != nil {
+			return agentproto.GitCredentials{}, fmt.Errorf("decrypt gitlab token: %w", err)
+		}
+		return agentproto.GitCredentials{URL: cloneURL, Username: "oauth2", Password: string(token)}, nil
+	default:
+		return agentproto.GitCredentials{}, fmt.Errorf("unknown provider %q", row.Provider)
+	}
 }

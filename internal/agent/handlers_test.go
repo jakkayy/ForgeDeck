@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jakkayy/ForgeDeck/internal/agent/docker"
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
@@ -32,7 +33,7 @@ const apiID = "aaaaaaaaaaaa1111"
 func runAction(t *testing.T, engine *recordingEngine, selfID string, payload map[string]string) error {
 	t.Helper()
 	raw, _ := json.Marshal(payload)
-	_, err := ContainerActionHandler(engine, selfID)(context.Background(), raw, &discardLog{})
+	_, err := ContainerActionHandler(engine, selfID)(context.Background(), &agentproto.Job{Payload: raw}, &discardLog{})
 	return err
 }
 

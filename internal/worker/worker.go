@@ -35,7 +35,7 @@ type Logger interface {
 
 // Handler runs one job type. A nil error with a non-nil result reports
 // success with that result; errors are reported as failures.
-type Handler func(ctx context.Context, payload json.RawMessage, log Logger) (result any, err error)
+type Handler func(ctx context.Context, job *agentproto.Job, log Logger) (result any, err error)
 
 // Worker claims jobs and runs them one at a time.
 type Worker struct {
@@ -114,7 +114,7 @@ func (w *Worker) run(ctx context.Context, job *agentproto.Job, output Logger) (a
 	if !ok {
 		return nil, &JobError{Code: "unsupported_job_type", Message: fmt.Sprintf("This worker cannot run %q jobs. Upgrade it.", job.Type)}
 	}
-	return handler(ctx, job.Payload, output)
+	return handler(ctx, job, output)
 }
 
 func (w *Worker) keepLease(ctx context.Context, cancel context.CancelCauseFunc, job *agentproto.Job) {

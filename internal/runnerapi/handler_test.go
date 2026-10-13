@@ -14,6 +14,9 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
+// echoJob is a Runner job type without credentials, for protocol tests.
+const echoJob = "echo"
+
 func TestRunnerClaimsOnlyRunnerJobsAndCompletesThem(t *testing.T) {
 	env := apitest.New(t)
 	owner, _ := env.NewUser("owner@example.com")
@@ -23,7 +26,7 @@ func TestRunnerClaimsOnlyRunnerJobsAndCompletesThem(t *testing.T) {
 	other := env.NewRunner("build-02")
 	svc := jobs.NewService(env.Pool, authz.New(store.New(env.Pool)), time.Now)
 	enqueue := func(kind jobs.WorkerKind, target *uuid.UUID) uuid.UUID {
-		job, err := svc.Enqueue(t.Context(), jobs.NewJob{ProjectID: projectID, Type: agentproto.JobBuild,
+		job, err := svc.Enqueue(t.Context(), jobs.NewJob{ProjectID: projectID, Type: echoJob,
 			WorkerKind: kind, TargetServerID: target, Payload: map[string]string{}})
 		if err != nil {
 			t.Fatal(err)
@@ -71,7 +74,7 @@ func TestRunnerEndpointsRequireCredential(t *testing.T) {
 		RequireStatus(http.StatusUnauthorized)
 }
 
-func TestRunnerLongPollWakesOnBuild(t *testing.T) {
+func TestRunnerLongPollWakesOnQueuedJob(t *testing.T) {
 	env := apitest.New(t)
 	owner, _ := env.NewUser("owner@example.com")
 	projectID := owner.CreateProject("Shop")
@@ -84,7 +87,7 @@ func TestRunnerLongPollWakesOnBuild(t *testing.T) {
 		result <- runner.Do(http.MethodPost, "/api/v1/runner/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait})
 	}()
 	time.Sleep(300 * time.Millisecond)
-	if _, err := svc.Enqueue(t.Context(), jobs.NewJob{ProjectID: projectID, Type: agentproto.JobBuild,
+	if _, err := svc.Enqueue(t.Context(), jobs.NewJob{ProjectID: projectID, Type: echoJob,
 		WorkerKind: jobs.WorkerRunner, Payload: map[string]string{}}); err != nil {
 		t.Fatal(err)
 	}
@@ -92,6 +95,6 @@ func TestRunnerLongPollWakesOnBuild(t *testing.T) {
 	case resp := <-result:
 		resp.RequireStatus(http.StatusOK)
 	case <-time.After(5 * time.Second):
-		t.Fatal("runner long-poll was not woken by a queued build")
+		t.Fatal("runner long-poll was not woken by a queued job")
 	}
 }

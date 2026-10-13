@@ -15,6 +15,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/applications"
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
+	"github.com/jakkayy/ForgeDeck/internal/builds"
 	"github.com/jakkayy/ForgeDeck/internal/config"
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
@@ -46,7 +47,6 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	go notifier.Run(ctx)
 	go jobService.RunRecovery(ctx, logger)
 	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier)
-	runnerHandler := runnerapi.NewHandler(ctx, runners.NewService(store.New(pool), time.Now), jobService, notifier)
 	var githubClient *github.Client
 	if cfg.GitHub != nil {
 		githubClient = github.NewClient(*cfg.GitHub, time.Now)
@@ -56,6 +56,10 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		PublicURL: cfg.PublicURL, Now: time.Now,
 	})
 	gitHandler := gitconn.NewHandler(gitService, logger)
+	runnerHandler := runnerapi.NewHandler(runnerapi.Deps{
+		Shutdown: ctx, Runners: runners.NewService(store.New(pool), time.Now), Jobs: jobService, Notifier: notifier,
+		Credentials: builds.NewCredentials(gitService), Logger: logger,
+	})
 	registryService := registries.NewService(store.New(pool), authorizer, cfg.Keyring)
 	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService, registryService))
 

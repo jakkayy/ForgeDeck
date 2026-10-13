@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -80,5 +81,24 @@ func TestParsePrivateKey(t *testing.T) {
 	}
 	if _, err := github.ParsePrivateKey([]byte("not pem")); err == nil {
 		t.Fatal("accepted non-PEM key")
+	}
+}
+
+func TestRepositoryReadTokenIsScopedAndFresh(t *testing.T) {
+	fake := githubtest.New(t)
+	fake.AddInstallation(11, "acme", github.Repository{ID: 5, FullName: "acme/shop"})
+	client := github.NewClient(fake.Config(), time.Now)
+
+	first, err := client.RepositoryReadToken(context.Background(), 11, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, _ := client.RepositoryReadToken(context.Background(), 11, 5)
+	if first == second {
+		t.Fatal("repository tokens were reused across builds")
+	}
+	scope, ok := fake.TokenScope(first)
+	if !ok || !slices.Equal(scope.RepositoryIDs, []int64{5}) || len(scope.Permissions) != 1 || scope.Permissions["contents"] != "read" {
+		t.Fatalf("scope %+v", scope)
 	}
 }
