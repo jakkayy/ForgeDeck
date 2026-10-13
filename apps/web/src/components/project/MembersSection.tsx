@@ -8,7 +8,6 @@ import {
   ListBox,
   Modal,
   Select,
-  Spinner,
   TextField,
   toast,
 } from "@heroui/react";
@@ -20,7 +19,7 @@ import { addMember, membersQuery, removeMember } from "../../api/projects";
 import type { Member, Role } from "../../api/types";
 import { useHasRole } from "../../lib/useHasRole";
 import { ApiForm } from "../ApiForm";
-import { QueryError } from "../QueryError";
+import { QueryBoundary } from "../QueryBoundary";
 import { RoleChip } from "../RoleChip";
 
 const roles: { id: Role; description: string }[] = [
@@ -42,22 +41,22 @@ export function MembersSection({ projectId }: { projectId: string }) {
           <AddMemberDialog projectId={projectId} />
         </div>
       )}
-      {members.isPending && <Spinner aria-label="Loading members" />}
-      {members.isError && <QueryError error={members.error} onRetry={() => members.refetch()} />}
-      {members.isSuccess && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {members.data.items.map((member) => (
-              <MemberRow
-                key={member.user_id}
-                projectId={projectId}
-                member={member}
-                canManage={canManage}
-              />
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary query={members} label="members">
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.items.map((member) => (
+                <MemberRow
+                  key={member.user_id}
+                  projectId={projectId}
+                  member={member}
+                  canManage={canManage}
+                />
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </section>
   );
 }

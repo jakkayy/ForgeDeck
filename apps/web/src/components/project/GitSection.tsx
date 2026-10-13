@@ -8,7 +8,6 @@ import {
   Input,
   Label,
   Modal,
-  Spinner,
   TextField,
   toast,
 } from "@heroui/react";
@@ -24,7 +23,7 @@ import {
 } from "../../api/git";
 import { useHasRole } from "../../lib/useHasRole";
 import { ApiForm } from "../ApiForm";
-import { QueryError } from "../QueryError";
+import { QueryBoundary } from "../QueryBoundary";
 
 const providerLabel = { github: "GitHub", gitlab: "GitLab" } as const;
 
@@ -41,33 +40,35 @@ export function GitSection({ projectId }: { projectId: string }) {
           <ConnectGitLabDialog projectId={projectId} />
         </div>
       )}
-      {connections.isPending && <Spinner aria-label="Loading connections" />}
-      {connections.isError && (
-        <QueryError error={connections.error} onRetry={() => connections.refetch()} />
-      )}
-      {connections.isSuccess && connections.data.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          No Git provider connected. Connect GitHub or GitLab so applications can build from your
-          repositories.
-        </Card>
-      )}
-      {connections.isSuccess && connections.data.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {connections.data.map((conn) => (
-              <li key={conn.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-                <div className="min-w-48 flex-1">
-                  <p className="font-medium">{conn.display_name}</p>
-                  <p className="text-xs text-[var(--muted)]">
-                    {providerLabel[conn.provider]} · {conn.base_url}
-                  </p>
-                </div>
-                {canManage && <RemoveConnection projectId={projectId} connection={conn} />}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary
+        query={connections}
+        label="connections"
+        isEmpty={(data) => data.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            No Git provider connected. Connect GitHub or GitLab so applications can build from your
+            repositories.
+          </Card>
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.map((conn) => (
+                <li key={conn.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+                  <div className="min-w-48 flex-1">
+                    <p className="font-medium">{conn.display_name}</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {providerLabel[conn.provider]} · {conn.base_url}
+                    </p>
+                  </div>
+                  {canManage && <RemoveConnection projectId={projectId} connection={conn} />}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </section>
   );
 }

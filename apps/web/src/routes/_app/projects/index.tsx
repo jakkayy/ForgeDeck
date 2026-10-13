@@ -6,7 +6,6 @@ import {
   Input,
   Label,
   Modal,
-  Spinner,
   TextField,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,7 +16,7 @@ import { createProject, projectsQuery } from "../../../api/projects";
 import { ApiForm } from "../../../components/ApiForm";
 import { EmptyState } from "../../../components/EmptyState";
 import { PageHeader } from "../../../components/PageHeader";
-import { QueryError } from "../../../components/QueryError";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { RoleChip } from "../../../components/RoleChip";
 
 export const Route = createFileRoute("/_app/projects/")({
@@ -35,35 +34,39 @@ function ProjectsPage() {
         description="Projects group servers, applications and the people who can manage them."
         actions={<NewProjectDialog />}
       />
-      {projects.isPending && <Spinner aria-label="Loading projects" />}
-      {projects.isError && <QueryError error={projects.error} onRetry={() => projects.refetch()} />}
-      {projects.isSuccess && projects.data.items.length === 0 && (
-        <EmptyState
-          title="No projects yet"
-          description="Create a project first. Servers and applications always belong to a project."
-        />
-      )}
-      {projects.isSuccess && projects.data.items.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {projects.data.items.map((project) => (
-              <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="min-w-0">
-                  <Link
-                    to="/projects/$projectId"
-                    params={{ projectId: project.id }}
-                    className="block truncate font-medium hover:underline"
-                  >
-                    {project.name}
-                  </Link>
-                  <p className="truncate font-mono text-xs text-[var(--muted)]">{project.slug}</p>
-                </div>
-                <RoleChip role={project.role} />
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary
+        query={projects}
+        label="projects"
+        isEmpty={(data) => data.items.length === 0}
+        empty={
+          <EmptyState
+            title="No projects yet"
+            description="Create a project first. Servers and applications always belong to a project."
+          />
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.items.map((project) => (
+                <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="min-w-0">
+                    <Link
+                      to="/projects/$projectId"
+                      params={{ projectId: project.id }}
+                      className="block truncate font-medium hover:underline"
+                    >
+                      {project.name}
+                    </Link>
+                    <p className="truncate font-mono text-xs text-[var(--muted)]">{project.slug}</p>
+                  </div>
+                  <RoleChip role={project.role} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </>
   );
 }

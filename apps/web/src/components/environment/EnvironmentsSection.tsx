@@ -1,4 +1,4 @@
-import { AlertDialog, Button, Card, Chip, Spinner, toast } from "@heroui/react";
+import { AlertDialog, Button, Card, Chip, toast } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
@@ -18,7 +18,7 @@ import { timeAgo } from "../../lib/time";
 import { useHasRole } from "../../lib/useHasRole";
 import { useRefreshReleases } from "../../lib/useRefreshReleases";
 import { JobStatusChip } from "../JobStatusChip";
-import { QueryError } from "../QueryError";
+import { QueryBoundary } from "../QueryBoundary";
 import { EnvironmentDialog } from "./EnvironmentDialog";
 
 type Props = { applicationId: string; projectId: string };
@@ -46,31 +46,33 @@ export function EnvironmentsSection({ applicationId, projectId }: Props) {
         <h2 className="text-base font-semibold">Environments</h2>
         {canManage && <EnvironmentDialog applicationId={applicationId} projectId={projectId} />}
       </div>
-      {environments.isPending && <Spinner aria-label="Loading environments" />}
-      {environments.isError && (
-        <QueryError error={environments.error} onRetry={() => environments.refetch()} />
-      )}
-      {environments.isSuccess && environments.data.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          No environments yet. An environment is a server and how the service runs on it, such as
-          production.
-        </Card>
-      )}
-      {environments.isSuccess && environments.data.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {environments.data.map((environment) => (
-              <EnvironmentRow
-                key={environment.id}
-                environment={environment}
-                applicationId={applicationId}
-                projectId={projectId}
-                latestBuild={latestBuild.data?.items[0]}
-              />
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary
+        query={environments}
+        label="environments"
+        isEmpty={(data) => data.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            No environments yet. An environment is a server and how the service runs on it, such as
+            production.
+          </Card>
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.map((environment) => (
+                <EnvironmentRow
+                  key={environment.id}
+                  environment={environment}
+                  applicationId={applicationId}
+                  projectId={projectId}
+                  latestBuild={latestBuild.data?.items[0]}
+                />
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </section>
   );
 }

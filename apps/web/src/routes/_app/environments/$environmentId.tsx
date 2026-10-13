@@ -1,4 +1,4 @@
-import { Card, Spinner } from "@heroui/react";
+import { Card } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { applicationQuery } from "../../../api/applications";
@@ -14,7 +14,7 @@ import { DeploymentFailure } from "../../../components/environment/DeploymentFai
 import { DeploymentStages } from "../../../components/environment/DeploymentStages";
 import { ReleaseHistory } from "../../../components/environment/ReleaseHistory";
 import { JobStatusChip } from "../../../components/JobStatusChip";
-import { QueryError } from "../../../components/QueryError";
+import { QueryBoundary, StaleNotice, waitingFor } from "../../../components/QueryBoundary";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { duration } from "../../../lib/describeJob";
 import { shortImage } from "../../../lib/serviceConfig";
@@ -35,15 +35,13 @@ function EnvironmentPage() {
     enabled: !!environment.data,
   });
 
-  if (environment.isPending) {
-    return <Spinner aria-label="Loading environment" />;
-  }
-  if (environment.isError) {
-    return <QueryError error={environment.error} onRetry={() => environment.refetch()} />;
+  if (environment.data === undefined) {
+    return waitingFor(environment, "environment");
   }
   const projectId = app.data?.project_id;
   return (
     <div className="flex flex-col gap-6">
+      <StaleNotice query={environment} label="environment" />
       <EnvironmentHeader environmentId={environmentId} />
       <CurrentRelease environmentId={environmentId} />
       <Deployments environmentId={environmentId} />
@@ -90,8 +88,8 @@ function EnvironmentHeader({ environmentId }: { environmentId: string }) {
 function CurrentRelease({ environmentId }: { environmentId: string }) {
   const releases = useQuery(releasesQuery(environmentId, 1));
   const current = releases.data?.items[0];
-  if (releases.isPending) {
-    return <Spinner aria-label="Loading release" />;
+  if (releases.data === undefined) {
+    return waitingFor(releases, "release");
   }
   return (
     <Card className="flex flex-col gap-1 px-4 py-3">
@@ -118,24 +116,26 @@ function Deployments({ environmentId }: { environmentId: string }) {
   return (
     <section aria-label="Deployments" className="flex flex-col gap-3">
       <h2 className="text-base font-semibold">Deployments</h2>
-      {deployments.isPending && <Spinner aria-label="Loading deployments" />}
-      {deployments.isError && (
-        <QueryError error={deployments.error} onRetry={() => deployments.refetch()} />
-      )}
-      {deployments.isSuccess && deployments.data.items.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          No deployments yet.
-        </Card>
-      )}
-      {deployments.isSuccess && deployments.data.items.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {deployments.data.items.map((d) => (
-              <DeploymentRow key={d.id} deployment={d} />
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary
+        query={deployments}
+        label="deployments"
+        isEmpty={(data) => data.items.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            No deployments yet.
+          </Card>
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.items.map((d) => (
+                <DeploymentRow key={d.id} deployment={d} />
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </section>
   );
 }

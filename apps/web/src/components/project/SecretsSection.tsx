@@ -8,7 +8,6 @@ import {
   Input,
   Label,
   Modal,
-  Spinner,
   TextField,
   toast,
 } from "@heroui/react";
@@ -19,7 +18,7 @@ import { deleteSecret, type Secret, secretsQuery, setSecret } from "../../api/se
 import { timeAgo } from "../../lib/time";
 import { useHasRole } from "../../lib/useHasRole";
 import { ApiForm } from "../ApiForm";
-import { QueryError } from "../QueryError";
+import { QueryBoundary } from "../QueryBoundary";
 
 /** Project secrets: named values that services receive at deployment. Values are write-only. */
 export function SecretsSection({ projectId }: { projectId: string }) {
@@ -35,39 +34,43 @@ export function SecretsSection({ projectId }: { projectId: string }) {
         </p>
         {canManage && <SecretDialog projectId={projectId} />}
       </div>
-      {secrets.isPending && <Spinner aria-label="Loading secrets" />}
-      {secrets.isError && <QueryError error={secrets.error} onRetry={() => secrets.refetch()} />}
-      {secrets.isSuccess && secrets.data.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          No secrets yet. Add database passwords and API keys here instead of in an environment's
-          variables, which every project member can read.
-        </Card>
-      )}
-      {secrets.isSuccess && secrets.data.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {secrets.data.map((secret) => (
-              <li
-                key={secret.name}
-                className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3"
-              >
-                <div className="min-w-48 flex-1">
-                  <p className="font-mono text-sm font-medium">{secret.name}</p>
-                  <p className="text-xs text-[var(--muted)]">
-                    Version {secret.version} · changed {timeAgo(secret.updated_at)}
-                  </p>
-                </div>
-                {canManage && (
-                  <div className="flex gap-2">
-                    <SecretDialog projectId={projectId} secret={secret} />
-                    <DeleteSecret projectId={projectId} secret={secret} />
+      <QueryBoundary
+        query={secrets}
+        label="secrets"
+        isEmpty={(data) => data.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            No secrets yet. Add database passwords and API keys here instead of in an environment's
+            variables, which every project member can read.
+          </Card>
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.map((secret) => (
+                <li
+                  key={secret.name}
+                  className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3"
+                >
+                  <div className="min-w-48 flex-1">
+                    <p className="font-mono text-sm font-medium">{secret.name}</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      Version {secret.version} · changed {timeAgo(secret.updated_at)}
+                    </p>
                   </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+                  {canManage && (
+                    <div className="flex gap-2">
+                      <SecretDialog projectId={projectId} secret={secret} />
+                      <DeleteSecret projectId={projectId} secret={secret} />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </section>
   );
 }

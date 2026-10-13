@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Modal, Spinner, toast } from "@heroui/react";
+import { Alert, Button, Card, Modal, toast } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
@@ -17,7 +17,7 @@ import { ApiForm } from "../../../components/ApiForm";
 import { ImageFields, type ImageValue } from "../../../components/application/ImageFields";
 import { EnvironmentsSection } from "../../../components/environment/EnvironmentsSection";
 import { JobStatusChip } from "../../../components/JobStatusChip";
-import { QueryError } from "../../../components/QueryError";
+import { QueryBoundary, StaleNotice, waitingFor } from "../../../components/QueryBoundary";
 import { duration } from "../../../lib/describeJob";
 import { timeAgo } from "../../../lib/time";
 import { useHasRole } from "../../../lib/useHasRole";
@@ -34,14 +34,12 @@ function ApplicationPage() {
   const { applicationId } = Route.useParams();
   const app = useQuery(applicationQuery(applicationId));
 
-  if (app.isPending) {
-    return <Spinner aria-label="Loading application" />;
-  }
-  if (app.isError) {
-    return <QueryError error={app.error} onRetry={() => app.refetch()} />;
+  if (app.data === undefined) {
+    return waitingFor(app, "application");
   }
   return (
     <div className="flex flex-col gap-6">
+      <StaleNotice query={app} label="application" />
       <ApplicationHeader app={app.data} />
       <ImageCard app={app.data} />
       <EnvironmentsSection applicationId={app.data.id} projectId={app.data.project_id} />
@@ -207,22 +205,26 @@ function BuildHistory({ app }: { app: Application }) {
   return (
     <section aria-label="Builds" className="flex flex-col gap-3">
       <h2 className="text-base font-semibold">Recent builds</h2>
-      {builds.isPending && <Spinner aria-label="Loading builds" />}
-      {builds.isError && <QueryError error={builds.error} onRetry={() => builds.refetch()} />}
-      {builds.isSuccess && builds.data.items.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          No builds yet. Push to {app.branch} or start one with the Build button.
-        </Card>
-      )}
-      {builds.isSuccess && builds.data.items.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {builds.data.items.map((job) => (
-              <BuildRow key={job.id} job={job} />
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary
+        query={builds}
+        label="builds"
+        isEmpty={(data) => data.items.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            No builds yet. Push to {app.branch} or start one with the Build button.
+          </Card>
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.items.map((job) => (
+                <BuildRow key={job.id} job={job} />
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </section>
   );
 }

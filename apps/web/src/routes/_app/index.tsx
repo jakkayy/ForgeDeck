@@ -1,4 +1,4 @@
-import { Card, Spinner } from "@heroui/react";
+import { Card } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -11,7 +11,7 @@ import {
 import { EmptyState } from "../../components/EmptyState";
 import { JobStatusChip } from "../../components/JobStatusChip";
 import { PageHeader } from "../../components/PageHeader";
-import { QueryError } from "../../components/QueryError";
+import { QueryBoundary } from "../../components/QueryBoundary";
 import { describeJob } from "../../lib/describeJob";
 import { timeAgo } from "../../lib/time";
 
@@ -26,9 +26,9 @@ function OverviewPage() {
   return (
     <>
       <PageHeader title="Overview" description="What is running and what needs attention." />
-      {overview.isPending && <Spinner aria-label="Loading overview" />}
-      {overview.isError && <QueryError error={overview.error} onRetry={() => overview.refetch()} />}
-      {overview.isSuccess && <Summary overview={overview.data} />}
+      <QueryBoundary query={overview} label="overview">
+        {(data) => <Summary overview={data} />}
+      </QueryBoundary>
     </>
   );
 }
@@ -187,38 +187,32 @@ function RecentActivity() {
   const jobs = useQuery(recentJobsQuery);
   return (
     <Section title="Recent jobs">
-      {jobs.isPending && (
-        <div className="px-4 py-6">
-          <Spinner size="sm" aria-label="Loading jobs" />
-        </div>
-      )}
-      {jobs.isError && (
-        <div className="p-4">
-          <QueryError error={jobs.error} onRetry={() => jobs.refetch()} />
-        </div>
-      )}
-      {jobs.isSuccess && jobs.data.items.length === 0 && (
-        <p className="px-4 py-6 text-sm text-[var(--muted)]">No jobs yet.</p>
-      )}
-      {jobs.isSuccess && jobs.data.items.length > 0 && (
-        <ul className="divide-y divide-[var(--separator)]">
-          {jobs.data.items.map((job) => (
-            <li key={job.id} className="flex items-center gap-x-4 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <Link
-                  to="/jobs/$jobId"
-                  params={{ jobId: job.id }}
-                  className="block truncate text-sm font-medium hover:underline"
-                >
-                  {describeJob(job)}
-                </Link>
-                <p className="text-xs text-[var(--muted)]">{timeAgo(job.created_at)}</p>
-              </div>
-              <JobStatusChip status={job.status} />
-            </li>
-          ))}
-        </ul>
-      )}
+      <QueryBoundary
+        query={jobs}
+        label="jobs"
+        isEmpty={(data) => data.items.length === 0}
+        empty={<p className="px-4 py-6 text-sm text-[var(--muted)]">No jobs yet.</p>}
+      >
+        {(data) => (
+          <ul className="divide-y divide-[var(--separator)]">
+            {data.items.map((job) => (
+              <li key={job.id} className="flex items-center gap-x-4 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <Link
+                    to="/jobs/$jobId"
+                    params={{ jobId: job.id }}
+                    className="block truncate text-sm font-medium hover:underline"
+                  >
+                    {describeJob(job)}
+                  </Link>
+                  <p className="text-xs text-[var(--muted)]">{timeAgo(job.created_at)}</p>
+                </div>
+                <JobStatusChip status={job.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </QueryBoundary>
       <div className="border-t border-[var(--separator)] px-4 py-2 text-sm">
         <Link to="/jobs" className="text-[var(--muted)] hover:underline">
           All jobs

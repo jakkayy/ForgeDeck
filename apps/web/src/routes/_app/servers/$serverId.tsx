@@ -1,4 +1,4 @@
-import { Alert, Card, Spinner } from "@heroui/react";
+import { Alert, Card } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -7,7 +7,7 @@ import type { Container, ContainerList, Server } from "../../../api/types";
 import { ContainerActions } from "../../../components/ContainerActions";
 import { ContainerLogs } from "../../../components/ContainerLogs";
 import { ContainerStateChip } from "../../../components/ContainerStateChip";
-import { QueryError } from "../../../components/QueryError";
+import { QueryBoundary, StaleNotice, waitingFor } from "../../../components/QueryBoundary";
 import { RemoveServerDialog } from "../../../components/RemoveServerDialog";
 import { RotateCredentialButton } from "../../../components/RotateCredentialButton";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
@@ -28,31 +28,27 @@ function ServerPage() {
   const server = useQuery(serverQuery(serverId));
   const containers = useQuery(containersQuery(serverId));
 
-  if (server.isPending) {
-    return <Spinner aria-label="Loading server" />;
-  }
-  if (server.isError) {
-    return <QueryError error={server.error} onRetry={() => server.refetch()} />;
+  if (server.data === undefined) {
+    return waitingFor(server, "server");
   }
   return (
     <div className="flex flex-col gap-6">
+      <StaleNotice query={server} label="server" />
       <ServerSummary server={server.data} />
       <section aria-labelledby="containers-heading" className="flex flex-col gap-3">
         <h2 id="containers-heading" className="font-semibold">
           Containers
         </h2>
-        {containers.isPending && <Spinner aria-label="Loading containers" />}
-        {containers.isError && (
-          <QueryError error={containers.error} onRetry={() => containers.refetch()} />
-        )}
-        {containers.isSuccess && (
-          <Containers
-            list={containers.data}
-            serverId={serverId}
-            projectId={server.data.project_id}
-            isOnline={server.data.status === "online"}
-          />
-        )}
+        <QueryBoundary query={containers} label="containers">
+          {(list) => (
+            <Containers
+              list={list}
+              serverId={serverId}
+              projectId={server.data.project_id}
+              isOnline={server.data.status === "online"}
+            />
+          )}
+        </QueryBoundary>
       </section>
     </div>
   );

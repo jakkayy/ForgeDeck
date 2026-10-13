@@ -150,6 +150,14 @@ Every data-driven page should support:
 
 Empty states should explain the next action, e.g. “No servers yet — register your first Docker server.”
 
+How the dashboard implements them:
+
+- **One component for lists and sections.** `QueryBoundary` (and `waitingFor` / `StaleNotice` for pages that return early) renders loading, failed, empty and stale in the same way everywhere, so a page cannot forget one.
+- **Loading** is a spinner labelled for screen readers ("Loading servers"). **Failed** with nothing to show is an error with the server's message and *Try again*.
+- **Stale:** when a refresh fails, or the browser is offline, the last data stays on screen under a notice saying how old it is ("Could not refresh servers. Showing what was loaded 2 minutes ago."). A network blip never replaces a list with an error screen. Pages refresh by polling (servers, containers, deployments, releases, jobs), so this is the state a user meets most.
+- **Permission denied:** a project you do not belong to is shown as *not found* (the API does the same, so IDs cannot be probed); actions above your role are hidden or disabled rather than failing.
+- **A URL that matches no page** shows *Page not found*, and a page that fails while rendering shows the error with *Try again*, instead of a blank screen.
+
 ## 12. Interaction principles
 
 - One obvious primary action per page.

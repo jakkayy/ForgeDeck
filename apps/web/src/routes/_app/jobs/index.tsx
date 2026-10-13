@@ -1,11 +1,11 @@
-import { Button, Card, ListBox, Select, Spinner } from "@heroui/react";
+import { Button, Card, ListBox, Select } from "@heroui/react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { listJobs } from "../../../api/jobs";
 import type { JobStatus } from "../../../api/types";
 import { JobStatusChip } from "../../../components/JobStatusChip";
 import { PageHeader } from "../../../components/PageHeader";
-import { QueryError } from "../../../components/QueryError";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { describeJob, duration } from "../../../lib/describeJob";
 import { timeAgo } from "../../../lib/time";
 
@@ -71,37 +71,44 @@ function JobsPage() {
           </Select>
         }
       />
-      {jobs.isPending && <Spinner aria-label="Loading jobs" />}
-      {jobs.isError && <QueryError error={jobs.error} onRetry={() => jobs.refetch()} />}
-      {jobs.isSuccess && jobs.data.pages[0]?.items.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          No jobs yet. They appear when you push code or operate a container.
-        </Card>
-      )}
-      {jobs.isSuccess && (jobs.data.pages[0]?.items.length ?? 0) > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {jobs.data.pages.flatMap((page) =>
-              page.items.map((job) => (
-                <li key={job.id} className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3">
-                  <Link
-                    to="/jobs/$jobId"
-                    params={{ jobId: job.id }}
-                    className="min-w-56 flex-1 truncate font-medium hover:underline"
+      <QueryBoundary
+        query={jobs}
+        label="jobs"
+        isEmpty={(data) => data.pages[0]?.items.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            No jobs yet. They appear when you push code or operate a container.
+          </Card>
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.pages.flatMap((page) =>
+                page.items.map((job) => (
+                  <li
+                    key={job.id}
+                    className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3"
                   >
-                    {describeJob(job)}
-                  </Link>
-                  <JobStatusChip status={job.status} />
-                  <p className="w-28 text-sm text-[var(--muted)]">{timeAgo(job.created_at)}</p>
-                  <p className="w-16 text-end text-sm tabular-nums text-[var(--muted)]">
-                    {duration(job.started_at, job.finished_at)}
-                  </p>
-                </li>
-              )),
-            )}
-          </ul>
-        </Card>
-      )}
+                    <Link
+                      to="/jobs/$jobId"
+                      params={{ jobId: job.id }}
+                      className="min-w-56 flex-1 truncate font-medium hover:underline"
+                    >
+                      {describeJob(job)}
+                    </Link>
+                    <JobStatusChip status={job.status} />
+                    <p className="w-28 text-sm text-[var(--muted)]">{timeAgo(job.created_at)}</p>
+                    <p className="w-16 text-end text-sm tabular-nums text-[var(--muted)]">
+                      {duration(job.started_at, job.finished_at)}
+                    </p>
+                  </li>
+                )),
+              )}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
       {jobs.hasNextPage && (
         <div className="mt-4 flex justify-center">
           <Button

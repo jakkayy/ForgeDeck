@@ -1,4 +1,4 @@
-import { Card, Spinner } from "@heroui/react";
+import { Card } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { serversQuery } from "../../../api/servers";
@@ -6,7 +6,7 @@ import type { Server } from "../../../api/types";
 import { AddServerDialog } from "../../../components/AddServerDialog";
 import { EmptyState } from "../../../components/EmptyState";
 import { PageHeader } from "../../../components/PageHeader";
-import { QueryError } from "../../../components/QueryError";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { timeAgo } from "../../../lib/time";
 
@@ -25,23 +25,27 @@ function ServersPage() {
         description="Docker hosts running the ForgeDeck Agent."
         actions={<AddServerDialog />}
       />
-      {servers.isPending && <Spinner aria-label="Loading servers" />}
-      {servers.isError && <QueryError error={servers.error} onRetry={() => servers.refetch()} />}
-      {servers.isSuccess && servers.data.items.length === 0 && (
-        <EmptyState
-          title="No servers yet"
-          description="Register your first Docker server: install the Agent and it connects to ForgeDeck over HTTPS, with no inbound ports."
-        />
-      )}
-      {servers.isSuccess && servers.data.items.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {servers.data.items.map((server) => (
-              <ServerRow key={server.id} server={server} />
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary
+        query={servers}
+        label="servers"
+        isEmpty={(data) => data.items.length === 0}
+        empty={
+          <EmptyState
+            title="No servers yet"
+            description="Register your first Docker server: install the Agent and it connects to ForgeDeck over HTTPS, with no inbound ports."
+          />
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.items.map((server) => (
+                <ServerRow key={server.id} server={server} />
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </>
   );
 }

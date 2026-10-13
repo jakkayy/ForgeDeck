@@ -1,10 +1,10 @@
-import { AlertDialog, Button, Card, Chip, Spinner, toast } from "@heroui/react";
+import { AlertDialog, Button, Card, Chip, toast } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type Release, releasesQuery, rollbackRelease } from "../../api/environments";
 import { shortImage } from "../../lib/serviceConfig";
 import { timeAgo } from "../../lib/time";
 import { useHasRole } from "../../lib/useHasRole";
-import { QueryError } from "../QueryError";
+import { QueryBoundary } from "../QueryBoundary";
 
 type Props = { environmentId: string; projectId: string };
 
@@ -16,38 +16,42 @@ export function ReleaseHistory({ environmentId, projectId }: Props) {
   return (
     <section aria-label="Releases" className="flex flex-col gap-3">
       <h2 className="text-base font-semibold">Release history</h2>
-      {releases.isPending && <Spinner aria-label="Loading releases" />}
-      {releases.isError && <QueryError error={releases.error} onRetry={() => releases.refetch()} />}
-      {releases.isSuccess && releases.data.items.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          No releases yet. A release is recorded when a deployment passes its health check.
-        </Card>
-      )}
-      {releases.isSuccess && releases.data.items.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {releases.data.items.map((release) => (
-              <li
-                key={release.id}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3"
-              >
-                <p className="min-w-48 flex-1 font-mono text-sm">
-                  <code>{release.commit_sha.slice(0, 7)}</code> · {shortImage(release.image_ref)}
-                </p>
-                {release.current && (
-                  <Chip size="sm" variant="soft" color="success">
-                    current
-                  </Chip>
-                )}
-                <p className="w-28 text-sm text-[var(--muted)]">{timeAgo(release.created_at)}</p>
-                {canDeploy && !release.current && (
-                  <RollbackButton release={release} environmentId={environmentId} />
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary
+        query={releases}
+        label="releases"
+        isEmpty={(data) => data.items.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            No releases yet. A release is recorded when a deployment passes its health check.
+          </Card>
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.items.map((release) => (
+                <li
+                  key={release.id}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3"
+                >
+                  <p className="min-w-48 flex-1 font-mono text-sm">
+                    <code>{release.commit_sha.slice(0, 7)}</code> · {shortImage(release.image_ref)}
+                  </p>
+                  {release.current && (
+                    <Chip size="sm" variant="soft" color="success">
+                      current
+                    </Chip>
+                  )}
+                  <p className="w-28 text-sm text-[var(--muted)]">{timeAgo(release.created_at)}</p>
+                  {canDeploy && !release.current && (
+                    <RollbackButton release={release} environmentId={environmentId} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </section>
   );
 }
