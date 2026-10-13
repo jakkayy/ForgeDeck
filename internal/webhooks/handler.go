@@ -1,32 +1,75 @@
 package webhooks
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
+	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
 // maxPayloadBytes matches GitHub's 25 MB cap with room to spare for GitLab.
 const maxPayloadBytes = 25 << 20
 
+// SecretSource looks up the per-connection GitLab webhook secret.
+type SecretSource interface {
+	GitLabWebhookSecret(ctx context.Context, connectionID uuid.UUID) (string, error)
+}
+
 // Handler serves provider webhooks. They are authenticated by signature or
 // secret token, never by session.
 type Handler struct {
 	gitHubSecret string // empty when the GitHub App is not configured
+	gitLab       SecretSource
 }
 
 // NewHandler returns webhook endpoints.
-func NewHandler(gitHubSecret string) *Handler {
-	return &Handler{gitHubSecret: gitHubSecret}
+func NewHandler(gitHubSecret string, gitLab SecretSource) *Handler {
+	return &Handler{gitHubSecret: gitHubSecret, gitLab: gitLab}
 }
 
 // Routes mounts the webhook endpoints on r.
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/webhooks/github", httpx.Handle(h.github))
+	r.Post("/webhooks/gitlab/{connectionID}", httpx.Handle(h.gitlab))
+}
+
+var errBadToken = httpx.Unauthorized("Webhook token is invalid.")
+
+// gitlab answers 401 for both unknown connections and wrong tokens, so the
+// endpoint cannot be used to discover connection IDs.
+func (h *Handler) gitlab(w http.ResponseWriter, r *http.Request) error {
+	connectionID, err := uuid.Parse(chi.URLParam(r, "connectionID"))
+	if err != nil {
+		return errBadToken
+	}
+	secret, err := h.gitLab.GitLabWebhookSecret(r.Context(), connectionID)
+	if errors.Is(err, gitconn.ErrNoWebhookSecret) {
+		return errBadToken
+	}
+	if err != nil {
+		return err
+	}
+	if err := verifyGitLabToken(secret, r.Header.Get("X-Gitlab-Token")); err != nil {
+		return errBadToken
+	}
+	body, err := readBody(w, r)
+	if err != nil {
+		return err
+	}
+
+	if r.Header.Get("X-Gitlab-Event") != "Push Hook" {
+		return httpx.WriteJSON(w, http.StatusOK, map[string]string{"result": "ignored: event not used"})
+	}
+	if _, _, err := parseGitLabPush(body); err != nil {
+		return httpx.BadRequest("invalid_payload", err.Error())
+	}
+	return httpx.WriteJSON(w, http.StatusAccepted, map[string]string{"result": "accepted"})
 }
 
 func (h *Handler) github(w http.ResponseWriter, r *http.Request) error {

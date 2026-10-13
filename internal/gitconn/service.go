@@ -120,3 +120,25 @@ func toConnection(row store.GitConnection) Connection {
 		DisplayName: row.DisplayName, BaseURL: row.BaseUrl, CreatedAt: row.CreatedAt,
 	}
 }
+
+// ErrNoWebhookSecret means the connection does not exist or has no
+// per-connection webhook secret (GitHub uses the App-wide one).
+var ErrNoWebhookSecret = errors.New("connection has no webhook secret")
+
+// GitLabWebhookSecret returns the secret GitLab sends in X-Gitlab-Token for
+// a connection. It is used by the unauthenticated webhook endpoint, so it
+// does no user authorization.
+func (s *Service) GitLabWebhookSecret(ctx context.Context, connectionID uuid.UUID) (string, error) {
+	row, err := s.queries.GetGitConnection(ctx, connectionID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.Provider != "gitlab") {
+		return "", ErrNoWebhookSecret
+	}
+	if err != nil {
+		return "", fmt.Errorf("get git connection: %w", err)
+	}
+	secret, err := s.keyring.Open(row.WebhookCiphertext, *row.WebhookKeyID, connectionAAD(row.ID, "webhook"))
+	if err != nil {
+		return "", fmt.Errorf("decrypt webhook secret: %w", err)
+	}
+	return string(secret), nil
+}
