@@ -125,3 +125,24 @@ WITH expired AS (
     WHERE job_attempts.job_id = recovered.id AND job_attempts.attempt_number = recovered.attempt_count
 )
 SELECT id, status, worker_kind, target_server_id FROM recovered;
+
+-- name: CancelJob :one
+-- Cancels a queued or running job and returns the status it had before.
+WITH target AS (
+    SELECT current.id, current.status, current.attempt_count FROM jobs AS current
+    WHERE current.id = @id
+    FOR UPDATE
+), cancelled AS (
+    UPDATE jobs
+    SET status = 'cancelled', finished_at = @now::timestamptz, lease_expires_at = NULL
+    FROM target
+    WHERE jobs.id = target.id AND target.status IN ('queued', 'running')
+), attempt AS (
+    UPDATE job_attempts
+    SET status = 'cancelled', finished_at = @now::timestamptz
+    FROM target
+    WHERE job_attempts.job_id = target.id
+      AND job_attempts.attempt_number = target.attempt_count
+      AND target.status = 'running'
+)
+SELECT status FROM target;

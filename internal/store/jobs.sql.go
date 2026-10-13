@@ -41,6 +41,40 @@ func (q *Queries) AppendJobLogs(ctx context.Context, arg AppendJobLogsParams) (i
 	return result.RowsAffected(), nil
 }
 
+const cancelJob = `-- name: CancelJob :one
+WITH target AS (
+    SELECT current.id, current.status, current.attempt_count FROM jobs AS current
+    WHERE current.id = $1
+    FOR UPDATE
+), cancelled AS (
+    UPDATE jobs
+    SET status = 'cancelled', finished_at = $2::timestamptz, lease_expires_at = NULL
+    FROM target
+    WHERE jobs.id = target.id AND target.status IN ('queued', 'running')
+), attempt AS (
+    UPDATE job_attempts
+    SET status = 'cancelled', finished_at = $2::timestamptz
+    FROM target
+    WHERE job_attempts.job_id = target.id
+      AND job_attempts.attempt_number = target.attempt_count
+      AND target.status = 'running'
+)
+SELECT status FROM target
+`
+
+type CancelJobParams struct {
+	ID  uuid.UUID
+	Now time.Time
+}
+
+// Cancels a queued or running job and returns the status it had before.
+func (q *Queries) CancelJob(ctx context.Context, arg CancelJobParams) (string, error) {
+	row := q.db.QueryRow(ctx, cancelJob, arg.ID, arg.Now)
+	var status string
+	err := row.Scan(&status)
+	return status, err
+}
+
 const claimAgentJob = `-- name: ClaimAgentJob :one
 WITH next AS (
     SELECT queued.id FROM jobs AS queued

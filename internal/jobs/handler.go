@@ -24,6 +24,19 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/jobs/{jobID}", httpx.Handle(h.get))
 	r.Get("/jobs/{jobID}/logs", httpx.Handle(h.logs))
+	r.Post("/jobs/{jobID}/cancel", httpx.Handle(h.cancel))
+}
+
+func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) error {
+	jobID, err := httpx.UUIDParam(r, "jobID")
+	if err != nil {
+		return err
+	}
+	job, err := h.svc.Cancel(r.Context(), auth.UserFrom(r.Context()).ID, jobID)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, job)
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
