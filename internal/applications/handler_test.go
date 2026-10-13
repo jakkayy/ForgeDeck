@@ -8,6 +8,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/applications"
+	"github.com/jakkayy/ForgeDeck/internal/config"
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab/gitlabtest"
@@ -16,24 +17,28 @@ import (
 
 type fixture struct {
 	env          *apitest.Env
+	gitlab       *gitlabtest.Server
 	owner        *apitest.Client
 	projectID    uuid.UUID
 	connectionID uuid.UUID
 }
 
-func newFixture(t *testing.T) fixture {
+const publicURL = "https://forgedeck.example.com"
+
+func newFixture(t *testing.T, options ...apitest.Option) fixture {
 	t.Helper()
 	fake := gitlabtest.New(t)
 	fake.AddToken("glpat-good", gitlabtest.Token{Username: "bot", Scopes: []string{"api"}, Projects: []gitlab.Project{
 		{ID: 77, PathWithNamespace: "acme/shop", DefaultBranch: "main", Visibility: "private"},
 	}})
-	env := apitest.New(t)
+	options = append([]apitest.Option{func(cfg *config.Config) { cfg.PublicURL = publicURL }}, options...)
+	env := apitest.New(t, options...)
 	owner, _ := env.NewUser("owner@example.com")
 	projectID := owner.CreateProject("Shop")
 	var conn gitconn.Connection
 	owner.Do(http.MethodPost, "/api/v1/projects/"+projectID.String()+"/git-connections/gitlab",
 		map[string]string{"base_url": fake.URL, "token": "glpat-good"}).RequireStatus(http.StatusCreated).Decode(&conn)
-	return fixture{env: env, owner: owner, projectID: projectID, connectionID: conn.ID}
+	return fixture{env: env, gitlab: fake, owner: owner, projectID: projectID, connectionID: conn.ID}
 }
 
 func (f fixture) create(t *testing.T, body map[string]any) *apitest.Response {
@@ -121,4 +126,35 @@ func TestApplicationsInvisibleAcrossProjects(t *testing.T) {
 	outsider.Do(http.MethodPost, "/api/v1/projects/"+ownProject.String()+"/applications",
 		map[string]any{"name": "steal", "git_connection_id": f.connectionID, "repository_id": "77"}).
 		RequireStatus(http.StatusNotFound)
+}
+
+func TestGitLabWebhookFollowsApplicationLifecycle(t *testing.T) {
+	f := newFixture(t)
+	var app applications.Application
+	f.create(t, map[string]any{"name": "API"}).RequireStatus(http.StatusCreated).Decode(&app)
+
+	hooks := f.gitlab.Hooks()
+	if len(hooks) != 1 || hooks[0].ProjectID != 77 ||
+		hooks[0].URL != publicURL+"/api/v1/webhooks/gitlab/"+f.connectionID.String() || hooks[0].Token == "" {
+		t.Fatalf("hooks %+v", hooks)
+	}
+
+	// A failed create (duplicate name) must not leave a hook behind.
+	f.create(t, map[string]any{"name": "API"}).RequireStatus(http.StatusUnprocessableEntity)
+	if n := len(f.gitlab.Hooks()); n != 1 {
+		t.Fatalf("%d hooks after failed create", n)
+	}
+
+	f.owner.Do(http.MethodDelete, "/api/v1/applications/"+app.ID.String(), nil).RequireStatus(http.StatusNoContent)
+	if n := len(f.gitlab.Hooks()); n != 0 {
+		t.Fatalf("%d hooks after delete", n)
+	}
+}
+
+func TestGitLabApplicationNeedsPublicURL(t *testing.T) {
+	f := newFixture(t, func(cfg *config.Config) { cfg.PublicURL = "" })
+	resp := f.create(t, map[string]any{"name": "API"}).RequireStatus(http.StatusConflict)
+	if resp.ErrorCode() != "public_url_required" {
+		t.Fatalf("code %s", resp.ErrorCode())
+	}
 }

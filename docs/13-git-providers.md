@@ -53,6 +53,8 @@ Works with gitlab.com and self-hosted GitLab. Each connection holds one **projec
 
 A project admin pastes the token and the GitLab address in **Project → Git**. ForgeDeck checks with GitLab that the token is active and has the `api` scope, then stores it encrypted together with a generated webhook secret.
 
+When an application is created from a GitLab repository, ForgeDeck registers a push webhook on that GitLab project pointing to `{FORGEDECK_PUBLIC_URL}/api/v1/webhooks/gitlab/{connectionID}`, with the connection's secret as the token. Deleting the application removes the hook. GitHub needs no per-repository hook: the App's webhook covers every installed repository.
+
 ### Self-hosted GitLab on a private network
 
 The GitLab address is user input, so ForgeDeck connects only to public addresses by default, checked after DNS resolution. Loopback, link-local (including cloud metadata at `169.254.169.254`), and private ranges are refused, and redirects are not followed. If your GitLab is on an internal network, the operator can allow private addresses:

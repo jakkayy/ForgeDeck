@@ -46,7 +46,8 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		githubClient = github.NewClient(*cfg.GitHub, time.Now)
 	}
 	gitService := gitconn.NewService(gitconn.Deps{
-		Pool: pool, Authz: authorizer, Keyring: cfg.Keyring, GitHub: githubClient, Outbound: cfg.Outbound, Now: time.Now,
+		Pool: pool, Authz: authorizer, Keyring: cfg.Keyring, GitHub: githubClient, Outbound: cfg.Outbound,
+		PublicURL: cfg.PublicURL, Now: time.Now,
 	})
 	gitHandler := gitconn.NewHandler(gitService, logger)
 	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService))

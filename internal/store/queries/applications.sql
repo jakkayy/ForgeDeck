@@ -1,10 +1,10 @@
 -- name: CreateApplication :one
 INSERT INTO applications (
     project_id, name, git_connection_id, repository_id, repository_full_name,
-    branch, dockerfile_path, build_context, test_command, created_by
+    branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by
 ) VALUES (
     @project_id, @name, @git_connection_id, @repository_id, @repository_full_name,
-    @branch, @dockerfile_path, @build_context, @test_command, @created_by
+    @branch, @dockerfile_path, @build_context, @test_command, @provider_webhook_id, @created_by
 )
 RETURNING *;
 

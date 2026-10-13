@@ -44,6 +44,7 @@ type Service struct {
 	github         *github.Client // nil when the GitHub App is not configured
 	outbound       *http.Client   // for user-supplied provider URLs
 	outboundPolicy safehttp.Policy
+	publicURL      string
 	now            func() time.Time
 }
 
@@ -54,14 +55,17 @@ type Deps struct {
 	Keyring  *keyring.Keyring
 	GitHub   *github.Client
 	Outbound safehttp.Policy
-	Now      func() time.Time
+	// PublicURL is where GitLab sends webhooks; required for GitLab applications.
+	PublicURL string
+	Now       func() time.Time
 }
 
 // NewService returns a Service.
 func NewService(d Deps) *Service {
 	return &Service{
 		pool: d.Pool, queries: store.New(d.Pool), authz: d.Authz, keyring: d.Keyring, github: d.GitHub,
-		outbound: safehttp.NewClient(d.Outbound, 15*time.Second), outboundPolicy: d.Outbound, now: d.Now,
+		outbound: safehttp.NewClient(d.Outbound, 15*time.Second), outboundPolicy: d.Outbound,
+		publicURL: d.PublicURL, now: d.Now,
 	}
 }
 

@@ -91,6 +91,10 @@ func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in Cr
 	if in.Branch == "" {
 		in.Branch = repo.DefaultBranch
 	}
+	hookID, err := s.git.EnsureWebhook(ctx, in.GitConnectionID, repo.ID)
+	if err != nil {
+		return Application{}, err
+	}
 
 	row, err := s.queries.CreateApplication(ctx, store.CreateApplicationParams{
 		ProjectID:          projectID,
@@ -102,8 +106,13 @@ func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in Cr
 		DockerfilePath:     path.Clean(in.DockerfilePath),
 		BuildContext:       path.Clean(in.BuildContext),
 		TestCommand:        optional(in.TestCommand),
+		ProviderWebhookID:  hookID,
 		CreatedBy:          &userID,
 	})
+	if err != nil {
+		// Do not leave a webhook behind for an application that does not exist.
+		_ = s.git.RemoveWebhook(context.WithoutCancel(ctx), in.GitConnectionID, repo.ID, hookID)
+	}
 	if database.IsUniqueViolation(err) {
 		return Application{}, errNameTaken
 	}
@@ -194,14 +203,18 @@ func (s *Service) Update(ctx context.Context, userID, applicationID uuid.UUID, i
 	return toApplication(row), nil
 }
 
-// Delete removes an application.
+// Delete removes an application and the provider webhook created for it.
+// A webhook that cannot be removed (token revoked, provider down) does not
+// block deletion; its deliveries will simply be rejected.
 func (s *Service) Delete(ctx context.Context, userID, applicationID uuid.UUID) error {
-	if _, err := s.authorize(ctx, userID, applicationID, authz.ManageApps); err != nil {
+	row, err := s.authorize(ctx, userID, applicationID, authz.ManageApps)
+	if err != nil {
 		return err
 	}
 	if err := s.queries.DeleteApplication(ctx, applicationID); err != nil {
 		return fmt.Errorf("delete application: %w", err)
 	}
+	_ = s.git.RemoveWebhook(ctx, row.GitConnectionID, row.RepositoryID, row.ProviderWebhookID)
 	return nil
 }
 

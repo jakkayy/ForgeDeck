@@ -14,10 +14,10 @@ import (
 const createApplication = `-- name: CreateApplication :one
 INSERT INTO applications (
     project_id, name, git_connection_id, repository_id, repository_full_name,
-    branch, dockerfile_path, build_context, test_command, created_by
+    branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by
 ) VALUES (
     $1, $2, $3, $4, $5,
-    $6, $7, $8, $9, $10
+    $6, $7, $8, $9, $10, $11
 )
 RETURNING id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at
 `
@@ -32,6 +32,7 @@ type CreateApplicationParams struct {
 	DockerfilePath     string
 	BuildContext       string
 	TestCommand        *string
+	ProviderWebhookID  *string
 	CreatedBy          *uuid.UUID
 }
 
@@ -46,6 +47,7 @@ func (q *Queries) CreateApplication(ctx context.Context, arg CreateApplicationPa
 		arg.DockerfilePath,
 		arg.BuildContext,
 		arg.TestCommand,
+		arg.ProviderWebhookID,
 		arg.CreatedBy,
 	)
 	var i Application
