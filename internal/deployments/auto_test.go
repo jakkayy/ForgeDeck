@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -161,4 +162,94 @@ func TestOneBrokenEnvironmentDoesNotFailTheBuildOrOthers(t *testing.T) {
 	if got := f.deploymentsOf(t, healthy.ID); len(got) != 1 {
 		t.Fatalf("healthy environment deployments %+v", got)
 	}
+}
+
+func TestClaimedDeploymentCarriesScopedRegistryCredentialsAndPreviousRelease(t *testing.T) {
+	f := newAutoFixture(t)
+	// A second registry of the project must never be sent for this image.
+	f.owner.Do(http.MethodPost, "/api/v1/projects/"+f.projectID.String()+"/registries",
+		map[string]string{"name": "Other", "host": "registry.other.example", "username": "other", "password": "other-secret"}).
+		RequireStatus(http.StatusCreated)
+	// The environment already runs a release.
+	releaseID := f.recordRelease(t, f.staging.ID, "ghcr.io/acme/shop-api@sha256:"+"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1")
+
+	build := f.build(t, f.appID, "succeeded", goodResult())
+	var d deployments.Deployment
+	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted).Decode(&d)
+
+	claimed := f.claimDeploy(t)
+	want := agentproto.RegistryCredentials{Host: "ghcr.io", Username: "bot", Password: "secret"}
+	if claimed.Deploy == nil || claimed.Deploy.Registry == nil || *claimed.Deploy.Registry != want {
+		t.Fatalf("registry credentials %+v", claimed.Deploy)
+	}
+	if prev := claimed.Deploy.Previous; prev == nil || prev.ReleaseID != releaseID || *prev.Config.PublishedPort != 18080 {
+		t.Fatalf("previous release %+v", claimed.Deploy.Previous)
+	}
+
+	// Secrets travel only in the claim response, not in the stored job.
+	var stored jobs.Job
+	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&stored)
+	if strings.Contains(string(stored.Payload), "secret") {
+		t.Fatalf("payload %s", stored.Payload)
+	}
+}
+
+func TestDeploymentOfAnImageFromAnUnknownRegistryHasNoCredentials(t *testing.T) {
+	f := newAutoFixture(t)
+	result := goodResult()
+	result.ImageRef = "unknown.example/acme/shop-api@" + digest
+	build := f.build(t, f.appID, "succeeded", result)
+	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted)
+
+	claimed := f.claimDeploy(t)
+	if claimed.Deploy == nil || claimed.Deploy.Registry != nil || claimed.Deploy.Previous != nil {
+		t.Fatalf("deploy context %+v", claimed.Deploy)
+	}
+}
+
+func TestDeploymentWhoseEnvironmentWasDeletedFailsAtClaim(t *testing.T) {
+	f := newAutoFixture(t)
+	build := f.build(t, f.appID, "succeeded", goodResult())
+	var d deployments.Deployment
+	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted).Decode(&d)
+	f.owner.Do(http.MethodDelete, "/api/v1/environments/"+f.staging.ID.String(), nil).RequireStatus(http.StatusNoContent)
+
+	wait := 0
+	f.server.Do(http.MethodPost, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).RequireStatus(http.StatusNoContent)
+	var job jobs.Job
+	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&job)
+	if job.Status != jobs.StatusFailed || job.Error == nil || job.Error.Code != "environment_not_found" {
+		t.Fatalf("job %+v", job)
+	}
+}
+
+func (f autoFixture) claimDeploy(t *testing.T) agentproto.Job {
+	t.Helper()
+	wait := 0
+	var job agentproto.Job
+	f.server.Do(http.MethodPost, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).RequireStatus(http.StatusOK).Decode(&job)
+	if job.Type != agentproto.JobDeployImage {
+		t.Fatalf("claimed %+v", job)
+	}
+	return job
+}
+
+// recordRelease inserts a release row for the environment, as a healthy
+// deployment will once release recording exists.
+func (f autoFixture) recordRelease(t *testing.T, environmentID uuid.UUID, ref string) uuid.UUID {
+	t.Helper()
+	config := `{"container_port":80,"published_port":18080,"bind_address":"127.0.0.1","env":{},"volumes":[],"restart":"unless-stopped","health_check":{"type":"tcp","timeout_seconds":60,"interval_seconds":2}}`
+	ctx := context.Background()
+	var deploymentID, releaseID uuid.UUID
+	err := f.env.Pool.QueryRow(ctx, `INSERT INTO deployments (environment_id, commit_sha, image_ref, config, status, source_release_id)
+		VALUES ($1, $2, $3, $4::jsonb, 'succeeded', NULL) RETURNING id`, environmentID, commit, ref, config).Scan(&deploymentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = f.env.Pool.QueryRow(ctx, `INSERT INTO releases (application_id, environment_id, deployment_id, commit_sha, image_ref, config)
+		VALUES ($1, $2, $3, $4, $5, $6::jsonb) RETURNING id`, f.appID, environmentID, deploymentID, commit, ref, config).Scan(&releaseID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return releaseID
 }

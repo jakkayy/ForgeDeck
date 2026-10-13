@@ -109,6 +109,28 @@ type Job struct {
 	// Credentials are minted for this attempt of a build job. They are sent
 	// only in the claim response, never stored or logged.
 	Credentials *BuildCredentials `json:"credentials,omitempty"`
+	// Deploy is added to a claimed deploy_image job. It is never stored.
+	Deploy *DeployContext `json:"deploy,omitempty"`
+}
+
+// DeployContext is what an Agent needs to run one deployment beyond its payload.
+type DeployContext struct {
+	// Registry holds credentials for the one registry that hosts the image,
+	// and for no other. It is nil when the project has no registry for that
+	// host, in which case the Agent pulls anonymously.
+	Registry *RegistryCredentials `json:"registry,omitempty"`
+	// Previous is the environment's current release when the job was
+	// claimed. If the new version does not become healthy, the Agent
+	// restores it.
+	Previous *PreviousRelease `json:"previous,omitempty"`
+}
+
+// PreviousRelease is a release the Agent can restore.
+type PreviousRelease struct {
+	ReleaseID uuid.UUID         `json:"release_id"`
+	CommitSHA string            `json:"commit_sha"`
+	ImageRef  string            `json:"image_ref"`
+	Config    servicecfg.Config `json:"config"`
 }
 
 // BuildCredentials let a Runner fetch one repository and push its image.

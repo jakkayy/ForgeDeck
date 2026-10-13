@@ -48,7 +48,6 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	notifier := jobs.NewNotifier(pool, logger)
 	go notifier.Run(ctx)
 	go jobService.RunRecovery(ctx, logger)
-	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier)
 	var githubClient *github.Client
 	if cfg.GitHub != nil {
 		githubClient = github.NewClient(*cfg.GitHub, time.Now)
@@ -66,6 +65,8 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService, registryService))
 
 	deploymentService := deployments.NewService(pool, authorizer, jobService)
+	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier,
+		agentapi.WithDeployContext(deployments.NewContextMinter(store.New(pool), registryService), logger))
 	deploymentHandler := deployments.NewHandler(deploymentService)
 	jobService.OnSucceeded(deploymentService.AutoDeploy(logger))
 

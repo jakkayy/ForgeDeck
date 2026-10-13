@@ -83,4 +83,4 @@ Applying a deployment is idempotent: pull the digest, render, `docker compose up
 
 ### Registry access for pulls
 
-The Agent pulls with credentials the Control Plane includes in the claimed `deploy_image` job for that one registry (4.7). They are scoped to the job, never stored in the payload or logs, and written to a per-job Docker config that is deleted afterwards.
+The Agent pulls with credentials the Control Plane adds to the claim response of a `deploy_image` job ([05 §8](05-agent-protocol.md)). They are scoped to the one registry that hosts the image, built per attempt, never stored in the job payload or logs, and written to a per-job Docker config that is deleted afterwards.

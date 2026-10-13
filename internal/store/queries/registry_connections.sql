@@ -16,3 +16,10 @@ SELECT * FROM registry_connections WHERE id = $1;
 
 -- name: DeleteRegistryConnection :exec
 DELETE FROM registry_connections WHERE id = $1;
+
+-- name: GetRegistryForHost :one
+-- The project's registry that hosts an image, preferring the application's own.
+SELECT * FROM registry_connections
+WHERE project_id = @project_id AND host = @host
+ORDER BY COALESCE(id = sqlc.narg(preferred_id)::uuid, false) DESC, created_at, id
+LIMIT 1;

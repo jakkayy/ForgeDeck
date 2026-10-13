@@ -87,6 +87,37 @@ func (q *Queries) GetRegistryConnection(ctx context.Context, id uuid.UUID) (Regi
 	return i, err
 }
 
+const getRegistryForHost = `-- name: GetRegistryForHost :one
+SELECT id, project_id, name, host, username, password_ciphertext, password_key_id, created_by, created_at FROM registry_connections
+WHERE project_id = $1 AND host = $2
+ORDER BY COALESCE(id = $3::uuid, false) DESC, created_at, id
+LIMIT 1
+`
+
+type GetRegistryForHostParams struct {
+	ProjectID   uuid.UUID
+	Host        string
+	PreferredID *uuid.UUID
+}
+
+// The project's registry that hosts an image, preferring the application's own.
+func (q *Queries) GetRegistryForHost(ctx context.Context, arg GetRegistryForHostParams) (RegistryConnection, error) {
+	row := q.db.QueryRow(ctx, getRegistryForHost, arg.ProjectID, arg.Host, arg.PreferredID)
+	var i RegistryConnection
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Name,
+		&i.Host,
+		&i.Username,
+		&i.PasswordCiphertext,
+		&i.PasswordKeyID,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listRegistryConnections = `-- name: ListRegistryConnections :many
 SELECT id, project_id, name, host, username, password_ciphertext, password_key_id, created_by, created_at FROM registry_connections
 WHERE project_id = $1
