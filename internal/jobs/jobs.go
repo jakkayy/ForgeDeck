@@ -56,6 +56,19 @@ type Service struct {
 	authz       *authz.Authorizer
 	now         func() time.Time
 	onSucceeded []SuccessHook
+	redactor    LogRedactor
+}
+
+// LogRedactor returns a function that masks a project's secret values.
+type LogRedactor interface {
+	For(ctx context.Context, projectID uuid.UUID) (func(string) string, error)
+}
+
+// SetLogRedactor makes every stored log line pass through r, so a project
+// secret that an Agent or Runner failed to mask never reaches the database or
+// a browser. Call it while wiring the application.
+func (s *Service) SetLogRedactor(r LogRedactor) {
+	s.redactor = r
 }
 
 // OnSucceeded registers a hook for jobs that succeed. Call it while wiring

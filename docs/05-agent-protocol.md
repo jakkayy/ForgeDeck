@@ -136,7 +136,7 @@ Prefer typed payloads. Phase 1 needs two Agent job types.
 
 - Returns a bounded range of past logs through job events, stored as `job_log_chunks`.
 - The Agent enforces its own maximum lines and bytes even if the payload asks for more, and reports truncation.
-- Apply secret redaction before sending.
+- Apply secret redaction before sending. The Control Plane masks the project's secrets again when it stores the lines (see [15 §4](15-deployments.md#4-project-secrets-phase-5)).
 - Live tail is out of scope for Phase 1.
 
 `deploy_image` (Phase 4; the model is in [15 — Deployments](15-deployments.md)):

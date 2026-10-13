@@ -47,6 +47,14 @@ type Service struct {
 	queries *store.Queries
 	authz   *authz.Authorizer
 	keyring *keyring.Keyring
+	// onChange is told when a project's secrets change.
+	onChange func(projectID uuid.UUID)
+}
+
+func (s *Service) changed(projectID uuid.UUID) {
+	if s.onChange != nil {
+		s.onChange(projectID)
+	}
 }
 
 // NewService returns a secrets Service.
@@ -87,6 +95,7 @@ func (s *Service) Set(ctx context.Context, userID, projectID uuid.UUID, name, va
 		if err != nil {
 			return Secret{}, false, fmt.Errorf("replace secret: %w", err)
 		}
+		s.changed(projectID)
 		return toSecret(row), false, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -104,6 +113,7 @@ func (s *Service) Set(ctx context.Context, userID, projectID uuid.UUID, name, va
 	if err != nil {
 		return Secret{}, false, fmt.Errorf("create secret: %w", err)
 	}
+	s.changed(projectID)
 	return toSecret(row), true, nil
 }
 
@@ -129,6 +139,7 @@ func (s *Service) Delete(ctx context.Context, userID, projectID uuid.UUID, name 
 	if err := s.queries.DeleteProjectSecret(ctx, row.ID); err != nil {
 		return fmt.Errorf("delete secret: %w", err)
 	}
+	s.changed(projectID)
 	return nil
 }
 

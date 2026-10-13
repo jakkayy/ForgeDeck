@@ -60,6 +60,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	gitHandler := gitconn.NewHandler(gitService, logger)
 	registryService := registries.NewService(store.New(pool), authorizer, cfg.Keyring)
 	secretService := secrets.NewService(store.New(pool), authorizer, cfg.Keyring)
+	jobService.SetLogRedactor(secrets.NewRedactor(secretService))
 	runnerHandler := runnerapi.NewHandler(runnerapi.Deps{
 		Shutdown: ctx, Runners: runners.NewService(store.New(pool), time.Now), Jobs: jobService, Notifier: notifier,
 		Credentials: builds.NewCredentials(store.New(pool), gitService, registryService), Logger: logger,
