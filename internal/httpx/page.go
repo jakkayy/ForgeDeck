@@ -1,8 +1,13 @@
 package httpx
 
 import (
+	"encoding/base64"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -63,4 +68,31 @@ func NewList[T any](items []T, page Page) List[T] {
 		list.NextCursor = &next
 	}
 	return list
+}
+
+// EncodeTimeCursor makes the opaque keyset cursor for a list ordered by
+// (created_at, id) newest first: the position after the last row of a page.
+func EncodeTimeCursor(createdAt time.Time, id uuid.UUID) string {
+	raw := strconv.FormatInt(createdAt.UnixMicro(), 10) + "_" + id.String()
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+// DecodeTimeCursor parses a cursor from EncodeTimeCursor. An empty string is
+// the first page (ok, with a nil position).
+func DecodeTimeCursor(s string) (createdAt *time.Time, id *uuid.UUID, ok bool) {
+	if s == "" {
+		return nil, nil, true
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return nil, nil, false
+	}
+	micros, idText, found := strings.Cut(string(raw), "_")
+	us, errTime := strconv.ParseInt(micros, 10, 64)
+	parsed, errID := uuid.Parse(idText)
+	if !found || errTime != nil || errID != nil {
+		return nil, nil, false
+	}
+	t := time.UnixMicro(us)
+	return &t, &parsed, true
 }

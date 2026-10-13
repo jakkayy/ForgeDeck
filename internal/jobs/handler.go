@@ -52,7 +52,7 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := auth.UserFrom(r.Context()).ID
-	if _, err := h.svc.authorizeJob(r.Context(), userID, jobID); err != nil {
+	if err := h.svc.authorizeJobOutput(r.Context(), userID, jobID); err != nil {
 		httpx.WriteError(w, r, err)
 		return
 	}

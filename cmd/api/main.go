@@ -7,6 +7,8 @@
 //	forgedeck-api create-user --email <address>   (password from terminal or stdin)
 //	forgedeck-api create-runner --name <name>     (prints the Runner credential once)
 //	forgedeck-api delete-runner --name <name>
+//	forgedeck-api healthcheck         exit 0 if the server on this machine is healthy (for containers)
+//	forgedeck-api version             print the version
 package main
 
 import (
@@ -21,6 +23,9 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/logging"
 )
 
+// version is set at build time with -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "forgedeck-api:", err)
@@ -29,6 +34,15 @@ func main() {
 }
 
 func run(args []string) error {
+	if len(args) > 0 && args[0] == "version" {
+		fmt.Println("forgedeck-api", version)
+		return nil
+	}
+	if len(args) > 0 && args[0] == "healthcheck" {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return healthcheck(ctx)
+	}
 	cfg, err := config.Load(os.LookupEnv)
 	if err != nil {
 		return err
@@ -61,6 +75,6 @@ func dispatch(ctx context.Context, command string, args []string, cfg config.Con
 	case "delete-runner":
 		return deleteRunner(ctx, args, cfg, logger)
 	default:
-		return fmt.Errorf("unknown command %q (want serve, migrate, create-user, create-runner or delete-runner)", command)
+		return fmt.Errorf("unknown command %q (want serve, migrate, create-user, create-runner, delete-runner, healthcheck or version)", command)
 	}
 }

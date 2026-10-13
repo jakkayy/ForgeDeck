@@ -60,6 +60,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Group(func(agent chi.Router) {
 		agent.Use(h.RequireAgent)
 		agent.Post("/agent/heartbeat", httpx.Handle(h.heartbeat))
+		agent.Post("/agent/rotate-credential", httpx.Handle(h.rotateCredential))
 		agent.Post("/agent/containers/snapshot", httpx.Handle(h.snapshot))
 		agent.Post("/agent/jobs/claim", httpx.Handle(h.claim))
 		agent.Post("/agent/jobs/{jobID}/heartbeat", httpx.Handle(h.renewLease))
@@ -100,8 +101,23 @@ func (h *Handler) heartbeat(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.WriteJSON(w, http.StatusOK, agentproto.HeartbeatResponse{
-		IntervalSeconds: int(servers.HeartbeatInterval / time.Second),
+		IntervalSeconds:  int(servers.HeartbeatInterval / time.Second),
+		RotateCredential: IdentityFrom(r.Context()).RotationDue,
 	})
+}
+
+// rotateCredential gives the Agent a new credential. The response is the only
+// time it is shown, so it is not cacheable.
+func (h *Handler) rotateCredential(w http.ResponseWriter, r *http.Request) error {
+	resp, err := h.servers.RotateCredential(r.Context(), IdentityFrom(r.Context()), bearerCredential(r))
+	if errors.Is(err, servers.ErrInvalidAgentCredential) {
+		return errAgentUnauthorized
+	}
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	return httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) snapshot(w http.ResponseWriter, r *http.Request) error {

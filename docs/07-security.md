@@ -127,3 +127,95 @@ Audit metadata must not contain secret values. Document how to revoke provider c
 - Whether external Runner hosts are supported in the first release.
 - Network policy for build jobs.
 - Secret rotation and incident response procedures.
+
+
+## Audit log
+
+Security-relevant changes are recorded in an append-only audit log that project admins read through `GET /projects/{id}/audit-logs` (see [03](03-database.md) and [04](04-api-spec.md)).
+
+**What is recorded.** Every route that changes data is listed in `internal/audit/rules.go` as either *audited* or *exempt with a reason*, and a test walks the real router and fails if a route is in neither, so an endpoint cannot be added without deciding. Audited: projects and members, secrets (set, replace, delete), registries, Git connections, applications, builds, environments, deployments and rollbacks, job cancellation, server removal, enrollment tokens, container actions and log fetches, signing in. Recorded outside HTTP: an Agent enrolling (`server.enroll`, actor `agent`), a push that queues a build (`build.queue`, actor `webhook`), and an automatic deployment (`deployment.start`, actor `system`, written in the same transaction as the deployment). Exempt: heartbeats, claims, log events and completions from Agents and Runners (machine traffic; the work they do was audited when it was requested) and signing out.
+
+**What is never recorded.** Secret values, passwords, tokens and credentials. Route rules copy only fields named in the rule (such as a role or a commit), the response is read only for the identifying fields `id`, `name`, `email` and a few like them (never an enrollment token or a session), and metadata values under keys that look like credentials are replaced with `[redacted]` as a last defense. Tests assert that known secret values appear nowhere in the log.
+
+**Properties.** A failed request records nothing (an event says something happened). An event is written after the action; if writing fails it is logged at error level and the action stands. The actor is stored as text, so the record outlives the user. The log has no foreign key to the project, so deleting a project keeps the record of who deleted it; only the retention job removes rows. Reading it requires the admin role.
+
+**Not covered.** There is no source IP in the record (ForgeDeck often sits behind a proxy, and a forwarded address is attacker-controlled unless the proxy is trusted); the request ID ties an event to the access log, which has the client address. Tampering by someone with database access is not detected: ship the log to a store they cannot write if that matters.
+
+## Roles and permissions
+
+Roles rank Viewer < Developer < Admin < Owner, and each role has everything below it. A caller who is not a member of a project gets **404** for anything in it (so membership cannot be probed); a member whose role is too low gets **403**; no session gets **401**.
+
+| Capability | Viewer | Developer | Admin | Owner |
+|---|---|---|---|---|
+| See the project, members, servers, container list, Git connections, registries, secret **names**, applications, environments, deployments, releases, jobs and the output of builds and deployments | ✓ | ✓ | ✓ | ✓ |
+| Start a build; deploy a build; roll back a release; cancel a job; restart, stop or start a container; fetch container logs and read them | | ✓ | ✓ | ✓ |
+| Create, change or delete applications, environments, registries, Git connections and secrets; add or remove members; enroll or remove servers; read the audit log; change the project | | | ✓ | ✓ |
+| Delete the project | | | | ✓ |
+
+Notes on the choices:
+
+- **Container output is for developers.** A fetched container log can hold sensitive data, so fetching it and reading it (the job's `/logs` and `/events`) need the developer role. Viewers can see that the job ran. This is stricter than the first version, which let viewers fetch logs.
+- **Secret values are in no row of this table.** Nobody can read one back, including owners; admins can only replace or delete.
+- A few routes belong to no project: listing one's own projects, servers and jobs (each returns only what the caller's memberships allow), creating a project (the creator becomes its owner), the caller's own user, sign-in and sign-out, the GitHub install redirect (verified by a sealed state and OAuth), the health check, and the embedded UI. Machine endpoints are authenticated by an Agent credential, a Runner credential, or a webhook signature.
+
+**How this is enforced.** `internal/app/rbac_test.go` walks the real router. Every route must be classified there with its minimum role (or listed as not project-scoped, with a reason), or the test fails. For each project route it then calls the route as an anonymous caller (401), a non-member (404), a member one role below the minimum (403), and a member with exactly the minimum role (must not be refused), against real resources of every kind. Adding an endpoint without deciding who may call it fails the build. The review that introduced this test found three problems, now fixed: viewers could fetch container logs; the GitHub install route reported whether a GitHub App is configured before checking the caller's role, which told non-members about the installation; and fetched container logs were readable by viewers through the job endpoints.
+
+## Browser security headers
+
+Every response carries these headers (`internal/httpx/headers.go`):
+
+| Header | Value | Why |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'none'; script-src 'self'; style-src 'self' 'sha256-…'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'` | A cross-site scripting bug cannot load attacker code or send data to another origin. No inline script, no `unsafe-inline`, no `unsafe-eval`, no third-party origin. |
+| `X-Frame-Options` | `DENY` | Clickjacking (also covered by `frame-ancestors` in browsers that support it). |
+| `X-Content-Type-Options` | `nosniff` | A response is never reinterpreted as a script or stylesheet. |
+| `Referrer-Policy` | `no-referrer` | Dashboard URLs contain resource IDs; they are not sent to other sites. |
+| `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` | `same-origin` | Other origins cannot hold a reference to the dashboard window or embed its responses. |
+| `Permissions-Policy` | camera, microphone, geolocation, payment, USB, interest-cohort off | The dashboard uses none of them. |
+| `Strict-Transport-Security` | two years, `includeSubDomains` | Only when `FORGEDECK_COOKIE_SECURE=true` (an HTTPS deployment). A browser that sees it refuses plain HTTP to the host for that long, so it is never sent over HTTP. |
+
+API responses also carry `Cache-Control: no-store`: they hold session-scoped data. Static assets keep their own cache headers.
+
+**The one inline style.** react-aria (HeroUI's behavior layer) adds a single `<style>` element at run time that sets `touch-action` for pressable elements. The policy allows exactly that text by hash rather than `unsafe-inline`, so every other inline style stays blocked, and the dashboard's own CSS contains the same rule so nothing depends on the hash. If a react-aria upgrade changes the text, the browser console reports a blocked style with the new hash: update `reactAriaPressStyle`. The theme script that used to be inline in `index.html` is now `/theme.js`, which still runs before first paint.
+
+**Verified.** The dashboard was loaded in Chrome under this policy and exercised (sign-in, every project tab, dialogs, dropdowns, the audit log); no policy violation is reported. Unit tests pin the policy: no `unsafe-inline`, `unsafe-eval`, wildcard or `http(s):` source, exactly one style hash, HSTS only when enabled.
+
+
+## Rate limiting
+
+The limits are per process and in memory (ForgeDeck runs as one Control Plane process). They stop abuse; they are not quotas, and they reset when the process restarts.
+
+| What | Limit | Key |
+|---|---|---|
+| Sign-in | 20 in a burst then one per 3 s per address; 10 then one per 30 s per email | client address, email |
+| Agent enrollment | 10 in a burst, then one per 6 s | client address |
+| Bad credentials on Agent, Runner and webhook endpoints | 20 failures in a burst, then one per 6 s; further requests get `429` until it refills | client address |
+| A signed-in user changing something (POST, PUT, PATCH, DELETE) | 60 in a burst, then one per second | user |
+| Adding a member, creating an enrollment token, connecting Git, creating a project | 10 in a burst, then one per 6 s | user |
+| Starting a build, setting a secret | 30 in a burst, then one per 2 s | user |
+
+Reads are not limited. A refused request gets `429` with `Retry-After`.
+
+**Failures only for machines.** Agents and Runners report every few seconds, often many from one NAT address, so their endpoints are not limited per request. Only `401` responses count, so a client that authenticates correctly is never throttled while one guessing credentials is. (Credentials are long random strings, so this is a second line of defense against guessing and against noise, not the first.)
+
+**The client address behind a proxy.** The address a limit uses is the TCP peer unless `FORGEDECK_TRUSTED_PROXIES` lists the reverse proxies in front of ForgeDeck (addresses or CIDR ranges, comma separated). Then, and only when the peer is one of them, `X-Forwarded-For` is read from the right and the first address that is not itself a trusted proxy is the client; everything left of it was supplied by the client and is ignored. A malformed hop makes ForgeDeck fall back to the peer. **Set it when you run behind a proxy.** Without it every request looks like it comes from the proxy, so a limit per address is one bucket shared by everyone, and one caller can lock the others out. Never list addresses that clients can reach directly: they could then claim to be anyone. The access log records `client_ip`.
+
+**Not covered.** A distributed attacker with many addresses is slowed, not stopped; account lockout is not implemented (it would let an attacker lock a user out). Put a WAF or a limiting reverse proxy in front for volumetric abuse.
+
+
+## Production deployment
+
+`deploy/compose` ([README](../deploy/compose/README.md)) is the supported production setup. What it enforces, and what it leaves to you:
+
+| Threat | Mitigation | Yours to do |
+|---|---|---|
+| Traffic read or altered in transit | Caddy terminates TLS (Let's Encrypt, HTTP/2), redirects HTTP, and the app sends HSTS and `__Host-` `Secure` cookies | Point real DNS at the host; keep ports 80/443 open for certificates |
+| The database or the Control Plane reached directly | Only the proxy publishes ports; the database network is `internal` (no route out) and the proxy is not on it | Firewall the host; do not add `ports:` to `postgres` or `api` |
+| A client forging its address to dodge rate limits or the audit trail | `X-Forwarded-For` is believed only from the proxy's fixed address; a spoofed header was verified to be ignored | Leave `FORGEDECK_TRUSTED_PROXIES` as the proxy's address |
+| A compromised Control Plane process | Static no-shell image, non-root, read-only filesystem, no capabilities, no new privileges | Update the image regularly |
+| A leaked database backup | Secrets in it are encrypted; the key is not in the database or the backup | Keep `FORGEDECK_SECRET_KEYS` apart from backups ([16](16-backup-restore.md)) |
+| Weak secrets in the environment | `docker compose up` refuses to start without `POSTGRES_PASSWORD`, `FORGEDECK_SECRET_KEYS` and `FORGEDECK_DOMAIN` | Generate them with `openssl rand`, as `.env.example` shows |
+
+The Compose project is `forgedeck-prod`, distinct from the development stack, so the two can never share a database volume.
+
+**Not provided.** There is no web application firewall, no volumetric DDoS protection, and no intrusion detection. The Docker host itself, and anyone with access to the Docker socket on it, is trusted. Run the Control Plane on a host that runs nothing else you cannot afford to expose.

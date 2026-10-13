@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,15 +50,33 @@ type Environment struct {
 	UpdatedAt     time.Time         `json:"updated_at"`
 }
 
+// SecretChecker says which secret names a project does not have.
+type SecretChecker interface {
+	Missing(ctx context.Context, projectID uuid.UUID, names []string) ([]string, error)
+}
+
 // Service implements environment operations.
 type Service struct {
 	queries *store.Queries
 	authz   *authz.Authorizer
+	secrets SecretChecker
 }
 
 // NewService returns an environment Service.
-func NewService(queries *store.Queries, authorizer *authz.Authorizer) *Service {
-	return &Service{queries: queries, authz: authorizer}
+func NewService(queries *store.Queries, authorizer *authz.Authorizer, secretChecker SecretChecker) *Service {
+	return &Service{queries: queries, authz: authorizer, secrets: secretChecker}
+}
+
+// checkSecrets requires every secret an environment lists to exist in the project.
+func (s *Service) checkSecrets(ctx context.Context, projectID uuid.UUID, config servicecfg.Config) error {
+	missing, err := s.secrets.Missing(ctx, projectID, config.Secrets)
+	if err != nil {
+		return err
+	}
+	if len(missing) > 0 {
+		return validate.Errors{"secrets": "Unknown secret: " + strings.Join(missing, ", ") + ". Create it in the project's Secrets first."}
+	}
+	return nil
 }
 
 // CreateInput describes a new environment.
@@ -82,6 +101,9 @@ func (s *Service) Create(ctx context.Context, userID, applicationID uuid.UUID, i
 		return Environment{}, err
 	}
 	if err := s.checkServer(ctx, app.ProjectID, in.ServerID); err != nil {
+		return Environment{}, err
+	}
+	if err := s.checkSecrets(ctx, app.ProjectID, config); err != nil {
 		return Environment{}, err
 	}
 
@@ -160,13 +182,21 @@ func (s *Service) Update(ctx context.Context, userID, environmentID uuid.UUID, i
 	if err := errs.Err(); err != nil {
 		return Environment{}, err
 	}
-	if in.ServerID != nil {
+	if in.ServerID != nil || in.Config != nil {
 		app, err := s.queries.GetApplication(ctx, current.ApplicationID)
 		if err != nil {
 			return Environment{}, fmt.Errorf("get application: %w", err)
 		}
-		if err := s.checkServer(ctx, app.ProjectID, *in.ServerID); err != nil {
-			return Environment{}, err
+		if in.ServerID != nil {
+			if err := s.checkServer(ctx, app.ProjectID, *in.ServerID); err != nil {
+				return Environment{}, err
+			}
+		}
+		if in.Config != nil {
+			normalized, _ := servicecfg.Normalize(*in.Config) // validated above
+			if err := s.checkSecrets(ctx, app.ProjectID, normalized); err != nil {
+				return Environment{}, err
+			}
 		}
 	}
 

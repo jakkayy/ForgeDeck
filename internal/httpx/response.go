@@ -192,9 +192,18 @@ func TooManyRequests(w http.ResponseWriter, retryAfter time.Duration) *Error {
 	return &Error{Status: http.StatusTooManyRequests, Code: "rate_limited", Message: "Too many attempts. Wait a moment and try again."}
 }
 
-// ClientIP returns the TCP peer address of the request without the port.
-// Behind a reverse proxy this is the proxy's address.
+// ClientIP returns the address of the client that made the request. It is
+// the TCP peer unless TrustedProxies is in front of the handler and the peer
+// is one of the trusted proxies, in which case it is the address that proxy
+// reported (see TrustedProxies).
 func ClientIP(r *http.Request) string {
+	if ip, ok := r.Context().Value(clientIPKey{}).(string); ok {
+		return ip
+	}
+	return peerIP(r)
+}
+
+func peerIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr

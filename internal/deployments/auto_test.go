@@ -11,8 +11,10 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
+	"github.com/jakkayy/ForgeDeck/internal/audit"
 	"github.com/jakkayy/ForgeDeck/internal/deployments"
 	"github.com/jakkayy/ForgeDeck/internal/environments"
+	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
 )
 
@@ -189,7 +191,8 @@ func TestClaimedDeploymentCarriesScopedRegistryCredentialsAndPreviousRelease(t *
 	// Secrets travel only in the claim response, not in the stored job.
 	var stored jobs.Job
 	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&stored)
-	if strings.Contains(string(stored.Payload), "secret") {
+	// (The registry password in this fixture is "secret".)
+	if strings.Contains(string(stored.Payload), `"password"`) || strings.Contains(string(stored.Payload), `":"secret"`) {
 		t.Fatalf("payload %s", stored.Payload)
 	}
 }
@@ -252,4 +255,132 @@ func (f autoFixture) recordRelease(t *testing.T, environmentID uuid.UUID, ref st
 		t.Fatal(err)
 	}
 	return releaseID
+}
+
+func (f autoFixture) setSecret(t *testing.T, name, value string) {
+	t.Helper()
+	f.owner.Do(http.MethodPut, "/api/v1/projects/"+f.projectID.String()+"/secrets/"+name, map[string]string{"value": value}).
+		RequireStatus(http.StatusCreated)
+}
+
+func (f autoFixture) useSecrets(t *testing.T, names ...string) {
+	t.Helper()
+	f.owner.Do(http.MethodPatch, "/api/v1/environments/"+f.staging.ID.String(), map[string]any{
+		"config": map[string]any{"container_port": 8080, "published_port": 18080, "secrets": names},
+	}).RequireStatus(http.StatusOK)
+}
+
+func TestClaimedDeploymentCarriesCurrentSecretValuesOnly(t *testing.T) {
+	f := newAutoFixture(t)
+	f.setSecret(t, "DATABASE_PASSWORD", "first-database-value")
+	f.setSecret(t, "OTHER_PROJECT_SECRET", "unrelated-secret-value")
+	f.useSecrets(t, "DATABASE_PASSWORD")
+
+	build := f.build(t, f.appID, "succeeded", goodResult())
+	var d deployments.Deployment
+	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted).Decode(&d)
+	// The secret is rotated after the deployment was queued: the claim has the new value.
+	f.setSecretReplace(t, "DATABASE_PASSWORD", "rotated-database-value")
+
+	claimed := f.claimDeploy(t)
+	if got := claimed.Deploy.Secrets; len(got) != 1 || got["DATABASE_PASSWORD"] != "rotated-database-value" {
+		t.Fatalf("secrets %v", got)
+	}
+	// Values are never stored: not in the job, the deployment, or a later release's snapshot.
+	var stored jobs.Job
+	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&stored)
+	f.agentComplete(t, claimed, agentproto.CompleteRequest{Outcome: agentproto.OutcomeSucceeded})
+	for name, body := range map[string]string{
+		"job":        string(stored.Payload),
+		"deployment": string(f.owner.Do(http.MethodGet, "/api/v1/deployments/"+d.ID.String(), nil).Body),
+		"releases":   string(f.owner.Do(http.MethodGet, "/api/v1/environments/"+f.staging.ID.String()+"/releases", nil).Body),
+	} {
+		if strings.Contains(body, "database-value") {
+			t.Fatalf("a secret value is in the %s: %s", name, body)
+		}
+	}
+	if releases := f.releases(t); len(releases) != 1 || len(releases[0].Config.Secrets) != 1 || releases[0].Config.Secrets[0] != "DATABASE_PASSWORD" {
+		t.Fatalf("release snapshot %+v", releases)
+	}
+}
+
+func (f autoFixture) setSecretReplace(t *testing.T, name, value string) {
+	t.Helper()
+	f.owner.Do(http.MethodPut, "/api/v1/projects/"+f.projectID.String()+"/secrets/"+name, map[string]string{"value": value}).
+		RequireStatus(http.StatusOK)
+}
+
+func TestRollbackUsesTheCurrentSecretValue(t *testing.T) {
+	f := newAutoFixture(t)
+	f.setSecret(t, "API_TOKEN", "token-before-rotation")
+	f.useSecrets(t, "API_TOKEN")
+	a, _ := f.twoReleases(t)
+	f.setSecretReplace(t, "API_TOKEN", "token-after-rotation")
+
+	f.rollback(f.owner, a.ID).RequireStatus(http.StatusAccepted)
+	claimed := f.claimDeploy(t)
+	if got := claimed.Deploy.Secrets["API_TOKEN"]; got != "token-after-rotation" {
+		t.Fatalf("rollback delivered %q: a rollback must not bring back a rotated secret", got)
+	}
+}
+
+func TestDeploymentFailsAtClaimWhenAListedSecretIsGone(t *testing.T) {
+	f := newAutoFixture(t)
+	f.setSecret(t, "DATABASE_PASSWORD", "a-long-enough-value")
+	f.useSecrets(t, "DATABASE_PASSWORD")
+	build := f.build(t, f.appID, "succeeded", goodResult())
+	var d deployments.Deployment
+	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted).Decode(&d)
+	// Deleting it is refused while listed, so remove it behind the API's back.
+	if _, err := f.env.Pool.Exec(context.Background(), `DELETE FROM project_secrets`); err != nil {
+		t.Fatal(err)
+	}
+
+	wait := 0
+	f.server.Do(http.MethodPost, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).RequireStatus(http.StatusNoContent)
+	var job jobs.Job
+	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&job)
+	if job.Status != jobs.StatusFailed || job.Error == nil || job.Error.Code != "secret_not_found" || !strings.Contains(job.Error.Message, "DATABASE_PASSWORD") {
+		t.Fatalf("job %+v", job)
+	}
+}
+
+// auditEvents returns the project's audit entries of one action, newest first.
+func (f fixture) auditEvents(t *testing.T, action string) []audit.Entry {
+	t.Helper()
+	var page httpx.List[audit.Entry]
+	f.owner.Do(http.MethodGet, "/api/v1/projects/"+f.projectID.String()+"/audit-logs?limit=100&action="+action, nil).
+		RequireStatus(http.StatusOK).Decode(&page)
+	return page.Items
+}
+
+func TestDeploymentsAreAudited(t *testing.T) {
+	f := newAutoFixture(t)
+	f.setAutoDeploy(t, f.staging.ID, true)
+
+	// An automatic deployment is the system's, tied to the build that caused it.
+	f.queueBuild(t, agentproto.TriggerPush)
+	f.succeed(t, f.claim(t), imageRef)
+	auto := f.auditEvents(t, "deployment.start")
+	if len(auto) != 1 || auto[0].Actor != "system" || auto[0].TargetName == nil || *auto[0].TargetName != "staging" {
+		t.Fatalf("auto-deploy events %+v", auto)
+	}
+	var metadata map[string]any
+	_ = json.Unmarshal(auto[0].Metadata, &metadata)
+	if metadata["trigger"] != "auto_deploy" || metadata["deployment_id"] == nil {
+		t.Fatalf("metadata %v", metadata)
+	}
+
+	// A manual deployment and a rollback are the user's.
+	build := f.build(t, f.appID, "succeeded", goodResult())
+	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted)
+	manual := f.auditEvents(t, "deployment.start")
+	if len(manual) != 2 || manual[0].Actor != "owner@example.com" {
+		t.Fatalf("manual deployment events %+v", manual)
+	}
+	releaseID := f.recordRelease(t, f.staging.ID, refOf(digestA))
+	f.rollback(f.owner, releaseID).RequireStatus(http.StatusAccepted)
+	if rollbacks := f.auditEvents(t, "release.rollback"); len(rollbacks) != 1 || rollbacks[0].Actor != "owner@example.com" {
+		t.Fatalf("rollback events %+v", rollbacks)
+	}
 }

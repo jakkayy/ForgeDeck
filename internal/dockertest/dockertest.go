@@ -62,3 +62,51 @@ func StartRegistry(t testing.TB) string {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
+
+// Postgres is a throwaway PostgreSQL server in a container.
+type Postgres struct {
+	// Container is the container's name, for `docker exec`.
+	Container string
+	// URL reaches the database "forgedeck" from this machine.
+	URL string
+}
+
+// StartPostgres runs PostgreSQL 17 in a container with a database named
+// "forgedeck" and returns once it accepts connections.
+func StartPostgres(t testing.TB) Postgres {
+	t.Helper()
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	_ = listener.Close()
+
+	name := fmt.Sprintf("forgedeck-test-postgres-%d", port)
+	//nolint:gosec // test helper; the arguments are fixed apart from a local port
+	out, err := exec.CommandContext(context.Background(), "docker", "run", "--detach", "--rm", "--name", name,
+		"--env", "POSTGRES_USER=forgedeck", "--env", "POSTGRES_PASSWORD=backup-test", "--env", "POSTGRES_DB=forgedeck",
+		"--publish", fmt.Sprintf("127.0.0.1:%d:5432", port), "postgres:17-alpine").CombinedOutput()
+	if err != nil {
+		t.Fatalf("start postgres: %v\n%s", err, out)
+	}
+	t.Cleanup(func() {
+		_ = exec.CommandContext(context.Background(), "docker", "rm", "--force", name).Run() //nolint:gosec // see above
+	})
+
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		ready := exec.CommandContext(context.Background(), "docker", "exec", name, "pg_isready", "-U", "forgedeck", "-d", "forgedeck").Run() //nolint:gosec // see above
+		if ready == nil {
+			// pg_isready answers during the image's own bootstrap restart; a real query does not.
+			if exec.CommandContext(context.Background(), "docker", "exec", name, "psql", "-U", "forgedeck", "-d", "forgedeck", "-tAc", "SELECT 1").Run() == nil { //nolint:gosec // see above
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("postgres did not start")
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	return Postgres{Container: name, URL: fmt.Sprintf("postgres://forgedeck:backup-test@127.0.0.1:%d/forgedeck?sslmode=disable", port)}
+}

@@ -32,6 +32,8 @@
 @import "@heroui/styles/components/tabs.css" layer(components);
 @import "@heroui/styles/components/disclosure.css" layer(components);
 @import "@heroui/styles/components/switch.css" layer(components);
+@import "@heroui/styles/components/checkbox.css" layer(components);
+@import "@heroui/styles/components/checkbox-group.css" layer(components);
 @import "@heroui/styles/components/textarea.css" layer(components);
 
 /*
@@ -53,4 +55,15 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * react-aria adds this same rule in an inline <style> at run time. The
+ * Content-Security-Policy allows that one inline text by hash, and this copy
+ * keeps the behavior if an upgrade changes the text and the hash stops matching.
+ */
+@layer base {
+  [data-react-aria-pressable] {
+    touch-action: pan-x pan-y pinch-zoom;
+  }
 }

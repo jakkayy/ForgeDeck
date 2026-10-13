@@ -14,6 +14,8 @@ export type ServiceConfig = {
   published_port: number | null;
   bind_address: "127.0.0.1" | "0.0.0.0";
   env: Record<string, string>;
+  /** Names of project secrets the service receives as environment variables. */
+  secrets: string[];
   volumes: { name: string; path: string }[];
   restart: "unless-stopped" | "always" | "on-failure" | "no";
   memory_mb: number | null;

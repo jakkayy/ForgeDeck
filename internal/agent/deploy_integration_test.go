@@ -80,7 +80,8 @@ func httpBody(t *testing.T, port int) string {
 func TestDeployWithRealDockerCompose(t *testing.T) {
 	dockertest.Require(t)
 	image := pushImage(t, dockertest.StartRegistry(t), "web", webServer)
-	d := DeployImageHandler(filepath.Join(t.TempDir(), "deployments"))
+	deploymentsDir := filepath.Join(t.TempDir(), "deployments")
+	d := DeployImageHandler(deploymentsDir)
 
 	environmentID := uuid.New()
 	port, container := freePort(t), 8080
@@ -89,10 +90,13 @@ func TestDeployWithRealDockerCompose(t *testing.T) {
 		raw, _ := json.Marshal(agentproto.DeployImagePayload{
 			DeploymentID: uuid.New(), EnvironmentID: environmentID, ApplicationID: uuid.New(), CommitSHA: "abc", ImageRef: image,
 			Config: servicecfg.Config{ContainerPort: &container, PublishedPort: &port, Env: env,
+				Secrets: []string{"API_TOKEN"},
 				Volumes: []servicecfg.Volume{{Name: "data", Path: "/data"}}},
 		})
 		log := &logRecorder{}
-		result, err := d(context.Background(), &agentproto.Job{Type: agentproto.JobDeployImage, Payload: raw}, log)
+		job := &agentproto.Job{Type: agentproto.JobDeployImage, Payload: raw,
+			Deploy: &agentproto.DeployContext{Secrets: map[string]string{"API_TOKEN": "tok-9f8e7d6c5b4a"}}}
+		result, err := d(context.Background(), job, log)
 		if err != nil {
 			t.Fatalf("deploy: %v\n%s", err, log)
 		}
@@ -109,6 +113,15 @@ func TestDeployWithRealDockerCompose(t *testing.T) {
 	labels, err := exec.CommandContext(t.Context(), "docker", "inspect", "--format", "{{index .Config.Labels \"forgedeck.managed\"}}", first.ContainerID).Output() //nolint:gosec // test
 	if err != nil || strings.TrimSpace(string(labels)) != "true" {
 		t.Fatalf("labels %q, %v", labels, err)
+	}
+
+	// The service receives the secret, and no file ForgeDeck wrote holds it.
+	inspected, err := exec.CommandContext(t.Context(), "docker", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", first.ContainerID).Output() //nolint:gosec // test
+	if err != nil || !strings.Contains(string(inspected), "API_TOKEN=tok-9f8e7d6c5b4a") {
+		t.Fatalf("container environment %q, %v", inspected, err)
+	}
+	if out, err := exec.CommandContext(t.Context(), "grep", "-r", "tok-9f8e7d6c5b4a", deploymentsDir).CombinedOutput(); err == nil { //nolint:gosec // test
+		t.Fatalf("the secret was written to disk:\n%s", out)
 	}
 
 	// Applying the same deployment again changes nothing.

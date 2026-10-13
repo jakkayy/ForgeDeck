@@ -38,6 +38,7 @@ type Permission string
 const (
 	ViewProject      Permission = "project.view"
 	OperateContainer Permission = "container.operate"
+	ViewLogs         Permission = "container.logs"
 	RunBuilds        Permission = "builds.run"
 	Deploy           Permission = "deployments.run"
 	UpdateProject    Permission = "project.update"
@@ -45,6 +46,7 @@ const (
 	ManageServers    Permission = "servers.manage"
 	ManageGit        Permission = "git.manage"
 	ManageApps       Permission = "applications.manage"
+	ViewAudit        Permission = "audit.view"
 	DeleteProject    Permission = "project.delete"
 )
 
@@ -53,6 +55,7 @@ const (
 var minimumRole = map[Permission]Role{
 	ViewProject:      RoleViewer,
 	OperateContainer: RoleDeveloper,
+	ViewLogs:         RoleDeveloper,
 	RunBuilds:        RoleDeveloper,
 	Deploy:           RoleDeveloper,
 	UpdateProject:    RoleAdmin,
@@ -60,6 +63,7 @@ var minimumRole = map[Permission]Role{
 	ManageServers:    RoleAdmin,
 	ManageGit:        RoleAdmin,
 	ManageApps:       RoleAdmin,
+	ViewAudit:        RoleAdmin,
 	DeleteProject:    RoleOwner,
 }
 

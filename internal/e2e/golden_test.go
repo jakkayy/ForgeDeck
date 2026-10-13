@@ -103,8 +103,14 @@ func startStack(t *testing.T) *stack {
 	t.Cleanup(func() { _ = engine.Close() })
 	quiet := slog.New(slog.DiscardHandler)
 	identity := agent.Identity{ControlPlaneURL: env.Server.URL, AgentID: enrolled.AgentID, ServerID: enrolled.ServerID, Credential: enrolled.Credential}
+	agentState, err := agent.NewState(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	handlers := map[string]worker.Handler{agentproto.JobDeployImage: agent.DeployImageHandler(t.TempDir())}
-	runInBackground(t, func(ctx context.Context) error { return agent.Run(ctx, identity, "test", handlers, engine, quiet) })
+	runInBackground(t, func(ctx context.Context) error {
+		return agent.Run(ctx, identity, agentState, "test", handlers, engine, quiet)
+	})
 
 	// The Runner builds, tests and pushes.
 	registered := env.NewRunner("build-01")

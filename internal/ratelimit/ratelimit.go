@@ -57,6 +57,42 @@ func (l *Limiter) Allow(key string) (bool, time.Duration) {
 	return true, 0
 }
 
+// Blocked reports whether key has used up its tokens, without using one, and
+// if so how long until it has one again. It is for limits on failures: check
+// Blocked before doing the work, call Fail when the work failed.
+func (l *Limiter) Blocked(key string) (bool, time.Duration) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	now := l.now()
+	b, ok := l.buckets[key]
+	if !ok {
+		return false, 0
+	}
+	tokens := b.limiter.TokensAt(now)
+	if tokens >= 1 {
+		return false, 0
+	}
+	return true, time.Duration((1 - tokens) * float64(l.every))
+}
+
+// Fail uses a token of key. Unlike Allow it never refuses: the failure
+// happened, and the bucket simply stays empty.
+func (l *Limiter) Fail(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	now := l.now()
+	l.sweep(now)
+	b, ok := l.buckets[key]
+	if !ok {
+		b = &bucket{limiter: rate.NewLimiter(rate.Every(l.every), l.burst)}
+		l.buckets[key] = b
+	}
+	b.lastSeen = now
+	b.limiter.AllowN(now, 1)
+}
+
 func (l *Limiter) sweep(now time.Time) {
 	if now.Sub(l.lastSweep) < time.Minute {
 		return

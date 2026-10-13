@@ -313,17 +313,19 @@ The encryption key must be provided from outside the database. Avoid returning d
 
 ### `audit_logs`
 
+An append-only record of who did what. Nothing updates a row; only the retention job removes them.
+
 - `id UUID PRIMARY KEY`
-- `project_id UUID REFERENCES projects(id)`
-- `actor_user_id UUID REFERENCES users(id)`
-- `actor_agent_id UUID REFERENCES agents(id)`
-- `action TEXT NOT NULL`
-- `resource_type TEXT`
-- `resource_id UUID`
-- `metadata JSONB`
+- `project_id UUID` — **no foreign key**, so deleting a project does not erase the record of who deleted it; NULL for installation-level events
+- `actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL`
+- `actor TEXT NOT NULL` — the actor as text so the record outlives the user: an email address, or `agent`, `runner`, `system`
+- `action TEXT NOT NULL` — `<noun>.<verb>`, such as `secret.set`
+- `target_type TEXT NOT NULL`, `target_id TEXT`, `target_name TEXT`
+- `metadata JSONB NOT NULL` — non-sensitive details only; values under keys that look like credentials (`secret`, `password`, `token`, `credential`, `key`, `value`) are replaced with `[redacted]` before they are stored
+- `request_id TEXT` — ties the event to the request that caused it
 - `created_at TIMESTAMPTZ NOT NULL`
 
-Avoid putting secret values or sensitive payloads into audit metadata.
+Events are written after the action they describe has succeeded. A failure to write is logged at error level and does not fail the action: the action has already happened.
 
 ## 5. Queue transaction requirements
 
@@ -337,14 +339,22 @@ To support long-poll claims without busy queries, inserting a queued job may iss
 
 ## 6. Retention
 
-Define configurable retention for:
-- Job logs (including `fetch_logs` output, which can use a shorter retention).
-- Old job attempts.
-- Webhook event records.
-- Audit logs (audit retention may need to be longer).
-- Historical metrics.
+A background pass removes data that has outlived its use. It runs about a minute after the Control Plane starts and then every 6 hours, deletes in batches of 2000 so a backlog never holds a long lock, and logs how much it removed. Every step is a delete by age, so running it twice, or from two processes, is harmless.
 
-Do not delete release records that are required for rollback without an explicit retention policy.
+| Data | Kept for (default) | Setting | What is removed |
+|---|---|---|---|
+| Job log lines | 30 days after the job finished | `FORGEDECK_RETENTION_JOB_LOGS_DAYS` | The lines only. The job stays, marked `logs_expired`, and the dashboard says the output was removed. |
+| Finished jobs | 180 days | `FORGEDECK_RETENTION_JOBS_DAYS` | The job, its attempts and its logs. Jobs that are queued or running are never removed. |
+| Webhook deliveries | 30 days | `FORGEDECK_RETENTION_WEBHOOKS_DAYS` | Delivery records. Providers redeliver within days, so this window still deduplicates. |
+| Audit events | 365 days | `FORGEDECK_RETENTION_AUDIT_DAYS` | Audit rows. |
+| Sessions | 1 day after they expire | not configurable | Expired sessions. |
+| Enrollment tokens | 7 days after use or expiry | not configurable | Used and expired tokens. |
+
+`0` keeps a kind forever; negative or non-numeric values, and keeping job logs longer than the jobs themselves, are rejected at start-up.
+
+**Never removed automatically:** releases and deployments. A release is what a rollback restores, and the deployment history is small. Deleting a *job* does not touch them: deployments only lose the link to a job that no longer exists (and keep their own status and error), and releases do not depend on jobs at all. The one consequence is that a build older than the job retention can no longer be picked for a new deployment from its job; deploying a release again (rollback) is unaffected.
+
+Not stored, so nothing to remove: container snapshots are replaced on every report, and server metrics keep only the latest values.
 
 ## 7. Open decisions
 

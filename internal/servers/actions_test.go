@@ -65,13 +65,17 @@ func TestContainerLogsQueuesBoundedFetch(t *testing.T) {
 	env := apitest.New(t)
 	owner, _ := env.NewUser("owner@example.com")
 	viewer, viewerID := env.NewUser("viewer@example.com")
+	developer, developerID := env.NewUser("dev@example.com")
 	projectID := owner.CreateProject("Infra")
 	env.AddMember(projectID, viewerID, "viewer")
+	env.AddMember(projectID, developerID, "developer")
 	agent := env.EnrollAgent(owner, projectID, "prod-01")
 	agent.ReportContainers(t, apiContainer)
 	path := "/api/v1/servers/" + agent.ServerID.String() + "/containers/" + apiContainer + "/logs"
 
-	viewer.Do(http.MethodPost, path, map[string]any{}).RequireStatus(http.StatusAccepted)
+	// Container output can hold sensitive data: developers and above only.
+	viewer.Do(http.MethodPost, path, map[string]any{}).RequireStatus(http.StatusForbidden)
+	developer.Do(http.MethodPost, path, map[string]any{}).RequireStatus(http.StatusAccepted)
 	owner.Do(http.MethodPost, path, map[string]any{"tail_lines": agentproto.MaxTailLines + 1}).
 		RequireStatus(http.StatusUnprocessableEntity)
 

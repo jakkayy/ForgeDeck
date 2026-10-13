@@ -9,6 +9,7 @@ import { ContainerLogs } from "../../../components/ContainerLogs";
 import { ContainerStateChip } from "../../../components/ContainerStateChip";
 import { QueryError } from "../../../components/QueryError";
 import { RemoveServerDialog } from "../../../components/RemoveServerDialog";
+import { RotateCredentialButton } from "../../../components/RotateCredentialButton";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { timeAgo } from "../../../lib/time";
 import { useHasRole } from "../../../lib/useHasRole";
@@ -83,7 +84,8 @@ function ServerSummary({ server }: { server: Server }) {
           <h1 className="text-xl font-semibold tracking-tight">{server.name}</h1>
           <ServerStatusChip status={server.status} />
           {canManage && (
-            <div className="ms-auto">
+            <div className="ms-auto flex gap-2">
+              <RotateCredentialButton server={server} />
               <RemoveServerDialog server={server} />
             </div>
           )}
@@ -142,17 +144,20 @@ function Containers({ list, serverId, projectId, isOnline }: ContainersProps) {
                 container={container}
                 actions={
                   <div className="flex items-center gap-2">
-                    <ContainerLogs
-                      serverId={serverId}
-                      container={container}
-                      isDisabled={!isOnline}
-                    />
+                    {/* Container output can hold sensitive data: developers and above. */}
                     {canOperate && (
-                      <ContainerActions
-                        serverId={serverId}
-                        container={container}
-                        isDisabled={!isOnline}
-                      />
+                      <>
+                        <ContainerLogs
+                          serverId={serverId}
+                          container={container}
+                          isDisabled={!isOnline}
+                        />
+                        <ContainerActions
+                          serverId={serverId}
+                          container={container}
+                          isDisabled={!isOnline}
+                        />
+                      </>
                     )}
                   </div>
                 }

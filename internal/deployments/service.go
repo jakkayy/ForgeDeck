@@ -16,6 +16,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apperr"
+	"github.com/jakkayy/ForgeDeck/internal/audit"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/database"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
@@ -63,11 +64,12 @@ type Service struct {
 	queries *store.Queries
 	authz   *authz.Authorizer
 	jobs    *jobs.Service
+	audit   *audit.Recorder
 }
 
 // NewService returns a deployment Service.
-func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, jobService *jobs.Service) *Service {
-	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, jobs: jobService}
+func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, jobService *jobs.Service, recorder *audit.Recorder) *Service {
+	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, jobs: jobService, audit: recorder}
 }
 
 // Deploy queues a deployment of a succeeded build's image into an

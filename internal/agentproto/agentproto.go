@@ -59,6 +59,17 @@ type Resources struct {
 // HeartbeatResponse tells the Agent when to send the next heartbeat.
 type HeartbeatResponse struct {
 	IntervalSeconds int `json:"interval_seconds"`
+	// RotateCredential asks the Agent to replace its credential now: it is
+	// old, an admin asked for it, or the Agent still uses one that was
+	// already replaced.
+	RotateCredential bool `json:"rotate_credential,omitempty"`
+}
+
+// RotateResponse carries the Agent's new credential. The one it presented
+// keeps working for a short grace period.
+type RotateResponse struct {
+	ServerID   uuid.UUID `json:"server_id"`
+	Credential string    `json:"credential"`
 }
 
 // MaxSnapshotContainers caps one snapshot; the Control Plane rejects more.
@@ -124,6 +135,9 @@ type DeployContext struct {
 	// claimed. If the new version does not become healthy, the Agent
 	// restores it.
 	Previous *PreviousRelease `json:"previous,omitempty"`
+	// Secrets are the current values of the project secrets the new and the
+	// previous release list, by name. They are never stored or logged.
+	Secrets map[string]string `json:"secrets,omitempty"`
 }
 
 // PreviousRelease is a release the Agent can restore.

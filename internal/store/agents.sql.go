@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -14,7 +15,7 @@ import (
 const createAgent = `-- name: CreateAgent :one
 INSERT INTO agents (server_id, credential_hash)
 VALUES ($1, $2)
-RETURNING id, server_id, credential_hash, created_at
+RETURNING id, server_id, credential_hash, created_at, previous_credential_hash, previous_expires_at, credential_rotated_at, rotation_requested_at
 `
 
 type CreateAgentParams struct {
@@ -30,26 +31,102 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 		&i.ServerID,
 		&i.CredentialHash,
 		&i.CreatedAt,
+		&i.PreviousCredentialHash,
+		&i.PreviousExpiresAt,
+		&i.CredentialRotatedAt,
+		&i.RotationRequestedAt,
 	)
 	return i, err
 }
 
 const getAgentByCredentialHash = `-- name: GetAgentByCredentialHash :one
-SELECT agents.id, agents.server_id, servers.project_id
+SELECT agents.id, agents.server_id, servers.project_id,
+       agents.credential_rotated_at, agents.rotation_requested_at,
+       (agents.credential_hash <> $1)::boolean AS is_previous
 FROM agents
 JOIN servers ON servers.id = agents.server_id
 WHERE agents.credential_hash = $1
+   OR (agents.previous_credential_hash = $1 AND agents.previous_expires_at > $2::timestamptz)
 `
 
-type GetAgentByCredentialHashRow struct {
-	ID        uuid.UUID
-	ServerID  uuid.UUID
-	ProjectID uuid.UUID
+type GetAgentByCredentialHashParams struct {
+	Hash []byte
+	Now  time.Time
 }
 
-func (q *Queries) GetAgentByCredentialHash(ctx context.Context, credentialHash []byte) (GetAgentByCredentialHashRow, error) {
-	row := q.db.QueryRow(ctx, getAgentByCredentialHash, credentialHash)
+type GetAgentByCredentialHashRow struct {
+	ID                  uuid.UUID
+	ServerID            uuid.UUID
+	ProjectID           uuid.UUID
+	CredentialRotatedAt time.Time
+	RotationRequestedAt *time.Time
+	IsPrevious          bool
+}
+
+// The current credential, or the one it replaced while its grace period lasts.
+func (q *Queries) GetAgentByCredentialHash(ctx context.Context, arg GetAgentByCredentialHashParams) (GetAgentByCredentialHashRow, error) {
+	row := q.db.QueryRow(ctx, getAgentByCredentialHash, arg.Hash, arg.Now)
 	var i GetAgentByCredentialHashRow
-	err := row.Scan(&i.ID, &i.ServerID, &i.ProjectID)
+	err := row.Scan(
+		&i.ID,
+		&i.ServerID,
+		&i.ProjectID,
+		&i.CredentialRotatedAt,
+		&i.RotationRequestedAt,
+		&i.IsPrevious,
+	)
 	return i, err
+}
+
+const requestAgentRotation = `-- name: RequestAgentRotation :execrows
+UPDATE agents SET rotation_requested_at = COALESCE(rotation_requested_at, $1::timestamptz)
+WHERE server_id = $2
+`
+
+type RequestAgentRotationParams struct {
+	Now      time.Time
+	ServerID uuid.UUID
+}
+
+func (q *Queries) RequestAgentRotation(ctx context.Context, arg RequestAgentRotationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, requestAgentRotation, arg.Now, arg.ServerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const rotateAgentCredential = `-- name: RotateAgentCredential :execrows
+UPDATE agents
+SET previous_credential_hash = $1,
+    previous_expires_at      = $2::timestamptz,
+    credential_hash          = $3,
+    credential_rotated_at    = $4::timestamptz,
+    rotation_requested_at    = NULL
+WHERE id = $5
+  AND (credential_hash = $1
+       OR (previous_credential_hash = $1 AND previous_expires_at > $4::timestamptz))
+`
+
+type RotateAgentCredentialParams struct {
+	PresentedHash []byte
+	GraceUntil    time.Time
+	NewHash       []byte
+	Now           time.Time
+	ID            uuid.UUID
+}
+
+// Installs a new credential and keeps the one presented for a grace period.
+func (q *Queries) RotateAgentCredential(ctx context.Context, arg RotateAgentCredentialParams) (int64, error) {
+	result, err := q.db.Exec(ctx, rotateAgentCredential,
+		arg.PresentedHash,
+		arg.GraceUntil,
+		arg.NewHash,
+		arg.Now,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

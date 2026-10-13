@@ -25,7 +25,7 @@ func (st Status) finished() bool {
 // away, or shutdown begins. Log events carry "<attempt>.<sequence>" ids so a
 // reconnecting EventSource resumes exactly where it stopped.
 func (s *Service) Stream(ctx context.Context, userID, jobID uuid.UUID, after LogCursor, notifier *Notifier, sse *httpx.SSE) error {
-	if _, err := s.authorizeJob(ctx, userID, jobID); err != nil {
+	if err := s.authorizeJobOutput(ctx, userID, jobID); err != nil {
 		return err
 	}
 	// Subscribe before the first read so no change between read and wait is missed.

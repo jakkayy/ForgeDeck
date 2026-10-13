@@ -4,13 +4,17 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { projectQuery } from "../../../api/projects";
 import { ApplicationsSection } from "../../../components/project/ApplicationsSection";
+import { AuditSection } from "../../../components/project/AuditSection";
 import { GitSection } from "../../../components/project/GitSection";
 import { MembersSection } from "../../../components/project/MembersSection";
 import { RegistriesSection } from "../../../components/project/RegistriesSection";
+import { SecretsSection } from "../../../components/project/SecretsSection";
+import { SetupGuide } from "../../../components/project/SetupGuide";
 import { QueryError } from "../../../components/QueryError";
 import { RoleChip } from "../../../components/RoleChip";
+import { useHasRole } from "../../../lib/useHasRole";
 
-const tabs = ["applications", "git", "registries", "members"] as const;
+const tabs = ["applications", "git", "registries", "secrets", "members", "audit"] as const;
 type Tab = (typeof tabs)[number];
 
 const gitErrors: Record<string, string> = {
@@ -37,7 +41,10 @@ function ProjectPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const project = useQuery(projectQuery(projectId));
-  const tab = search.tab ?? "applications";
+  const canSeeAudit = useHasRole(projectId, "admin");
+  // The audit log is for admins; anyone else asking for it lands on the default tab.
+  const tab =
+    search.tab === "audit" && !canSeeAudit ? "applications" : (search.tab ?? "applications");
 
   // Report the outcome of a GitHub install redirect once, then tidy the URL.
   useEffect(() => {
@@ -71,6 +78,7 @@ function ProjectPage() {
           <RoleChip role={project.data.role} />
         </div>
       </div>
+      <SetupGuide projectId={projectId} />
       {/* isolate keeps the tab indicator's z-index from rising above dialogs */}
       <Tabs
         className="isolate"
@@ -91,10 +99,20 @@ function ProjectPage() {
               Registries
               <Tabs.Indicator />
             </Tabs.Tab>
+            <Tabs.Tab id="secrets">
+              Secrets
+              <Tabs.Indicator />
+            </Tabs.Tab>
             <Tabs.Tab id="members">
               Members
               <Tabs.Indicator />
             </Tabs.Tab>
+            {canSeeAudit && (
+              <Tabs.Tab id="audit">
+                Audit log
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            )}
           </Tabs.List>
         </Tabs.ListContainer>
         <Tabs.Panel id="applications" className="pt-4">
@@ -106,9 +124,17 @@ function ProjectPage() {
         <Tabs.Panel id="registries" className="pt-4">
           <RegistriesSection projectId={projectId} />
         </Tabs.Panel>
+        <Tabs.Panel id="secrets" className="pt-4">
+          <SecretsSection projectId={projectId} />
+        </Tabs.Panel>
         <Tabs.Panel id="members" className="pt-4">
           <MembersSection projectId={projectId} />
         </Tabs.Panel>
+        {canSeeAudit && (
+          <Tabs.Panel id="audit" className="pt-4">
+            <AuditSection projectId={projectId} />
+          </Tabs.Panel>
+        )}
       </Tabs>
     </div>
   );

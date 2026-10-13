@@ -35,6 +35,12 @@ func (h *Handler) RequireUser(next http.Handler) http.Handler {
 
 var errSignInRequired = httpx.Unauthorized("Sign in to continue.")
 
+// MaybeUserFrom returns the signed-in user, if RequireUser stored one.
+func MaybeUserFrom(ctx context.Context) (User, bool) {
+	user, ok := ctx.Value(userKey{}).(User)
+	return user, ok
+}
+
 // UserFrom returns the user stored by RequireUser. It panics when called on
 // a route that is not behind RequireUser, which is a programming error.
 func UserFrom(ctx context.Context) User {

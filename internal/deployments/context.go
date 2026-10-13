@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/registries"
+	"github.com/jakkayy/ForgeDeck/internal/secrets"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
@@ -26,17 +28,19 @@ func (e *MintError) Error() string { return e.Code + ": " + e.Message }
 var (
 	errEnvironmentGone = &MintError{Code: "environment_not_found", Message: "The environment was deleted before the deployment started."}
 	errNoRegistryCreds = &MintError{Code: "registry_credentials_unavailable", Message: "ForgeDeck could not read the registry credentials for this image. Check the registry in the project."}
+	errNoSecretValues  = &MintError{Code: "secret_unavailable", Message: "ForgeDeck could not read a secret this environment uses."}
 )
 
 // ContextMinter builds the DeployContext of a claimed deploy_image job.
 type ContextMinter struct {
 	queries    *store.Queries
 	registries *registries.Service
+	secrets    *secrets.Service
 }
 
 // NewContextMinter returns a ContextMinter.
-func NewContextMinter(queries *store.Queries, registryService *registries.Service) *ContextMinter {
-	return &ContextMinter{queries: queries, registries: registryService}
+func NewContextMinter(queries *store.Queries, registryService *registries.Service, secretService *secrets.Service) *ContextMinter {
+	return &ContextMinter{queries: queries, registries: registryService, secrets: secretService}
 }
 
 // Mint returns the context for one attempt of the deployment in payload.
@@ -89,6 +93,27 @@ func (m *ContextMinter) Mint(ctx context.Context, payload json.RawMessage) (*age
 			return nil, err
 		}
 		out.Previous = &agentproto.PreviousRelease{ReleaseID: release.ID, CommitSHA: release.CommitSha, ImageRef: release.ImageRef, Config: config}
+	}
+
+	// Secrets: the current values of everything the new release lists, plus
+	// what the release it may restore lists. A secret the previous release
+	// used and that has since been deleted is simply absent; the Agent then
+	// does not restore that release.
+	names := p.Config.Secrets
+	if out.Previous != nil {
+		names = append(slices.Clone(names), out.Previous.Config.Secrets...)
+	}
+	values, missing, err := m.secrets.Values(ctx, app.ProjectID, names)
+	if err != nil {
+		return nil, fmt.Errorf("%w (%w)", errNoSecretValues, err)
+	}
+	for _, name := range p.Config.Secrets {
+		if _, ok := values[name]; !ok && slices.Contains(missing, name) {
+			return nil, &MintError{Code: "secret_not_found", Message: "This environment uses the secret " + name + ", which no longer exists. Create it again in the project's Secrets, then deploy again."}
+		}
+	}
+	if len(values) > 0 {
+		out.Secrets = values
 	}
 	return out, nil
 }

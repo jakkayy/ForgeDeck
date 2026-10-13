@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"github.com/jakkayy/ForgeDeck/internal/audit"
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
@@ -31,11 +32,12 @@ type Handler struct {
 	gitLab       SecretSource
 	queries      *store.Queries
 	jobs         *jobs.Service
+	audit        *audit.Recorder
 }
 
 // NewHandler returns webhook endpoints.
-func NewHandler(gitHubSecret string, gitLab SecretSource, queries *store.Queries, jobService *jobs.Service) *Handler {
-	return &Handler{gitHubSecret: gitHubSecret, gitLab: gitLab, queries: queries, jobs: jobService}
+func NewHandler(gitHubSecret string, gitLab SecretSource, queries *store.Queries, jobService *jobs.Service, recorder *audit.Recorder) *Handler {
+	return &Handler{gitHubSecret: gitHubSecret, gitLab: gitLab, queries: queries, jobs: jobService, audit: recorder}
 }
 
 // Routes mounts the webhook endpoints on r.

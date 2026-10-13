@@ -14,7 +14,8 @@ ForgeDeck จัดการ Application, Docker server, Git repository แล�
 | 2 | Git integration (GitHub/GitLab), webhook, job queue | เสร็จ |
 | 3 | Runner แยกจาก production: checkout → build → test → push | เสร็จ |
 | 4 | Environment, deploy ผ่าน Agent + Compose, health check, release, rollback | เสร็จ |
-| 5–6 | Secrets, hardening, production readiness | ยังไม่เริ่ม |
+| 5 | Secrets, audit log, RBAC, rate limit, retention, backup, production compose, Agent installer, upgrade guide | เสร็จ |
+| 6 | Usability และ performance | ยังไม่เริ่ม |
 
 รายละเอียดของแต่ละข้อดูที่ [docs/11-implementation-plan.md](docs/11-implementation-plan.md)
 
@@ -52,16 +53,21 @@ make build               # web + api + agent + runner ลงใน bin/
 bin/forgedeck-api serve  # เปิด http://localhost:8080
 ```
 
+## ติดตั้งจริง (production)
+
+ใช้ [deploy/compose](deploy/compose/README.md): Control Plane + PostgreSQL + Caddy (TLS อัตโนมัติ) ในชุดเดียว มีแต่ proxy ที่เปิด port ส่วน database กับ API เข้าถึงจากภายนอกไม่ได้ ใช้โดเมนจริงที่ชี้มาที่เครื่อง และ**เก็บ `FORGEDECK_SECRET_KEYS` ไว้นอกเครื่องนี้** (ไม่อยู่ใน backup) ดู [docs/16-backup-restore.md](docs/16-backup-restore.md)
+
 ## ต่อ Agent (จัดการ Docker ของเครื่องอื่น)
 
-ใน UI ไปที่ **Servers > Add server** จะได้ token และคำสั่ง จากนั้นบนเครื่องปลายทาง:
+ใน UI ไปที่ **Servers > Add server** จะได้ token จากนั้นบนเครื่องปลายทาง (Linux + systemd + Docker + Compose plugin):
 
 ```sh
-bin/forgedeck-agent enroll --url https://forgedeck.example.com
-bin/forgedeck-agent run
+sudo FORGEDECK_ENROLLMENT_TOKEN=<token> deploy/agent/install.sh --url https://forgedeck.example.com --binary bin/forgedeck-agent
 ```
 
-ถ้า Control Plane ไม่ใช่ HTTPS (เช่นทดลองใน LAN) ให้เพิ่ม `--allow-insecure`
+ติดตั้งเป็น service ที่รันด้วย user เฉพาะ อัปเกรดได้โดยรันซ้ำ รายละเอียดและข้อควรระวังเรื่องสิทธิ์ใน [deploy/agent](deploy/agent/README.md)
+
+ทดลองแบบไม่ติดตั้ง service: `bin/forgedeck-agent enroll --url http://localhost:8080 --allow-insecure` แล้ว `bin/forgedeck-agent run` (ถ้า Control Plane ไม่ใช่ HTTPS ต้องเพิ่ม `--allow-insecure`)
 
 ## ต่อ Runner (build image)
 
@@ -122,4 +128,6 @@ FORGEDECK_RUNNER_CREDENTIAL=fdr_... make run-runner URL=http://localhost:8080
 | [10 Roadmap](docs/10-roadmap.md) · [11 Plan](docs/11-implementation-plan.md) | แผนงาน |
 | [12 Measurements](docs/12-measurements.md) · [13 Git Providers](docs/13-git-providers.md) | ผลวัดและการตั้งค่า provider |
 | [15 Deployments](docs/15-deployments.md) | environment, deployment, release, rollback |
+| [16 Backup and Restore](docs/16-backup-restore.md) | สำรองและกู้ข้อมูล, `FORGEDECK_SECRET_KEYS` ต้องเก็บแยก |
+| [17 Upgrade Guide](docs/17-upgrade-guide.md) | อัปเกรด, ย้อนกลับ, การเปลี่ยนแปลงที่ต้องทำตาม |
 | [AGENTS.md](AGENTS.md) | กฎสำหรับ AI coding agents |

@@ -496,3 +496,86 @@ func TestSecretsAreMaskedInTheJobLog(t *testing.T) {
 		t.Fatalf("leaked: %s", got)
 	}
 }
+
+func secretJob(t *testing.T, secrets []string, values map[string]string, previous *agentproto.PreviousRelease) *agentproto.Job {
+	t.Helper()
+	job, payload := deployJob(t, nil)
+	payload.Config.Secrets = secrets
+	raw, _ := json.Marshal(payload)
+	job.Payload = raw
+	job.Deploy = &agentproto.DeployContext{Secrets: values, Previous: previous}
+	return job
+}
+
+func TestSecretsReachComposeThroughTheEnvironmentOnly(t *testing.T) {
+	fake := &fakeDocker{}
+	d := newTestDeployer(t, fake)
+	job := secretJob(t, []string{"DATABASE_PASSWORD"},
+		map[string]string{"DATABASE_PASSWORD": "db-secret-value", "UNRELATED": "other-project-secret"}, nil)
+	var payload agentproto.DeployImagePayload
+	_ = json.Unmarshal(job.Payload, &payload)
+
+	if _, err := d.handle(context.Background(), job, &logRecorder{}); err != nil {
+		t.Fatal(err)
+	}
+	// Every compose command gets exactly the secrets the release lists.
+	for _, c := range fake.commands {
+		if len(c.Args) > 0 && c.Args[0] == "compose" && len(c.Args) > composeBaseArgs {
+			if strings.Join(c.Env, " ") != "DATABASE_PASSWORD=db-secret-value" {
+				t.Fatalf("compose %v ran with environment %v", c.Args[composeBaseArgs:], c.Env)
+			}
+		}
+		if strings.Contains(strings.Join(c.Args, " "), "db-secret-value") {
+			t.Fatalf("secret in arguments: %v", c.Args)
+		}
+	}
+	// The file on disk refers to the secret and never holds it.
+	data, err := os.ReadFile(filepath.Join(d.dir, payload.EnvironmentID.String(), "compose.yml"))
+	if err != nil || !strings.Contains(string(data), "${DATABASE_PASSWORD}") || strings.Contains(string(data), "db-secret-value") {
+		t.Fatalf("compose file: %v\n%s", err, data)
+	}
+}
+
+func TestDeploymentWithoutADeliveredSecretFailsBeforeRunningAnything(t *testing.T) {
+	fake := &fakeDocker{}
+	job := secretJob(t, []string{"DATABASE_PASSWORD"}, map[string]string{}, nil)
+	_, err := newTestDeployer(t, fake).handle(context.Background(), job, &logRecorder{})
+	var jobErr *worker.JobError
+	if !errors.As(err, &jobErr) || jobErr.Code != "secret_not_found" || !strings.Contains(jobErr.Message, "DATABASE_PASSWORD") {
+		t.Fatalf("got %v", err)
+	}
+	if len(fake.commands) != 0 {
+		t.Fatalf("ran %d commands", len(fake.commands))
+	}
+}
+
+func TestPreviousReleaseWithADeletedSecretIsNotRestored(t *testing.T) {
+	previous := previousRelease()
+	previous.Config.Secrets = []string{"GONE_SECRET"}
+	fake := &fakeDocker{}
+	probes := &passingProbes{failFn: func() error { return errors.New("down") }}
+	job := secretJob(t, nil, nil, previous)
+	var payload agentproto.DeployImagePayload
+	_ = json.Unmarshal(job.Payload, &payload)
+	payload.Config.HealthCheck = servicecfg.HealthCheck{Type: servicecfg.HealthTCP, TimeoutSeconds: 4, IntervalSeconds: 2}
+	job.Payload, _ = json.Marshal(payload)
+	log := &logRecorder{}
+
+	_, err := newTestDeployerWith(t, fake, probes).handle(context.Background(), job, log)
+	var jobErr *worker.JobError
+	if !errors.As(err, &jobErr) || !strings.Contains(jobErr.Message, "no previous release") {
+		t.Fatalf("got %v", err)
+	}
+	if fake.count("up --detach") != 1 || !strings.Contains(log.String(), "GONE_SECRET") {
+		t.Fatalf("commands %v\n%s", fake.subcommands(), log)
+	}
+}
+
+func TestSecretValuesAreMaskedInTheJobLogOfADeployment(t *testing.T) {
+	out := &logRecorder{}
+	log := redactSecrets(out, &agentproto.DeployContext{Secrets: map[string]string{"API_KEY": "key-0123456789"}}, servicecfg.Config{})
+	log.Log("stdout", "calling with key-0123456789")
+	if strings.Contains(out.String(), "key-0123456789") {
+		t.Fatalf("leaked: %s", out)
+	}
+}

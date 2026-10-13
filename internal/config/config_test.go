@@ -87,3 +87,57 @@ func TestLoadGitHubAppIsOptionalButComplete(t *testing.T) {
 		}
 	}
 }
+
+func baseEnv(extra map[string]string) LookupFunc {
+	vars := map[string]string{"FORGEDECK_DATABASE_URL": "postgres://localhost/forgedeck", "FORGEDECK_SECRET_KEYS": testKey}
+	for k, v := range extra {
+		vars[k] = v
+	}
+	return envOf(vars)
+}
+
+func TestTrustedProxiesAcceptAddressesAndRanges(t *testing.T) {
+	cfg, err := Load(baseEnv(map[string]string{"FORGEDECK_TRUSTED_PROXIES": "10.0.0.0/8, 192.168.1.5 ,::1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, len(cfg.TrustedProxies))
+	for i, p := range cfg.TrustedProxies {
+		got[i] = p.String()
+	}
+	want := []string{"10.0.0.0/8", "192.168.1.5/32", "::1/128"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	if _, err := Load(baseEnv(map[string]string{"FORGEDECK_TRUSTED_PROXIES": "not-an-address"})); err == nil ||
+		!strings.Contains(err.Error(), "FORGEDECK_TRUSTED_PROXIES") {
+		t.Fatalf("a bad address was accepted: %v", err)
+	}
+	cfg, err = Load(baseEnv(nil))
+	if err != nil || len(cfg.TrustedProxies) != 0 {
+		t.Fatalf("default %v, %v", cfg.TrustedProxies, err)
+	}
+}
+
+func TestRetentionDefaultsAndOverrides(t *testing.T) {
+	cfg, err := Load(baseEnv(nil))
+	if err != nil || cfg.Retention.JobLogDays != 30 || cfg.Retention.JobDays != 180 || cfg.Retention.WebhookDays != 30 || cfg.Retention.AuditDays != 365 {
+		t.Fatalf("defaults %+v, %v", cfg.Retention, err)
+	}
+	cfg, err = Load(baseEnv(map[string]string{
+		"FORGEDECK_RETENTION_JOB_LOGS_DAYS": "7", "FORGEDECK_RETENTION_JOBS_DAYS": "0", "FORGEDECK_RETENTION_AUDIT_DAYS": "730",
+	}))
+	if err != nil || cfg.Retention.JobLogDays != 7 || cfg.Retention.JobDays != 0 || cfg.Retention.AuditDays != 730 {
+		t.Fatalf("overrides %+v, %v", cfg.Retention, err)
+	}
+	for name, vars := range map[string]map[string]string{
+		"not a number":            {"FORGEDECK_RETENTION_JOBS_DAYS": "a month"},
+		"negative":                {"FORGEDECK_RETENTION_AUDIT_DAYS": "-1"},
+		"logs outlive their jobs": {"FORGEDECK_RETENTION_JOB_LOGS_DAYS": "90", "FORGEDECK_RETENTION_JOBS_DAYS": "30"},
+	} {
+		if _, err := Load(baseEnv(vars)); err == nil || !strings.Contains(err.Error(), "FORGEDECK_RETENTION") {
+			t.Errorf("%s: accepted (%v)", name, err)
+		}
+	}
+}

@@ -212,6 +212,14 @@ func (e *Env) EnrollAgent(owner *Client, projectID uuid.UUID, name string) Agent
 	return Agent{EnrollResponse: enrolled, Client: client}
 }
 
+// AgentClient returns a client that authenticates with credential, for tests
+// that hold several credentials of one Agent.
+func (e *Env) AgentClient(credential string) *Client {
+	client := e.Anonymous()
+	client.bearer = credential
+	return client
+}
+
 // ReportContainers sends a snapshot of running containers with the given
 // IDs (12+ lowercase hex characters) and requires it to be accepted.
 func (a Agent) ReportContainers(t testing.TB, ids ...string) {

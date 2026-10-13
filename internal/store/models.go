@@ -12,10 +12,14 @@ import (
 )
 
 type Agent struct {
-	ID             uuid.UUID
-	ServerID       uuid.UUID
-	CredentialHash []byte
-	CreatedAt      time.Time
+	ID                     uuid.UUID
+	ServerID               uuid.UUID
+	CredentialHash         []byte
+	CreatedAt              time.Time
+	PreviousCredentialHash []byte
+	PreviousExpiresAt      *time.Time
+	CredentialRotatedAt    time.Time
+	RotationRequestedAt    *time.Time
 }
 
 type Application struct {
@@ -35,6 +39,20 @@ type Application struct {
 	UpdatedAt            time.Time
 	RegistryConnectionID *uuid.UUID
 	ImageRepository      *string
+}
+
+type AuditLog struct {
+	ID          uuid.UUID
+	ProjectID   *uuid.UUID
+	ActorUserID *uuid.UUID
+	Actor       string
+	Action      string
+	TargetType  string
+	TargetID    *string
+	TargetName  *string
+	Metadata    json.RawMessage
+	RequestID   *string
+	CreatedAt   time.Time
 }
 
 type Deployment struct {
@@ -117,6 +135,7 @@ type Job struct {
 	StartedAt      *time.Time
 	FinishedAt     *time.Time
 	ApplicationID  *uuid.UUID
+	LogsExpiredAt  *time.Time
 }
 
 type JobAttempt struct {
@@ -155,6 +174,18 @@ type ProjectMember struct {
 	UserID    uuid.UUID
 	Role      string
 	CreatedAt time.Time
+}
+
+type ProjectSecret struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	Name       string
+	Ciphertext []byte
+	KeyID      string
+	Version    int32
+	CreatedBy  *uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 type RegistryConnection struct {

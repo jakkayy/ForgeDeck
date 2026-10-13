@@ -323,6 +323,18 @@ Added during Phase 4 (each shipped inside the commit of the item it supports, ex
 | 5.15 | Setup Wizard | `feat(web): add setup wizard` |
 | 5.16 | คู่มือ upgrade | `docs: add upgrade guide` |
 
+Added during Phase 5 (each shipped inside the commit of the item it supports, except where a commit is named):
+
+| # | งาน | อยู่ใน commit ของ |
+|---|---|---|
+| 5.1b | `jobs.SetLogRedactor` (ปิดกั้นแบบ fail closed) และ AAD `project_secret:<id>:value` ของการเข้ารหัส | 5.1, 5.3 |
+| 5.5b | `audit.RecordIn` (บันทึกใน transaction ของผู้เรียกผ่าน savepoint), ตาราง `Rules`/`Exempt` และเทสต์ที่เดา router แล้ว fail ถ้า route ที่แก้ข้อมูลไม่ถูกจัดประเภท | 5.5 |
+| 5.7b | permission `ViewLogs` (developer ขึ้นไป): viewer ดึงหรืออ่าน log ของ container ไม่ได้แล้ว; เทสต์ RBAC เดินทุก route; แก้ route GitHub install ที่ตรวจ config ก่อนตรวจสิทธิ์ | 5.7 |
+| 5.9b | `httpx.TrustedProxies` / `FORGEDECK_TRUSTED_PROXIES` (อ่าน X-Forwarded-For เฉพาะจาก proxy ที่เชื่อถือ), `client_ip` ใน access log | 5.9 |
+| 5.11b | `jobs.logs_expired_at` (UI แจ้งว่า log ถูกลบแล้ว) และ `FORGEDECK_RETENTION_*_DAYS` | 5.11 |
+| 5.13b | subcommand `healthcheck` ใน API (image ไม่มี shell) และ job `image` ใน CI | 5.13 |
+| 5.16b | subcommand `version`, log `version` ตอนเริ่ม (ก่อนหน้านี้ไม่มีตัวแปร `version` เลย `-X main.version` ใน Makefile จึงไม่มีผล) และเทสต์ว่าข้อมูลของ schema เก่ารอดการ migrate | 5.16 |
+
 ---
 
 ## Phase 6 — Usability and performance

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,9 +48,11 @@ const (
 
 // Client calls one worker API (AgentAPI or RunnerAPI) of the Control Plane.
 type Client struct {
-	baseURL    string
+	baseURL string
+	http    *http.Client
+
+	mu         sync.RWMutex
 	credential string
-	http       *http.Client
 }
 
 // NewClient returns a client for the API at controlPlaneURL+api. credential
@@ -60,6 +63,21 @@ func NewClient(controlPlaneURL, api, credential string) *Client {
 		credential: credential,
 		http:       &http.Client{},
 	}
+}
+
+// SetCredential replaces the credential used from now on. Agents do this when
+// the Control Plane rotates it; requests already in flight finish with the
+// old one, which stays valid for a grace period.
+func (c *Client) SetCredential(credential string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.credential = credential
+}
+
+func (c *Client) bearer() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.credential
 }
 
 // Post sends body to an endpoint below the client's API, such as "/enroll",
@@ -82,8 +100,8 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, path string, bod
 		return fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.credential != "" {
-		req.Header.Set("Authorization", "Bearer "+c.credential)
+	if credential := c.bearer(); credential != "" {
+		req.Header.Set("Authorization", "Bearer "+credential)
 	}
 
 	resp, err := c.http.Do(req)

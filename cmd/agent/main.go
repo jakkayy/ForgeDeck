@@ -115,7 +115,7 @@ func runAgent(ctx context.Context, args []string) error {
 		agentproto.JobFetchLogs:       agent.FetchLogsHandler(engine),
 		agentproto.JobDeployImage:     agent.DeployImageHandler(filepath.Join(*stateDir, "deployments")),
 	}
-	return agent.Run(ctx, identity, version, handlers, engine, logger)
+	return agent.Run(ctx, identity, state, version, handlers, engine, logger)
 }
 
 // enrollmentToken reads the token from the environment, a hidden terminal

@@ -136,7 +136,7 @@ Prefer typed payloads. Phase 1 needs two Agent job types.
 
 - Returns a bounded range of past logs through job events, stored as `job_log_chunks`.
 - The Agent enforces its own maximum lines and bytes even if the payload asks for more, and reports truncation.
-- Apply secret redaction before sending.
+- Apply secret redaction before sending. The Control Plane masks the project's secrets again when it stores the lines (see [15 §4](15-deployments.md#4-project-secrets-phase-5)).
 - Live tail is out of scope for Phase 1.
 
 `deploy_image` (Phase 4; the model is in [15 — Deployments](15-deployments.md)):
@@ -169,6 +169,7 @@ When an Agent **claims** a `deploy_image` job, the claim response adds a `deploy
 ```
 
 - `registry` is the credential of the one project registry whose host matches the image (the application's own registry first), and of no other registry. It is absent when the project has none for that host; the Agent then pulls anonymously. The Agent writes it to a per-job Docker config that it deletes afterwards.
+- `secrets` maps the names of project secrets to their **current** values, for the secrets the new release lists and those of the release it may restore. The Agent gives `docker compose` only the secrets of the release it is applying, in the process environment, and the Compose file refers to them as `${NAME}`, so no value is written to disk by ForgeDeck. A listed secret with no value fails the job with `secret_not_found` before anything runs; a previous release whose secret is gone is not restored. See [15 §4](15-deployments.md#4-project-secrets-phase-5).
 - `previous` is the environment's current release at claim time, which the Agent restores if the new version is not healthy.
 - Log lines of a deployment stage are tagged `[pull]`, `[start]` or `[health_check]` at the start of a `system` line, so the Control Plane can show the stage while the job runs. A job that finishes with `succeeded` has passed its health check: that is what records a release.
 - If the claim cannot be prepared (the environment was deleted, registry credentials cannot be read), the Control Plane fails the attempt immediately with a code such as `environment_not_found` or `registry_credentials_unavailable` and hands the Agent the next job instead.
@@ -198,6 +199,22 @@ When an Agent is revoked:
 - Record the action in the audit log.
 
 A disconnected Agent cannot receive a revocation message immediately, so jobs should use short leases and sensitive operations should revalidate authorization as appropriate. A pending long-poll claim from a revoked Agent must be ended without returning a job.
+
+### Credential rotation
+
+An Agent replaces its credential without being re-enrolled. The Control Plane decides when, and tells the Agent in the heartbeat response (`rotate_credential: true`) when:
+
+- the credential is **older than 90 days**;
+- an **administrator asked** (`POST /servers/{id}/credential-rotation`, admin role; it takes effect at the Agent's next heartbeat, within about 20 seconds when it is online and is remembered until the Agent acts); or
+- the Agent **presented a credential that was already replaced** (see below).
+
+The Agent then calls `POST /agent/rotate-credential`, authenticated with its current credential, and gets `{ server_id, credential }`. The response is the only time the new value is shown (`Cache-Control: no-store`). The Agent **saves it to its state file first** (atomic write, owner-only) and only then starts using it.
+
+**Grace period.** The credential presented in a rotation keeps working for 15 minutes. That covers the failure modes that would otherwise lock an Agent out: the response is lost, the Agent crashes before saving, or the disk refuses the write. In each case the Agent still holds a credential that works, is told again to rotate (a replaced credential in its grace period makes the heartbeat ask for rotation), and rotates again with it. Rotating with a replaced credential in its grace period is allowed; the credential it issues replaces whatever the previous rotation issued, so at most two credentials of an Agent are valid at any moment. After the grace period the replaced credential is rejected with `401`.
+
+Requests in flight during a rotation, including a pending long-poll claim, finish with the credential they started with. A rotation and each request for one are audited (`server.credential_rotate`, actor `agent`; `server.credential_rotation_request`, the admin).
+
+Runner credentials are not rotated this way: an operator creates a new Runner with `forgedeck-api create-runner` and deletes the old one.
 
 ## 12. Docker operation safety
 

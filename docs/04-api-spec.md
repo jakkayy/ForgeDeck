@@ -75,6 +75,26 @@ See [13 — Git Providers](13-git-providers.md) for provider setup.
 
 An application's image destination is `registry_connection_id` plus `image_repository` (e.g. `acme/shop-api`, no host or tag), set together on create or update; `"image_repository": ""` removes both. The registry must belong to the application's project. Registry passwords are write-only.
 
+### Project secrets
+
+See [15 — Deployments §4](15-deployments.md#4-project-secrets-phase-5).
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/projects/{projectID}/secrets` | List secrets: `name`, `version`, timestamps; never a value |
+| PUT | `/projects/{projectID}/secrets/{name}` | Create (`201`) or replace (`200`, `version` + 1) with `{ "value": "…" }` (admin) |
+| DELETE | `/projects/{projectID}/secrets/{name}` | Delete (`409 secret_in_use` while an environment lists it) (admin) |
+
+`name` is `[A-Z_][A-Z0-9_]{0,63}`; the value is 6 bytes to 4 KB. A secret is used by listing its name in an environment's `config.secrets` (the environment API rejects unknown names with `422`); the service receives it as an environment variable of that name at the next deployment.
+
+### Audit log
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/projects/{projectID}/audit-logs` | Events newest first; `?action=` filters by action; keyset `cursor`; admin or owner only |
+
+Each entry has `actor`, `action`, `target_type`, `target_id`, `target_name`, `metadata`, `request_id`, and `created_at`. See [03](03-database.md) for what is recorded and what is never put in metadata.
+
 ### Environments
 
 See [15 — Deployments](15-deployments.md) for the model and the `config` fields.
@@ -100,9 +120,10 @@ Servers belong to a project. Every server-scoped endpoint resolves the project t
 | POST | `/projects/{projectID}/servers/enrollment-tokens` | Create short-lived enrollment token bound to the project |
 | GET | `/servers/{serverID}` | Server detail |
 | DELETE | `/servers/{serverID}` | Remove/revoke server access |
+| POST | `/servers/{serverID}/credential-rotation` | Ask the server's Agent to rotate its credential at its next heartbeat (admin) |
 | GET | `/servers/{serverID}/containers` | List containers from the latest snapshot |
 | POST | `/servers/{serverID}/containers/{containerID}/actions` | Queue start/stop/restart (`container_action` job) |
-| POST | `/servers/{serverID}/containers/{containerID}/logs` | Queue a bounded log fetch (`fetch_logs` job) |
+| POST | `/servers/{serverID}/containers/{containerID}/logs` | Queue a bounded log fetch (`fetch_logs` job); developer or higher, as is reading the job's `/logs` and `/events` |
 
 The server record is created when an Agent enrolls with a project-bound token; there is no separate server registration endpoint in MVP.
 
@@ -188,7 +209,8 @@ These endpoints are machine-to-machine and require Agent authentication:
 | Method | Endpoint | Purpose |
 |---|---|---|
 | POST | `/agent/enroll` | Exchange enrollment token for Agent credential |
-| POST | `/agent/heartbeat` | Liveness, version, resource summary |
+| POST | `/agent/heartbeat` | Liveness, version, resource summary; the response may ask the Agent to rotate its credential |
+| POST | `/agent/rotate-credential` | Replace the Agent's credential; the old one works for a 15-minute grace period |
 | POST | `/agent/containers/snapshot` | Replace the server's container snapshot |
 | POST | `/agent/jobs/claim` | Long-poll for the next job targeted at this server |
 | POST | `/agent/jobs/{jobID}/heartbeat` | Renew job lease |

@@ -93,7 +93,7 @@ SET status           = 'running',
     started_at       = COALESCE(started_at, $3::timestamptz)
 FROM next
 WHERE jobs.id = next.id
-RETURNING jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id
+RETURNING jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id, jobs.logs_expired_at
 `
 
 type ClaimAgentJobParams struct {
@@ -132,6 +132,7 @@ func (q *Queries) ClaimAgentJob(ctx context.Context, arg ClaimAgentJobParams) (J
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.ApplicationID,
+		&i.LogsExpiredAt,
 	)
 	return i, err
 }
@@ -152,7 +153,7 @@ SET status           = 'running',
     started_at       = COALESCE(started_at, $3::timestamptz)
 FROM next
 WHERE jobs.id = next.id
-RETURNING jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id
+RETURNING jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id, jobs.logs_expired_at
 `
 
 type ClaimRunnerJobParams struct {
@@ -185,6 +186,7 @@ func (q *Queries) ClaimRunnerJob(ctx context.Context, arg ClaimRunnerJobParams) 
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.ApplicationID,
+		&i.LogsExpiredAt,
 	)
 	return i, err
 }
@@ -238,7 +240,7 @@ func (q *Queries) CompleteJob(ctx context.Context, arg CompleteJobParams) (int64
 }
 
 const findActiveBuild = `-- name: FindActiveBuild :one
-SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id FROM jobs
+SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id, logs_expired_at FROM jobs
 WHERE application_id = $1
   AND type = 'build'
   AND status IN ('queued', 'running')
@@ -278,6 +280,7 @@ func (q *Queries) FindActiveBuild(ctx context.Context, arg FindActiveBuildParams
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.ApplicationID,
+		&i.LogsExpiredAt,
 	)
 	return i, err
 }
@@ -343,7 +346,7 @@ func (q *Queries) GetAttemptOutcome(ctx context.Context, arg GetAttemptOutcomePa
 }
 
 const getJob = `-- name: GetJob :one
-SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id FROM jobs WHERE id = $1
+SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id, logs_expired_at FROM jobs WHERE id = $1
 `
 
 func (q *Queries) GetJob(ctx context.Context, id uuid.UUID) (Job, error) {
@@ -370,12 +373,13 @@ func (q *Queries) GetJob(ctx context.Context, id uuid.UUID) (Job, error) {
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.ApplicationID,
+		&i.LogsExpiredAt,
 	)
 	return i, err
 }
 
 const getJobByIdempotencyKey = `-- name: GetJobByIdempotencyKey :one
-SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id FROM jobs WHERE project_id = $1 AND idempotency_key = $2
+SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id, logs_expired_at FROM jobs WHERE project_id = $1 AND idempotency_key = $2
 `
 
 type GetJobByIdempotencyKeyParams struct {
@@ -407,6 +411,7 @@ func (q *Queries) GetJobByIdempotencyKey(ctx context.Context, arg GetJobByIdempo
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.ApplicationID,
+		&i.LogsExpiredAt,
 	)
 	return i, err
 }
@@ -415,7 +420,7 @@ const insertJob = `-- name: InsertJob :one
 INSERT INTO jobs (project_id, application_id, type, worker_kind, target_server_id, payload, max_attempts, idempotency_key, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (project_id, idempotency_key) DO NOTHING
-RETURNING id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id
+RETURNING id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id, logs_expired_at
 `
 
 type InsertJobParams struct {
@@ -465,6 +470,7 @@ func (q *Queries) InsertJob(ctx context.Context, arg InsertJobParams) (Job, erro
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.ApplicationID,
+		&i.LogsExpiredAt,
 	)
 	return i, err
 }
@@ -580,7 +586,7 @@ func (q *Queries) ListJobLogs(ctx context.Context, arg ListJobLogsParams) ([]Lis
 }
 
 const listJobsForUser = `-- name: ListJobsForUser :many
-SELECT jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id FROM jobs
+SELECT jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id, jobs.logs_expired_at FROM jobs
 JOIN project_members ON project_members.project_id = jobs.project_id AND project_members.user_id = $1
 WHERE ($2::uuid IS NULL OR jobs.project_id = $2::uuid)
   AND ($3::uuid IS NULL OR jobs.application_id = $3::uuid)
@@ -647,6 +653,7 @@ func (q *Queries) ListJobsForUser(ctx context.Context, arg ListJobsForUserParams
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.ApplicationID,
+			&i.LogsExpiredAt,
 		); err != nil {
 			return nil, err
 		}
