@@ -18,7 +18,12 @@ export function ApiForm({ error, onClearError, ...props }: Props) {
   return (
     // Field change events bubble here; display:contents keeps layout unchanged.
     <div className="contents" onChange={error ? onClearError : undefined}>
-      <Form {...props} validationErrors={isApiError(error, 422) ? error.fields : undefined} />
+      {/* The form must not be a layout box, so a dialog's body can scroll above its footer. */}
+      <Form
+        className="contents"
+        {...props}
+        validationErrors={isApiError(error, 422) ? error.fields : undefined}
+      />
     </div>
   );
 }

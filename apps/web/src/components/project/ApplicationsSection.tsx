@@ -1,5 +1,6 @@
 import { AlertDialog, Button, Card, Spinner, toast } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { type Application, applicationsQuery, deleteApplication } from "../../api/applications";
 import { useHasRole } from "../../lib/useHasRole";
 import { QueryError } from "../QueryError";
@@ -22,7 +23,7 @@ export function ApplicationsSection({ projectId }: { projectId: string }) {
       {apps.isSuccess && apps.data.items.length === 0 && (
         <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
           No applications yet. An application builds a Docker image from one repository and branch
-          on every push.
+          on every push, and pushes it to a registry.
         </Card>
       )}
       {apps.isSuccess && apps.data.items.length > 0 && (
@@ -31,7 +32,13 @@ export function ApplicationsSection({ projectId }: { projectId: string }) {
             {apps.data.items.map((app) => (
               <li key={app.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
                 <div className="min-w-48 flex-1">
-                  <p className="font-medium">{app.name}</p>
+                  <Link
+                    to="/applications/$applicationId"
+                    params={{ applicationId: app.id }}
+                    className="font-medium hover:underline"
+                  >
+                    {app.name}
+                  </Link>
                   <p className="truncate font-mono text-xs text-[var(--muted)]">
                     {app.repository_full_name} @ {app.branch}
                   </p>

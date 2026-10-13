@@ -38,6 +38,12 @@ Within an application:
 
 Keep global navigation stable and avoid deeply nested menus.
 
+### Builds (Phase 3)
+
+- The project page has **Applications · Git · Registries · Members** tabs. Registries holds the places images are pushed; an application chooses one and an image path.
+- An application page shows its image destination, a **Build <branch>** button (developer and up; disabled until an image is set), and recent builds. A row shows the short commit, its message, status, the pushed digest or the failure code, and the duration. The list refreshes every 5 seconds only while a build is queued or running.
+- A build's job page shows the commit, the exact `image@sha256:…` reference with a copy button once pushed, and the streamed log.
+
 ## 4. Overview page
 
 Prioritize:

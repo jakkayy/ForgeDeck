@@ -18,6 +18,7 @@ import { applicationsQuery, createApplication, type NewApplication } from "../..
 import { isApiError } from "../../api/client";
 import { gitConnectionsQuery, repositoriesQuery } from "../../api/git";
 import { ApiForm } from "../ApiForm";
+import { ImageFields, type ImageValue } from "../application/ImageFields";
 
 /** Creates an application: connection → repository → branch, with build settings tucked away. */
 export function NewApplicationDialog({ projectId }: { projectId: string }) {
@@ -78,6 +79,7 @@ function ApplicationForm({
   });
   const [repositoryId, setRepositoryId] = useState<string | null>(null);
   const [branch, setBranch] = useState("");
+  const [image, setImage] = useState<ImageValue>({ registryId: null, repository: "" });
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -91,6 +93,8 @@ function ApplicationForm({
       dockerfile_path: text("dockerfile_path") || undefined,
       build_context: text("build_context") || undefined,
       test_command: text("test_command") || undefined,
+      registry_connection_id: image.registryId ?? undefined,
+      image_repository: image.registryId ? image.repository.trim() : undefined,
     });
   };
 
@@ -180,6 +184,7 @@ function ApplicationForm({
               <Description>Every push to this branch builds a new image.</Description>
               <FieldError />
             </TextField>
+            <ImageFields projectId={projectId} value={image} onChange={setImage} />
             <Disclosure>
               <Disclosure.Heading>
                 <Disclosure.Trigger className="flex items-center gap-1 text-sm">
@@ -206,7 +211,7 @@ function ApplicationForm({
                     <Label>Test command</Label>
                     <Input placeholder="npm test" />
                     <Description>
-                      Optional. Runs in the Runner before the image is built.
+                      Optional. Runs inside the built image, without network, before it is pushed.
                     </Description>
                     <FieldError />
                   </TextField>

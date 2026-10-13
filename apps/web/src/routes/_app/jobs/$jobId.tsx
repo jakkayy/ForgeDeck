@@ -1,8 +1,10 @@
 import { Alert, Button, Spinner, toast } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { BuildResult } from "../../../api/applications";
 import { cancelJob } from "../../../api/jobs";
 import type { Job } from "../../../api/types";
+import { CopyField } from "../../../components/CopyField";
 import { JobStatusChip } from "../../../components/JobStatusChip";
 import { LogView } from "../../../components/LogView";
 import { describeJob, duration } from "../../../lib/describeJob";
@@ -23,6 +25,7 @@ function JobPage() {
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col gap-4">
       <JobHeader job={job} />
+      {job.type === "build" && <BuildSummary job={job} />}
       {job.error && (
         <Alert status="danger">
           <Alert.Content>
@@ -41,6 +44,37 @@ function JobPage() {
       ) : (
         <LogView lines={lines} />
       )}
+    </div>
+  );
+}
+
+type BuildPayload = {
+  application_id: string;
+  branch: string;
+  commit_sha: string;
+  commit_message?: string;
+};
+
+/** What a build is building and, once pushed, the exact image to deploy. */
+function BuildSummary({ job }: { job: Job }) {
+  const payload = job.payload as BuildPayload;
+  const result = job.status === "succeeded" ? (job.result as BuildResult | undefined) : undefined;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm">
+        <Link
+          to="/applications/$applicationId"
+          params={{ applicationId: payload.application_id }}
+          className="text-[var(--muted)] hover:text-[var(--foreground)] hover:underline"
+        >
+          Application
+        </Link>
+        <span className="text-[var(--muted)]"> · {payload.branch} · </span>
+        <code className="font-mono">{payload.commit_sha.slice(0, 12)}</code>
+        {payload.commit_message && <span> {payload.commit_message}</span>}
+      </p>
+      {result && <CopyField label="image reference" value={result.image_ref} />}
     </div>
   );
 }

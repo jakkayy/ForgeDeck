@@ -6,10 +6,11 @@ import { projectQuery } from "../../../api/projects";
 import { ApplicationsSection } from "../../../components/project/ApplicationsSection";
 import { GitSection } from "../../../components/project/GitSection";
 import { MembersSection } from "../../../components/project/MembersSection";
+import { RegistriesSection } from "../../../components/project/RegistriesSection";
 import { QueryError } from "../../../components/QueryError";
 import { RoleChip } from "../../../components/RoleChip";
 
-const tabs = ["applications", "git", "members"] as const;
+const tabs = ["applications", "git", "registries", "members"] as const;
 type Tab = (typeof tabs)[number];
 
 const gitErrors: Record<string, string> = {
@@ -86,6 +87,10 @@ function ProjectPage() {
               Git
               <Tabs.Indicator />
             </Tabs.Tab>
+            <Tabs.Tab id="registries">
+              Registries
+              <Tabs.Indicator />
+            </Tabs.Tab>
             <Tabs.Tab id="members">
               Members
               <Tabs.Indicator />
@@ -97,6 +102,9 @@ function ProjectPage() {
         </Tabs.Panel>
         <Tabs.Panel id="git" className="pt-4">
           <GitSection projectId={projectId} />
+        </Tabs.Panel>
+        <Tabs.Panel id="registries" className="pt-4">
+          <RegistriesSection projectId={projectId} />
         </Tabs.Panel>
         <Tabs.Panel id="members" className="pt-4">
           <MembersSection projectId={projectId} />

@@ -47,13 +47,20 @@ export async function getAllJobLogs(jobId: string, signal?: AbortSignal): Promis
 
 export type JobPage = List<Job>;
 
-export function listJobs(params: { status?: string; cursor?: string }, signal?: AbortSignal) {
-  const query = new URLSearchParams({ limit: "30" });
-  if (params.status) {
-    query.set("status", params.status);
-  }
-  if (params.cursor) {
-    query.set("cursor", params.cursor);
+export type JobFilter = {
+  status?: string;
+  type?: string;
+  application_id?: string;
+  cursor?: string;
+  limit?: number;
+};
+
+export function listJobs({ limit = 30, ...filter }: JobFilter, signal?: AbortSignal) {
+  const query = new URLSearchParams({ limit: String(limit) });
+  for (const [key, value] of Object.entries(filter)) {
+    if (value) {
+      query.set(key, value);
+    }
   }
   return api<JobPage>(`/jobs?${query}`, { signal });
 }
