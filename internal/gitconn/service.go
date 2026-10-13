@@ -1,0 +1,148 @@
+// Package gitconn manages a project's connections to Git providers.
+package gitconn
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/jakkayy/ForgeDeck/internal/apperr"
+	"github.com/jakkayy/ForgeDeck/internal/authz"
+	"github.com/jakkayy/ForgeDeck/internal/database"
+	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
+	"github.com/jakkayy/ForgeDeck/internal/keyring"
+	"github.com/jakkayy/ForgeDeck/internal/safehttp"
+	"github.com/jakkayy/ForgeDeck/internal/store"
+)
+
+// errConnectionNotFound also covers connections in projects the user cannot see.
+var errConnectionNotFound = apperr.NotFound("Git connection not found.")
+
+// Connection is a project's link to a Git provider. Credentials never leave
+// the server.
+type Connection struct {
+	ID          uuid.UUID `json:"id"`
+	ProjectID   uuid.UUID `json:"project_id"`
+	Provider    string    `json:"provider"`
+	DisplayName string    `json:"display_name"`
+	BaseURL     string    `json:"base_url"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// Service implements Git connection operations.
+type Service struct {
+	pool           *pgxpool.Pool
+	queries        *store.Queries
+	authz          *authz.Authorizer
+	keyring        *keyring.Keyring
+	github         *github.Client // nil when the GitHub App is not configured
+	outbound       *http.Client   // for user-supplied provider URLs
+	outboundPolicy safehttp.Policy
+	publicURL      string
+	now            func() time.Time
+}
+
+// Deps are the collaborators a Service needs. GitHub may be nil.
+type Deps struct {
+	Pool     *pgxpool.Pool
+	Authz    *authz.Authorizer
+	Keyring  *keyring.Keyring
+	GitHub   *github.Client
+	Outbound safehttp.Policy
+	// PublicURL is where GitLab sends webhooks; required for GitLab applications.
+	PublicURL string
+	Now       func() time.Time
+}
+
+// NewService returns a Service.
+func NewService(d Deps) *Service {
+	return &Service{
+		pool: d.Pool, queries: store.New(d.Pool), authz: d.Authz, keyring: d.Keyring, github: d.GitHub,
+		outbound: safehttp.NewClient(d.Outbound, 15*time.Second), outboundPolicy: d.Outbound,
+		publicURL: d.PublicURL, now: d.Now,
+	}
+}
+
+// List returns the project's connections.
+func (s *Service) List(ctx context.Context, userID, projectID uuid.UUID) ([]Connection, error) {
+	if _, err := s.authz.Require(ctx, userID, projectID, authz.ViewProject); err != nil {
+		return nil, err
+	}
+	rows, err := s.queries.ListGitConnections(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("list git connections: %w", err)
+	}
+	connections := make([]Connection, len(rows))
+	for i, row := range rows {
+		connections[i] = toConnection(row)
+	}
+	return connections, nil
+}
+
+// Delete removes a connection. Stored credentials go with it.
+func (s *Service) Delete(ctx context.Context, userID, connectionID uuid.UUID) error {
+	if _, err := s.authorize(ctx, userID, connectionID, authz.ManageGit); err != nil {
+		return err
+	}
+	err := s.queries.DeleteGitConnection(ctx, connectionID)
+	if database.IsForeignKeyViolation(err) {
+		return apperr.Conflict("connection_in_use", "Applications still build from this connection. Remove or move them first.")
+	}
+	if err != nil {
+		return fmt.Errorf("delete git connection: %w", err)
+	}
+	return nil
+}
+
+// authorize loads a connection and checks the user's permission in its project.
+func (s *Service) authorize(ctx context.Context, userID, connectionID uuid.UUID, p authz.Permission) (store.GitConnection, error) {
+	row, err := s.queries.GetGitConnection(ctx, connectionID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.GitConnection{}, errConnectionNotFound
+	}
+	if err != nil {
+		return store.GitConnection{}, fmt.Errorf("get git connection: %w", err)
+	}
+	if _, err := s.authz.Require(ctx, userID, row.ProjectID, p); err != nil {
+		if errors.Is(err, authz.ErrProjectNotFound) {
+			return store.GitConnection{}, errConnectionNotFound
+		}
+		return store.GitConnection{}, err
+	}
+	return row, nil
+}
+
+func toConnection(row store.GitConnection) Connection {
+	return Connection{
+		ID: row.ID, ProjectID: row.ProjectID, Provider: row.Provider,
+		DisplayName: row.DisplayName, BaseURL: row.BaseUrl, CreatedAt: row.CreatedAt,
+	}
+}
+
+// ErrNoWebhookSecret means the connection does not exist or has no
+// per-connection webhook secret (GitHub uses the App-wide one).
+var ErrNoWebhookSecret = errors.New("connection has no webhook secret")
+
+// GitLabWebhookSecret returns the secret GitLab sends in X-Gitlab-Token for
+// a connection. It is used by the unauthenticated webhook endpoint, so it
+// does no user authorization.
+func (s *Service) GitLabWebhookSecret(ctx context.Context, connectionID uuid.UUID) (string, error) {
+	row, err := s.queries.GetGitConnection(ctx, connectionID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.Provider != "gitlab") {
+		return "", ErrNoWebhookSecret
+	}
+	if err != nil {
+		return "", fmt.Errorf("get git connection: %w", err)
+	}
+	secret, err := s.keyring.Open(row.WebhookCiphertext, *row.WebhookKeyID, connectionAAD(row.ID, "webhook"))
+	if err != nil {
+		return "", fmt.Errorf("decrypt webhook secret: %w", err)
+	}
+	return string(secret), nil
+}

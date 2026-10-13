@@ -1,0 +1,204 @@
+package runner
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/http/cgi"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/jakkayy/ForgeDeck/internal/apitest"
+	"github.com/jakkayy/ForgeDeck/internal/applications"
+	"github.com/jakkayy/ForgeDeck/internal/builds"
+	"github.com/jakkayy/ForgeDeck/internal/config"
+	"github.com/jakkayy/ForgeDeck/internal/gitconn"
+	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab"
+	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab/gitlabtest"
+	"github.com/jakkayy/ForgeDeck/internal/jobs"
+	"github.com/jakkayy/ForgeDeck/internal/registries"
+)
+
+const gitBackend = "/usr/lib/git-core/git-http-backend"
+
+// gitServer serves bare repositories over smart HTTP behind the fake
+// GitLab's API, so one URL works for both API calls and clones. Clones need
+// the token the fake accepts, like a private repository.
+func gitServer(t *testing.T, fake *gitlabtest.Server, token string, repos map[string]string) string {
+	t.Helper()
+	if _, err := os.Stat(gitBackend); err != nil {
+		t.Skip("git-http-backend is not installed")
+	}
+	root := t.TempDir()
+	for path, source := range repos {
+		cmd := exec.CommandContext(t.Context(), "git", "clone", "--quiet", "--bare", source, root+"/"+path)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("clone %s: %v\n%s", path, err, out)
+		}
+	}
+	backend := &cgi.Handler{Path: gitBackend, Env: []string{"GIT_PROJECT_ROOT=" + root, "GIT_HTTP_EXPORT_ALL=1"}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, ".git/") {
+			fake.Config.Handler.ServeHTTP(w, r)
+			return
+		}
+		if _, password, ok := r.BasicAuth(); !ok || password != token {
+			w.Header().Set("WWW-Authenticate", "Basic")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		backend.ServeHTTP(w, r)
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+type buildFixture struct {
+	env       *apitest.Env
+	owner     *apitest.Client
+	projectID uuid.UUID
+	connID    uuid.UUID
+	registry  registries.Registry
+	host      string
+}
+
+func newBuildFixture(t *testing.T, repos map[string]string, commits map[string]string) buildFixture {
+	t.Helper()
+	requireDocker(t)
+	fake := gitlabtest.New(t)
+	fake.AddToken("glpat-good", gitlabtest.Token{Username: "bot", Scopes: []string{"api"}, Projects: []gitlab.Project{
+		{ID: 1, PathWithNamespace: "acme/good", DefaultBranch: "main", Visibility: "private"},
+		{ID: 2, PathWithNamespace: "acme/bad", DefaultBranch: "main", Visibility: "private"},
+	}})
+	for project, sha := range commits {
+		id := map[string]int64{"acme/good": 1, "acme/bad": 2}[project]
+		fake.AddCommit(id, "main", gitlab.Commit{ID: sha, Message: "Sample commit"})
+	}
+	url := gitServer(t, fake, "glpat-good", repos)
+	host := startRegistry(t)
+
+	env := apitest.New(t, func(cfg *config.Config) { cfg.PublicURL = "https://forgedeck.example.com" })
+	owner, _ := env.NewUser("owner@example.com")
+	projectID := owner.CreateProject("Shop")
+	base := "/api/v1/projects/" + projectID.String()
+	var conn gitconn.Connection
+	owner.Do(http.MethodPost, base+"/git-connections/gitlab", map[string]string{"base_url": url, "token": "glpat-good"}).
+		RequireStatus(http.StatusCreated).Decode(&conn)
+	var registry registries.Registry
+	owner.Do(http.MethodPost, base+"/registries", map[string]string{"name": "Local", "host": host, "username": "bot", "password": "pw"}).
+		RequireStatus(http.StatusCreated).Decode(&registry)
+
+	registered := env.NewRunner("build-01")
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	cfg := Config{ControlPlaneURL: env.Server.URL, Credential: registered.Credential, Version: "test"}
+	handlers := Handlers(BuildConfig{WorkDir: t.TempDir(), GitProtocols: "http", Timeout: 3 * time.Minute,
+		TestLimits: DefaultTestLimits})
+	go func() { done <- Run(ctx, cfg, handlers, DockerStatus, slog.New(slog.DiscardHandler)) }()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+	return buildFixture{env: env, owner: owner, projectID: projectID, connID: conn.ID, registry: registry, host: host}
+}
+
+func (f buildFixture) build(t *testing.T, repositoryID, name, testCommand string) jobs.Job {
+	t.Helper()
+	body := map[string]any{"name": name, "git_connection_id": f.connID, "repository_id": repositoryID,
+		"registry_connection_id": f.registry.ID, "image_repository": "acme/" + name}
+	if testCommand != "" {
+		body["test_command"] = testCommand
+	}
+	var app applications.Application
+	f.owner.Do(http.MethodPost, "/api/v1/projects/"+f.projectID.String()+"/applications", body).
+		RequireStatus(http.StatusCreated).Decode(&app)
+	var queued builds.Queued
+	f.owner.Do(http.MethodPost, "/api/v1/applications/"+app.ID.String()+"/builds", nil).
+		RequireStatus(http.StatusAccepted).Decode(&queued)
+
+	deadline := time.Now().Add(3 * time.Minute)
+	for {
+		var job jobs.Job
+		f.owner.Do(http.MethodGet, "/api/v1/jobs/"+queued.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&job)
+		if job.Status == jobs.StatusSucceeded || job.Status == jobs.StatusFailed {
+			return job
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("build never finished: %+v", job)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+func (f buildFixture) logs(t *testing.T, job jobs.Job) string {
+	t.Helper()
+	var page struct{ Items []jobs.LogLine }
+	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+job.ID.String()+"/logs?limit=1000", nil).RequireStatus(http.StatusOK).Decode(&page)
+	var lines []string
+	for _, line := range page.Items {
+		lines = append(lines, line.Message)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// registryHas reports whether the registry holds the repository.
+func registryHas(t *testing.T, host, repository string) bool {
+	t.Helper()
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+host+"/v2/"+repository+"/tags/list", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return resp.StatusCode == http.StatusOK
+}
+
+// TestSampleRepositoryBuilds drives the whole path: API, Runner, git clone
+// over HTTP, build, test, and push to a registry. A repository whose tests
+// fail must fail the job and push nothing.
+func TestSampleRepositoryBuilds(t *testing.T) {
+	dockerfile := "FROM busybox:1.37\nCOPY app.sh /app.sh\nCMD [\"sh\", \"/app.sh\"]\n"
+	goodSource, goodSHA := sourceRepo(t, map[string]string{"Dockerfile": dockerfile, "app.sh": "echo hello\n"})
+	badSource, badSHA := sourceRepo(t, map[string]string{"Dockerfile": dockerfile, "app.sh": "echo hello\n"})
+	f := newBuildFixture(t,
+		map[string]string{"acme/good.git": strings.TrimPrefix(goodSource, "file://"), "acme/bad.git": strings.TrimPrefix(badSource, "file://")},
+		map[string]string{"acme/good": goodSHA, "acme/bad": badSHA})
+
+	good := f.build(t, "1", "good", "sh /app.sh | grep -q hello && echo tests-passed")
+	if good.Status != jobs.StatusSucceeded {
+		t.Fatalf("good build %+v\n%s", good.Error, f.logs(t, good))
+	}
+	var result BuildResult
+	if err := json.Unmarshal(good.Result, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.CommitSHA != goodSHA || !validDigest.MatchString(result.Digest) ||
+		result.ImageRef != fmt.Sprintf("%s/acme/good@%s", f.host, result.Digest) {
+		t.Fatalf("result %+v", result)
+	}
+	if !registryHas(t, f.host, "acme/good") {
+		t.Fatal("image was not pushed")
+	}
+	if logs := f.logs(t, good); !strings.Contains(logs, "tests-passed") || strings.Contains(logs, "glpat-good") {
+		t.Fatalf("logs:\n%s", logs)
+	}
+
+	bad := f.build(t, "2", "bad", "echo about-to-fail; exit 7")
+	if bad.Status != jobs.StatusFailed || bad.Error == nil || bad.Error.Code != "tests_failed" {
+		t.Fatalf("bad build %+v\n%s", bad, f.logs(t, bad))
+	}
+	if registryHas(t, f.host, "acme/bad") {
+		t.Fatal("an image whose tests failed was pushed")
+	}
+	if logs := f.logs(t, bad); !strings.Contains(logs, "about-to-fail") {
+		t.Fatalf("test output missing from the log:\n%s", logs)
+	}
+}
