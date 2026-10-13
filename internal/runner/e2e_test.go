@@ -21,6 +21,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/applications"
 	"github.com/jakkayy/ForgeDeck/internal/builds"
 	"github.com/jakkayy/ForgeDeck/internal/config"
+	"github.com/jakkayy/ForgeDeck/internal/dockertest"
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab/gitlabtest"
@@ -73,7 +74,7 @@ type buildFixture struct {
 
 func newBuildFixture(t *testing.T, repos map[string]string, commits map[string]string) buildFixture {
 	t.Helper()
-	requireDocker(t)
+	dockertest.Require(t)
 	fake := gitlabtest.New(t)
 	fake.AddToken("glpat-good", gitlabtest.Token{Username: "bot", Scopes: []string{"api"}, Projects: []gitlab.Project{
 		{ID: 1, PathWithNamespace: "acme/good", DefaultBranch: "main", Visibility: "private"},
@@ -84,7 +85,7 @@ func newBuildFixture(t *testing.T, repos map[string]string, commits map[string]s
 		fake.AddCommit(id, "main", gitlab.Commit{ID: sha, Message: "Sample commit"})
 	}
 	url := gitServer(t, fake, "glpat-good", repos)
-	host := startRegistry(t)
+	host := dockertest.StartRegistry(t)
 
 	env := apitest.New(t, func(cfg *config.Config) { cfg.PublicURL = "https://forgedeck.example.com" })
 	owner, _ := env.NewUser("owner@example.com")

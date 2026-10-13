@@ -233,6 +233,12 @@ type BuildResult struct {
 	ImageRef  string `json:"image_ref"` // Image@Digest
 }
 
+// DeployResult is a successful deploy_image job's result.
+type DeployResult struct {
+	ImageRef    string `json:"image_ref"`
+	ContainerID string `json:"container_id"`
+}
+
 // DeployImagePayload deploys one image digest to one environment on the
 // Agent's server. It never carries secrets: registry credentials are added
 // to the claimed job, not stored in the payload. The Agent re-validates

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/procexec"
 )
 
 var validDigest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
@@ -15,23 +16,23 @@ var validDigest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 // pushImage logs in to the registry, pushes localTag as image:tag, and
 // returns the pushed manifest's digest. The password goes to docker on
 // stdin and is stored only in the job's own DOCKER_CONFIG.
-func pushImage(ctx context.Context, exec *executor, registry agentproto.RegistryCredentials, localTag, image, tag string) (string, error) {
-	login := command{
-		name:  "docker",
-		args:  []string{"login", "--username", registry.Username, "--password-stdin", registry.Host},
-		stdin: strings.NewReader(registry.Password),
+func pushImage(ctx context.Context, exec *procexec.Executor, registry agentproto.RegistryCredentials, localTag, image, tag string) (string, error) {
+	login := procexec.Command{
+		Name:  "docker",
+		Args:  []string{"login", "--username", registry.Username, "--password-stdin", registry.Host},
+		Stdin: strings.NewReader(registry.Password),
 	}
-	if err := exec.run(ctx, login); err != nil {
+	if err := exec.Run(ctx, login); err != nil {
 		return "", fmt.Errorf("docker login %s: %w", registry.Host, err)
 	}
 	remote := image + ":" + tag
-	if err := exec.run(ctx, command{name: "docker", args: []string{"tag", localTag, remote}}); err != nil {
+	if err := exec.Run(ctx, procexec.Command{Name: "docker", Args: []string{"tag", localTag, remote}}); err != nil {
 		return "", fmt.Errorf("docker tag: %w", err)
 	}
-	if err := exec.run(ctx, command{name: "docker", args: []string{"push", remote}}); err != nil {
+	if err := exec.Run(ctx, procexec.Command{Name: "docker", Args: []string{"push", remote}}); err != nil {
 		return "", fmt.Errorf("docker push: %w", err)
 	}
-	out, err := exec.output(ctx, command{name: "docker", args: []string{"image", "inspect", "--format", "{{json .RepoDigests}}", remote}})
+	out, err := exec.Output(ctx, procexec.Command{Name: "docker", Args: []string{"image", "inspect", "--format", "{{json .RepoDigests}}", remote}})
 	if err != nil {
 		return "", fmt.Errorf("read pushed digest: %w", err)
 	}

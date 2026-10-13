@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/jakkayy/ForgeDeck/internal/dockertest"
 )
 
 func TestResolveInsideRefusesEscapes(t *testing.T) {
@@ -39,23 +41,8 @@ func TestResolveInsideRefusesEscapes(t *testing.T) {
 	}
 }
 
-// requireDocker skips tests that need a Docker daemon unless opted in.
-func requireDocker(t *testing.T) {
-	t.Helper()
-	if os.Getenv("FORGEDECK_TEST_DOCKER") != "1" {
-		t.Skip("set FORGEDECK_TEST_DOCKER=1 to run against a Docker daemon")
-	}
-}
-
-// removeImage deletes a test image, ignoring errors.
-func removeImage(t *testing.T, ref string) {
-	t.Cleanup(func() {
-		_ = exec.CommandContext(context.Background(), "docker", "image", "rm", "--force", ref).Run()
-	})
-}
-
 func TestBuildImageWithBuildKit(t *testing.T) {
-	requireDocker(t)
+	dockertest.Require(t)
 	url, commit := sourceRepo(t, map[string]string{
 		"app/Dockerfile": "FROM busybox:1.37\nCOPY hello.txt /hello.txt\nRUN cat /hello.txt\n",
 		"app/hello.txt":  "hello from forgedeck\n",
@@ -69,7 +56,7 @@ func TestBuildImageWithBuildKit(t *testing.T) {
 	}
 
 	tag := "forgedeck-build:test-" + commit[:12]
-	removeImage(t, tag)
+	dockertest.RemoveImage(t, tag)
 	if err := buildImage(context.Background(), ex, ws.src, "app/Dockerfile", "app", commit, tag); err != nil {
 		t.Fatalf("build: %v\n%s", err, log)
 	}

@@ -20,8 +20,7 @@ const imageRef = "ghcr.io/acme/shop-api@sha256:0123456789abcdef0123456789abcdef0
 func ptr[T any](v T) *T { return &v }
 
 func spec(config servicecfg.Config) compose.Spec {
-	return compose.Spec{EnvironmentID: uuid.MustParse("11111111-1111-1111-1111-111111111111"),
-		DeploymentID: uuid.MustParse("22222222-2222-2222-2222-222222222222"), ImageRef: imageRef, Config: config}
+	return compose.Spec{EnvironmentID: uuid.MustParse("11111111-1111-1111-1111-111111111111"), ImageRef: imageRef, Config: config}
 }
 
 func render(t *testing.T, s compose.Spec) map[string]any {
@@ -66,7 +65,7 @@ func TestRenderFullConfiguration(t *testing.T) {
 		t.Fatalf("top-level volumes %v", file["volumes"])
 	}
 	labels := svc["labels"].(map[string]any)
-	if labels[compose.LabelManaged] != "true" || labels[compose.LabelDeployment] != "22222222-2222-2222-2222-222222222222" {
+	if labels[compose.LabelManaged] != "true" || labels[compose.LabelEnvironment] != "11111111-1111-1111-1111-111111111111" || len(labels) != 2 {
 		t.Fatalf("labels %v", labels)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/procexec"
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
@@ -49,7 +50,7 @@ func BuildHandler(cfg BuildConfig) worker.Handler {
 		if job.Credentials == nil {
 			return nil, errNoCredential
 		}
-		log = newRedactingLog(log, secretsOf(*job.Credentials))
+		log = worker.NewRedactingLog(log, secretsOf(*job.Credentials))
 		ws, err := newWorkspace(cfg.WorkDir)
 		if err != nil {
 			return nil, err
@@ -78,7 +79,7 @@ func BuildHandler(cfg BuildConfig) worker.Handler {
 type build struct {
 	cfg         BuildConfig
 	ws          *workspace
-	exec        *executor
+	exec        *procexec.Executor
 	log         worker.Logger
 	payload     agentproto.BuildPayload
 	credentials agentproto.BuildCredentials
@@ -127,7 +128,7 @@ func (b *build) removeImages(ctx context.Context) {
 		tags = append(tags, b.credentials.Image+":"+b.payload.CommitSHA[:12])
 	}
 	// Tags that were never created make docker exit non-zero; that is fine.
-	_, _ = b.exec.output(ctx, command{name: "docker", args: append([]string{"image", "rm", "--force"}, tags...)})
+	_, _ = b.exec.Output(ctx, procexec.Command{Name: "docker", Args: append([]string{"image", "rm", "--force"}, tags...)})
 }
 
 // testContainer names the test container of this build.

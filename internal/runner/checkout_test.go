@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/procexec"
 )
 
 func TestCheckoutFetchesExactCommit(t *testing.T) {
@@ -53,7 +54,7 @@ func TestExecutorHidesRunnerEnvironment(t *testing.T) {
 	t.Setenv("FORGEDECK_RUNNER_CREDENTIAL", "fdr_secret")
 	ws, _ := newWorkspace(t.TempDir())
 	log := &recordLog{}
-	if err := newExecutor(ws, log).run(context.Background(), command{name: "env"}); err != nil {
+	if err := newExecutor(ws, log).Run(context.Background(), procexec.Command{Name: "env"}); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(log.String(), "fdr_secret") || !strings.Contains(log.String(), "HOME="+ws.home) {

@@ -71,9 +71,9 @@ Plus `timeout_seconds` (default 60, max 600) and `interval_seconds` (default 2).
 
 ### Rendering and applying
 
-The file is **JSON** (valid YAML, which Compose reads), produced by the encoder, so no value can break out of its string; `$` in values is escaped as `$$` so Compose does not interpolate it. For each environment the Agent keeps `compose.yml` under its state directory, with Compose project `forgedeck-<environment id>` and a single service `app`. It carries ForgeDeck labels (`forgedeck.environment`, `forgedeck.release`) and the standard Compose labels, so the dashboard's container list shows it.
+The file is **JSON** (valid YAML, which Compose reads), produced by the encoder, so no value can break out of its string; `$` in values is escaped as `$$` so Compose does not interpolate it. For each environment the Agent keeps `compose.yml` under its state directory, with Compose project `forgedeck-<environment id>` and a single service `app`. It carries the labels `forgedeck.managed` and `forgedeck.environment` plus Compose's own, so the dashboard's container list shows it. There is deliberately no per-deployment label: Compose recreates a container whose configuration changed, and a label that differs on every deployment would restart an unchanged service each time. Which deployment a container belongs to is recorded by the Control Plane.
 
-Applying a deployment is idempotent: pull the digest, render, `docker compose up -d --remove-orphans`, then run the health check. Re-running the same deployment converges to the same state. The Agent needs the Docker Compose plugin on the host (documented as a requirement; the Agent reports it missing as `compose_unavailable`).
+Applying a deployment is idempotent: render, `docker compose pull`, `docker compose up -d --remove-orphans --no-build --pull never`, then run the health check. Re-applying an unchanged configuration leaves the container running; a changed image or configuration recreates it. The Agent needs the Docker Compose plugin on the host (documented as a requirement; the Agent reports it missing as `compose_unavailable`).
 
 ### Persistent volumes and downtime
 

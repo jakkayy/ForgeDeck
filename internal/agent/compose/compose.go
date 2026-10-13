@@ -23,7 +23,6 @@ const ServiceName = "app"
 const (
 	LabelManaged     = "forgedeck.managed"
 	LabelEnvironment = "forgedeck.environment"
-	LabelDeployment  = "forgedeck.deployment"
 )
 
 var imageRef = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._:/-]*@sha256:[0-9a-f]{64}$`)
@@ -31,7 +30,6 @@ var imageRef = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._:/-]*@sha256:[0-9a-f]
 // Spec is one service to run.
 type Spec struct {
 	EnvironmentID uuid.UUID
-	DeploymentID  uuid.UUID
 	ImageRef      string // registry/repo@sha256:…
 	Config        servicecfg.Config
 }
@@ -60,7 +58,9 @@ func Render(spec Spec) ([]byte, error) {
 		"labels": map[string]string{
 			LabelManaged:     "true",
 			LabelEnvironment: spec.EnvironmentID.String(),
-			LabelDeployment:  spec.DeploymentID.String(),
+			// No per-deployment label: Compose recreates a container whose
+			// configuration changed, and a label that differs on every
+			// deployment would restart an unchanged service each time.
 		},
 	}
 	if config.ContainerPort != nil && config.PublishedPort != nil {

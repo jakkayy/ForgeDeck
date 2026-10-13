@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -112,6 +113,7 @@ func runAgent(ctx context.Context, args []string) error {
 	handlers := map[string]worker.Handler{
 		agentproto.JobContainerAction: agent.ContainerActionHandler(engine, agent.SelfContainerID()),
 		agentproto.JobFetchLogs:       agent.FetchLogsHandler(engine),
+		agentproto.JobDeployImage:     agent.DeployImageHandler(filepath.Join(*stateDir, "deployments")),
 	}
 	return agent.Run(ctx, identity, version, handlers, engine, logger)
 }
