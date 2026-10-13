@@ -19,9 +19,9 @@ Create build job
   ↓
 Isolated Runner checks out exact commit SHA
   ↓
-Run configured tests
+Build image with BuildKit
   ↓
-Build image with BuildKit/Buildx
+Run configured tests inside the built image (no network, resource limits)
   ↓
 Push image to registry
   ↓
