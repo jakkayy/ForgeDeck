@@ -259,20 +259,34 @@ Record each attempt separately so retries do not erase prior failures:
 
 Ensure ordering and duplicate handling. Define retention/cleanup; logs can grow quickly.
 
-### `releases`
+### `deployments`
+
+One attempt to put an image digest into an environment; every attempt is kept ([15](15-deployments.md)).
 
 - `id UUID PRIMARY KEY`
-- `application_id UUID NOT NULL REFERENCES applications(id)`
-- `environment_id UUID NOT NULL REFERENCES environments(id)`
-- `job_id UUID REFERENCES jobs(id)`
+- `environment_id UUID NOT NULL REFERENCES environments(id) ON DELETE CASCADE`
+- `job_id UUID UNIQUE REFERENCES jobs(id) ON DELETE SET NULL` — the `deploy_image` job
+- `source_build_job_id UUID`, `source_release_id UUID` — a succeeded build, or an earlier release when rolling back
 - `commit_sha TEXT NOT NULL`
-- `image_reference TEXT NOT NULL`
-- `image_digest TEXT`
-- `status TEXT NOT NULL`
-- `deployed_at TIMESTAMPTZ`
+- `image_ref TEXT NOT NULL` — must end in `@sha256:<64 hex>`; a mutable tag is never deployed
+- `config JSONB NOT NULL` — the service configuration this deployment applies
+- `status` (`queued`, `running`, `succeeded`, `failed`, `cancelled`), `stage` (`pull`, `start`, `health_check`), `error_code`, `error_message`
+- `created_by`, `created_at`, `started_at`, `finished_at`
+
+### `releases`
+
+A deployment that passed its health check. Immutable; a failed deployment is never a release. A rollback restores the release's image and `config` snapshot.
+
+- `id UUID PRIMARY KEY`
+- `application_id UUID NOT NULL REFERENCES applications(id) ON DELETE CASCADE`
+- `environment_id UUID NOT NULL REFERENCES environments(id) ON DELETE CASCADE`
+- `deployment_id UUID NOT NULL UNIQUE REFERENCES deployments(id) ON DELETE CASCADE`
+- `commit_sha TEXT NOT NULL`
+- `image_ref TEXT NOT NULL` — `registry/repo@sha256:…`
+- `config JSONB NOT NULL` — snapshot
 - `created_at TIMESTAMPTZ NOT NULL`
 
-Rollback should target a previously recorded immutable image digest when possible.
+The current release of an environment is its newest row. Rollback targets a previously recorded immutable digest.
 
 ### `webhook_events`
 
