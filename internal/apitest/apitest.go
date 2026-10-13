@@ -22,6 +22,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/config"
 	"github.com/jakkayy/ForgeDeck/internal/keyring"
+	"github.com/jakkayy/ForgeDeck/internal/runners"
 	"github.com/jakkayy/ForgeDeck/internal/safehttp"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
@@ -219,6 +220,18 @@ func (a Agent) ReportContainers(t testing.TB, ids ...string) {
 	if !resp.Accepted {
 		t.Fatal("apitest: snapshot not accepted")
 	}
+}
+
+// NewRunner registers a Runner and returns a client authenticated as it.
+func (e *Env) NewRunner(name string) *Client {
+	e.t.Helper()
+	_, credential, err := runners.NewService(store.New(e.Pool), time.Now).Create(context.Background(), name)
+	if err != nil {
+		e.t.Fatalf("apitest: create runner: %v", err)
+	}
+	client := e.Anonymous()
+	client.bearer = credential
+	return client
 }
 
 // CreateProject creates a project owned by the client's user and returns its ID.

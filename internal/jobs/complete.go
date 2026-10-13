@@ -18,10 +18,10 @@ const maxErrorMessageBytes = 2000
 
 var validErrorCode = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
-// CompleteAgentJob records the outcome of an attempt the Agent owns. If the
-// same outcome was already recorded for this attempt, it succeeds again so
-// Agents can safely retry after a network failure.
-func (s *Service) CompleteAgentJob(ctx context.Context, lease AgentLease, req agentproto.CompleteRequest) error {
+// Complete records the outcome of an attempt the worker owns. If the same
+// outcome was already recorded for this attempt, it succeeds again so
+// workers can safely retry after a network failure.
+func (s *Service) Complete(ctx context.Context, lease Lease, req agentproto.CompleteRequest) error {
 	if err := validateCompletion(req); err != nil {
 		return err
 	}
@@ -33,8 +33,9 @@ func (s *Service) CompleteAgentJob(ctx context.Context, lease AgentLease, req ag
 
 	return database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.queries.WithTx(tx)
-		updated, err := q.CompleteAgentJob(ctx, store.CompleteAgentJobParams{
-			ID: lease.JobID, Attempt: lease.Attempt, WorkerID: lease.WorkerID, ServerID: lease.ServerID,
+		updated, err := q.CompleteJob(ctx, store.CompleteJobParams{
+			ID: lease.JobID, Attempt: lease.Attempt, WorkerKind: string(lease.WorkerKind),
+			WorkerID: lease.WorkerID, ServerID: lease.ServerID,
 			Status: req.Outcome, Result: result, Now: now,
 			ErrorCode: optional(req.ErrorCode), ErrorMessage: optional(req.ErrorMessage),
 		})
@@ -55,9 +56,10 @@ func (s *Service) CompleteAgentJob(ctx context.Context, lease AgentLease, req ag
 	})
 }
 
-func (s *Service) checkAlreadyCompleted(ctx context.Context, q *store.Queries, lease AgentLease, outcome string) error {
-	status, err := q.GetAgentAttemptOutcome(ctx, store.GetAgentAttemptOutcomeParams{
-		ID: lease.JobID, Attempt: lease.Attempt, WorkerID: lease.WorkerID, ServerID: lease.ServerID,
+func (s *Service) checkAlreadyCompleted(ctx context.Context, q *store.Queries, lease Lease, outcome string) error {
+	status, err := q.GetAttemptOutcome(ctx, store.GetAttemptOutcomeParams{
+		ID: lease.JobID, Attempt: lease.Attempt, WorkerKind: string(lease.WorkerKind),
+		WorkerID: lease.WorkerID, ServerID: lease.ServerID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && status != outcome) {
 		return ErrLeaseLost

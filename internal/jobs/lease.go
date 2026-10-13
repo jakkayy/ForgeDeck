@@ -18,19 +18,22 @@ import (
 // The worker must stop and discard the attempt.
 var ErrLeaseLost = apperr.Conflict("lease_lost", "This job attempt is no longer assigned to this worker.")
 
-// AgentLease identifies a job attempt held by an Agent.
-type AgentLease struct {
-	JobID    uuid.UUID
-	Attempt  int32
-	ServerID uuid.UUID
-	WorkerID string
+// Lease identifies a job attempt held by a worker. ServerID is the Agent's
+// server and nil for Runners; every ownership check matches all fields.
+type Lease struct {
+	JobID      uuid.UUID
+	Attempt    int32
+	WorkerKind WorkerKind
+	WorkerID   string
+	ServerID   *uuid.UUID
 }
 
-// RenewAgentLease extends the lease on an attempt the Agent still owns.
-func (s *Service) RenewAgentLease(ctx context.Context, lease AgentLease) (time.Time, error) {
+// RenewLease extends the lease on an attempt the worker still owns.
+func (s *Service) RenewLease(ctx context.Context, lease Lease) (time.Time, error) {
 	expiresAt, err := s.queries.RenewJobLease(ctx, store.RenewJobLeaseParams{
 		ID:             lease.JobID,
 		Attempt:        lease.Attempt,
+		WorkerKind:     string(lease.WorkerKind),
 		WorkerID:       lease.WorkerID,
 		ServerID:       lease.ServerID,
 		LeaseExpiresAt: s.now().Add(LeaseDuration),

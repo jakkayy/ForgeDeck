@@ -31,16 +31,31 @@ type Claimed struct {
 // workerID. It returns (nil, nil) when nothing is queued. serverID must come
 // from the authenticated Agent identity, never from the request.
 func (s *Service) ClaimForAgent(ctx context.Context, serverID uuid.UUID, workerID string) (*Claimed, error) {
+	return s.claim(ctx, workerID, func(q *store.Queries, now time.Time) (store.Job, error) {
+		return q.ClaimAgentJob(ctx, store.ClaimAgentJobParams{
+			ServerID: serverID, WorkerID: workerID, LeaseExpiresAt: now.Add(LeaseDuration), Now: now,
+		})
+	})
+}
+
+// ClaimForRunner assigns the oldest queued Runner job to workerID, or
+// returns (nil, nil) when nothing is queued.
+func (s *Service) ClaimForRunner(ctx context.Context, workerID string) (*Claimed, error) {
+	return s.claim(ctx, workerID, func(q *store.Queries, now time.Time) (store.Job, error) {
+		return q.ClaimRunnerJob(ctx, store.ClaimRunnerJobParams{
+			WorkerID: workerID, LeaseExpiresAt: now.Add(LeaseDuration), Now: now,
+		})
+	})
+}
+
+// claim runs a claim query, records the attempt, and notifies watchers, all
+// in one transaction.
+func (s *Service) claim(ctx context.Context, workerID string, take func(*store.Queries, time.Time) (store.Job, error)) (*Claimed, error) {
 	now := s.now()
 	var claimed *Claimed
 	err := database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.queries.WithTx(tx)
-		job, err := q.ClaimAgentJob(ctx, store.ClaimAgentJobParams{
-			ServerID:       serverID,
-			WorkerID:       workerID,
-			LeaseExpiresAt: now.Add(LeaseDuration),
-			Now:            now,
-		})
+		job, err := take(q, now)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}

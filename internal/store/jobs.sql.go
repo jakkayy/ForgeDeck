@@ -136,7 +136,60 @@ func (q *Queries) ClaimAgentJob(ctx context.Context, arg ClaimAgentJobParams) (J
 	return i, err
 }
 
-const completeAgentJob = `-- name: CompleteAgentJob :execrows
+const claimRunnerJob = `-- name: ClaimRunnerJob :one
+WITH next AS (
+    SELECT queued.id FROM jobs AS queued
+    WHERE queued.status = 'queued' AND queued.worker_kind = 'runner'
+    ORDER BY queued.created_at
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE jobs
+SET status           = 'running',
+    attempt_count    = attempt_count + 1,
+    lease_owner      = $1::text,
+    lease_expires_at = $2::timestamptz,
+    started_at       = COALESCE(started_at, $3::timestamptz)
+FROM next
+WHERE jobs.id = next.id
+RETURNING jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id
+`
+
+type ClaimRunnerJobParams struct {
+	WorkerID       string
+	LeaseExpiresAt time.Time
+	Now            time.Time
+}
+
+func (q *Queries) ClaimRunnerJob(ctx context.Context, arg ClaimRunnerJobParams) (Job, error) {
+	row := q.db.QueryRow(ctx, claimRunnerJob, arg.WorkerID, arg.LeaseExpiresAt, arg.Now)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Type,
+		&i.WorkerKind,
+		&i.TargetServerID,
+		&i.Status,
+		&i.Payload,
+		&i.Result,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.LeaseOwner,
+		&i.LeaseExpiresAt,
+		&i.IdempotencyKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.ApplicationID,
+	)
+	return i, err
+}
+
+const completeJob = `-- name: CompleteJob :execrows
 UPDATE jobs
 SET status           = $1::text,
     result           = $2,
@@ -148,10 +201,11 @@ WHERE id = $6
   AND status = 'running'
   AND attempt_count = $7
   AND lease_owner = $8::text
-  AND target_server_id = $9::uuid
+  AND worker_kind = $9::text
+  AND target_server_id IS NOT DISTINCT FROM $10::uuid
 `
 
-type CompleteAgentJobParams struct {
+type CompleteJobParams struct {
 	Status       string
 	Result       []byte
 	ErrorCode    *string
@@ -160,11 +214,12 @@ type CompleteAgentJobParams struct {
 	ID           uuid.UUID
 	Attempt      int32
 	WorkerID     string
-	ServerID     uuid.UUID
+	WorkerKind   string
+	ServerID     *uuid.UUID
 }
 
-func (q *Queries) CompleteAgentJob(ctx context.Context, arg CompleteAgentJobParams) (int64, error) {
-	result, err := q.db.Exec(ctx, completeAgentJob,
+func (q *Queries) CompleteJob(ctx context.Context, arg CompleteJobParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeJob,
 		arg.Status,
 		arg.Result,
 		arg.ErrorCode,
@@ -173,6 +228,7 @@ func (q *Queries) CompleteAgentJob(ctx context.Context, arg CompleteAgentJobPara
 		arg.ID,
 		arg.Attempt,
 		arg.WorkerID,
+		arg.WorkerKind,
 		arg.ServerID,
 	)
 	if err != nil {
@@ -211,26 +267,29 @@ func (q *Queries) FinishJobAttempt(ctx context.Context, arg FinishJobAttemptPara
 	return err
 }
 
-const getAgentAttemptOutcome = `-- name: GetAgentAttemptOutcome :one
+const getAttemptOutcome = `-- name: GetAttemptOutcome :one
 SELECT status FROM jobs
 WHERE id = $1
   AND attempt_count = $2
   AND lease_owner = $3::text
-  AND target_server_id = $4::uuid
+  AND worker_kind = $4::text
+  AND target_server_id IS NOT DISTINCT FROM $5::uuid
 `
 
-type GetAgentAttemptOutcomeParams struct {
-	ID       uuid.UUID
-	Attempt  int32
-	WorkerID string
-	ServerID uuid.UUID
+type GetAttemptOutcomeParams struct {
+	ID         uuid.UUID
+	Attempt    int32
+	WorkerID   string
+	WorkerKind string
+	ServerID   *uuid.UUID
 }
 
-func (q *Queries) GetAgentAttemptOutcome(ctx context.Context, arg GetAgentAttemptOutcomeParams) (string, error) {
-	row := q.db.QueryRow(ctx, getAgentAttemptOutcome,
+func (q *Queries) GetAttemptOutcome(ctx context.Context, arg GetAttemptOutcomeParams) (string, error) {
+	row := q.db.QueryRow(ctx, getAttemptOutcome,
 		arg.ID,
 		arg.Attempt,
 		arg.WorkerID,
+		arg.WorkerKind,
 		arg.ServerID,
 	)
 	var status string
@@ -387,29 +446,32 @@ func (q *Queries) InsertJobAttempt(ctx context.Context, arg InsertJobAttemptPara
 	return err
 }
 
-const isAgentAttemptActive = `-- name: IsAgentAttemptActive :one
+const isAttemptActive = `-- name: IsAttemptActive :one
 SELECT EXISTS (
     SELECT 1 FROM jobs
     WHERE id = $1
       AND status = 'running'
       AND attempt_count = $2
       AND lease_owner = $3::text
-      AND target_server_id = $4::uuid
+      AND worker_kind = $4::text
+      AND target_server_id IS NOT DISTINCT FROM $5::uuid
 )
 `
 
-type IsAgentAttemptActiveParams struct {
-	ID       uuid.UUID
-	Attempt  int32
-	WorkerID string
-	ServerID uuid.UUID
+type IsAttemptActiveParams struct {
+	ID         uuid.UUID
+	Attempt    int32
+	WorkerID   string
+	WorkerKind string
+	ServerID   *uuid.UUID
 }
 
-func (q *Queries) IsAgentAttemptActive(ctx context.Context, arg IsAgentAttemptActiveParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isAgentAttemptActive,
+func (q *Queries) IsAttemptActive(ctx context.Context, arg IsAttemptActiveParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isAttemptActive,
 		arg.ID,
 		arg.Attempt,
 		arg.WorkerID,
+		arg.WorkerKind,
 		arg.ServerID,
 	)
 	var exists bool
@@ -631,7 +693,8 @@ WHERE id = $2
   AND status = 'running'
   AND attempt_count = $3
   AND lease_owner = $4::text
-  AND target_server_id = $5::uuid
+  AND worker_kind = $5::text
+  AND target_server_id IS NOT DISTINCT FROM $6::uuid
 RETURNING lease_expires_at
 `
 
@@ -640,7 +703,8 @@ type RenewJobLeaseParams struct {
 	ID             uuid.UUID
 	Attempt        int32
 	WorkerID       string
-	ServerID       uuid.UUID
+	WorkerKind     string
+	ServerID       *uuid.UUID
 }
 
 func (q *Queries) RenewJobLease(ctx context.Context, arg RenewJobLeaseParams) (*time.Time, error) {
@@ -649,6 +713,7 @@ func (q *Queries) RenewJobLease(ctx context.Context, arg RenewJobLeaseParams) (*
 		arg.ID,
 		arg.Attempt,
 		arg.WorkerID,
+		arg.WorkerKind,
 		arg.ServerID,
 	)
 	var lease_expires_at *time.Time

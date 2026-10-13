@@ -22,6 +22,8 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/projects"
+	"github.com/jakkayy/ForgeDeck/internal/runnerapi"
+	"github.com/jakkayy/ForgeDeck/internal/runners"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/webhooks"
@@ -43,6 +45,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	go notifier.Run(ctx)
 	go jobService.RunRecovery(ctx, logger)
 	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier)
+	runnerHandler := runnerapi.NewHandler(ctx, runners.NewService(store.New(pool), time.Now), jobService, notifier)
 	var githubClient *github.Client
 	if cfg.GitHub != nil {
 		githubClient = github.NewClient(*cfg.GitHub, time.Now)
@@ -65,6 +68,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		}))
 		authHandler.Routes(api)
 		agentHandler.Routes(api)
+		runnerHandler.Routes(api)
 		gitHandler.PublicRoutes(api)
 		webhooks.NewHandler(cfg.GitHubWebhookSecret, gitService, store.New(pool), jobService).Routes(api)
 

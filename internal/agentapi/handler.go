@@ -113,7 +113,10 @@ func (h *Handler) claim(w http.ResponseWriter, r *http.Request) error {
 
 	identity := IdentityFrom(ctx)
 	credential := bearerCredential(r)
-	job, err := h.jobs.ClaimForAgentWait(ctx, h.notifier, identity.ServerID, identity.AgentID.String(), maxWait,
+	claim := func(ctx context.Context) (*jobs.Claimed, error) {
+		return h.jobs.ClaimForAgent(ctx, identity.ServerID, identity.AgentID.String())
+	}
+	job, err := jobs.ClaimWait(ctx, h.notifier, identity.ServerID.String(), claim, maxWait,
 		func(ctx context.Context) error {
 			_, err := h.servers.AuthenticateAgent(ctx, credential)
 			if errors.Is(err, servers.ErrInvalidAgentCredential) {
@@ -142,7 +145,7 @@ func (h *Handler) renewLease(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	expiresAt, err := h.jobs.RenewAgentLease(r.Context(), lease)
+	expiresAt, err := h.jobs.RenewLease(r.Context(), lease)
 	if err != nil {
 		return err
 	}
@@ -158,7 +161,7 @@ func (h *Handler) appendEvents(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := h.jobs.AppendAgentLogs(r.Context(), lease, req.Events); err != nil {
+	if err := h.jobs.AppendLogs(r.Context(), lease, req.Events); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -174,7 +177,7 @@ func (h *Handler) complete(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := h.jobs.CompleteAgentJob(r.Context(), lease, req); err != nil {
+	if err := h.jobs.Complete(r.Context(), lease, req); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -183,14 +186,15 @@ func (h *Handler) complete(w http.ResponseWriter, r *http.Request) error {
 
 // agentLease identifies the attempt named in the URL as held by the
 // authenticated Agent, so the job queries can verify ownership.
-func agentLease(r *http.Request, attempt int32) (jobs.AgentLease, error) {
+func agentLease(r *http.Request, attempt int32) (jobs.Lease, error) {
 	jobID, err := httpx.UUIDParam(r, "jobID")
 	if err != nil {
-		return jobs.AgentLease{}, err
+		return jobs.Lease{}, err
 	}
 	identity := IdentityFrom(r.Context())
-	return jobs.AgentLease{
-		JobID: jobID, Attempt: attempt, ServerID: identity.ServerID, WorkerID: identity.AgentID.String(),
+	return jobs.Lease{
+		JobID: jobID, Attempt: attempt, WorkerKind: jobs.WorkerAgent,
+		WorkerID: identity.AgentID.String(), ServerID: &identity.ServerID,
 	}, nil
 }
 

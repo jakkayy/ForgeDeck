@@ -48,7 +48,7 @@ func TestRecoverExpiredLeases(t *testing.T) {
 		t.Fatalf("reclaim: %+v %v", again, err)
 	}
 	// The vanished worker's late renewal is refused.
-	_, err = f.svc.RenewAgentLease(ctx, jobs.AgentLease{JobID: first.ID, Attempt: 1, ServerID: f.serverID, WorkerID: "agent-a"})
+	_, err = f.svc.RenewLease(ctx, jobs.Lease{JobID: first.ID, Attempt: 1, WorkerKind: jobs.WorkerAgent, ServerID: &f.serverID, WorkerID: "agent-a"})
 	if err == nil {
 		t.Fatal("stale attempt renewed its lease")
 	}

@@ -13,9 +13,9 @@ var validStreams = map[string]bool{
 	agentproto.StreamStdout: true, agentproto.StreamStderr: true, agentproto.StreamSystem: true,
 }
 
-// AppendAgentLogs stores a batch of log events for an attempt the Agent
-// still owns. Events already stored (same sequence) are skipped.
-func (s *Service) AppendAgentLogs(ctx context.Context, lease AgentLease, events []agentproto.LogEvent) error {
+// AppendLogs stores a batch of log events for an attempt the worker still
+// owns. Events already stored (same sequence) are skipped.
+func (s *Service) AppendLogs(ctx context.Context, lease Lease, events []agentproto.LogEvent) error {
 	if err := validateEvents(events); err != nil {
 		return err
 	}
@@ -39,9 +39,10 @@ func (s *Service) AppendAgentLogs(ctx context.Context, lease AgentLease, events 
 	return notifyJob(ctx, s.queries, lease.JobID)
 }
 
-func (s *Service) requireActive(ctx context.Context, lease AgentLease) error {
-	active, err := s.queries.IsAgentAttemptActive(ctx, store.IsAgentAttemptActiveParams{
-		ID: lease.JobID, Attempt: lease.Attempt, WorkerID: lease.WorkerID, ServerID: lease.ServerID,
+func (s *Service) requireActive(ctx context.Context, lease Lease) error {
+	active, err := s.queries.IsAttemptActive(ctx, store.IsAttemptActiveParams{
+		ID: lease.JobID, Attempt: lease.Attempt, WorkerKind: string(lease.WorkerKind),
+		WorkerID: lease.WorkerID, ServerID: lease.ServerID,
 	})
 	if err != nil {
 		return fmt.Errorf("check job ownership: %w", err)

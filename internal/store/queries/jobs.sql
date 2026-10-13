@@ -31,6 +31,24 @@ FROM next
 WHERE jobs.id = next.id
 RETURNING jobs.*;
 
+-- name: ClaimRunnerJob :one
+WITH next AS (
+    SELECT queued.id FROM jobs AS queued
+    WHERE queued.status = 'queued' AND queued.worker_kind = 'runner'
+    ORDER BY queued.created_at
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE jobs
+SET status           = 'running',
+    attempt_count    = attempt_count + 1,
+    lease_owner      = @worker_id::text,
+    lease_expires_at = @lease_expires_at::timestamptz,
+    started_at       = COALESCE(started_at, @now::timestamptz)
+FROM next
+WHERE jobs.id = next.id
+RETURNING jobs.*;
+
 -- name: InsertJobAttempt :exec
 INSERT INTO job_attempts (job_id, attempt_number, worker_id, status, started_at)
 VALUES ($1, $2, $3, 'running', $4);
@@ -42,17 +60,19 @@ WHERE id = @id
   AND status = 'running'
   AND attempt_count = @attempt
   AND lease_owner = @worker_id::text
-  AND target_server_id = @server_id::uuid
+  AND worker_kind = @worker_kind::text
+  AND target_server_id IS NOT DISTINCT FROM sqlc.narg(server_id)::uuid
 RETURNING lease_expires_at;
 
--- name: IsAgentAttemptActive :one
+-- name: IsAttemptActive :one
 SELECT EXISTS (
     SELECT 1 FROM jobs
     WHERE id = @id
       AND status = 'running'
       AND attempt_count = @attempt
       AND lease_owner = @worker_id::text
-      AND target_server_id = @server_id::uuid
+      AND worker_kind = @worker_kind::text
+      AND target_server_id IS NOT DISTINCT FROM sqlc.narg(server_id)::uuid
 );
 
 -- name: AppendJobLogs :execrows
@@ -60,7 +80,7 @@ INSERT INTO job_log_chunks (job_id, attempt_number, sequence_number, stream, con
 SELECT @job_id, @attempt_number, unnest(@sequence_numbers::bigint[]), unnest(@streams::text[]), unnest(@contents::text[])
 ON CONFLICT (job_id, attempt_number, sequence_number) DO NOTHING;
 
--- name: CompleteAgentJob :execrows
+-- name: CompleteJob :execrows
 UPDATE jobs
 SET status           = @status::text,
     result           = @result,
@@ -72,7 +92,8 @@ WHERE id = @id
   AND status = 'running'
   AND attempt_count = @attempt
   AND lease_owner = @worker_id::text
-  AND target_server_id = @server_id::uuid;
+  AND worker_kind = @worker_kind::text
+  AND target_server_id IS NOT DISTINCT FROM sqlc.narg(server_id)::uuid;
 
 -- name: FinishJobAttempt :exec
 UPDATE job_attempts
@@ -82,12 +103,13 @@ SET status        = @status::text,
     error_summary = @error_summary
 WHERE job_id = @job_id AND attempt_number = @attempt_number;
 
--- name: GetAgentAttemptOutcome :one
+-- name: GetAttemptOutcome :one
 SELECT status FROM jobs
 WHERE id = @id
   AND attempt_count = @attempt
   AND lease_owner = @worker_id::text
-  AND target_server_id = @server_id::uuid;
+  AND worker_kind = @worker_kind::text
+  AND target_server_id IS NOT DISTINCT FROM sqlc.narg(server_id)::uuid;
 
 -- name: GetJob :one
 SELECT * FROM jobs WHERE id = $1;
