@@ -52,3 +52,20 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test -race ./...
+
+  # The production image must keep building: it is what deploy/compose runs.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -f deploy/Dockerfile --build-arg VERSION=ci -t forgedeck-api:ci .
+      # The image has no shell, so run its own commands: with nothing configured
+      # it must refuse to start and say why, and its health check must fail
+      # (nothing is listening) rather than hang.
+      - name: The image starts, explains a bad configuration, and is non-root
+        run: |
+          out=$(docker run --rm forgedeck-api:ci serve 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "FORGEDECK_DATABASE_URL is required"
+          test "$(docker inspect forgedeck-api:ci --format '{{.Config.User}}')" = "nonroot:nonroot"
+          ! docker run --rm forgedeck-api:ci healthcheck
