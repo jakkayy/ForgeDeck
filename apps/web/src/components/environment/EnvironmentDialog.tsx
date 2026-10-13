@@ -1,6 +1,8 @@
 import {
   Alert,
   Button,
+  Checkbox,
+  CheckboxGroup,
   Description,
   Disclosure,
   FieldError,
@@ -26,6 +28,7 @@ import {
   type ServiceConfig,
   updateEnvironment,
 } from "../../api/environments";
+import { secretsQuery } from "../../api/secrets";
 import { serversQuery } from "../../api/servers";
 import {
   envToText,
@@ -111,6 +114,7 @@ function EnvironmentForm({
   onSubmit,
 }: FormProps) {
   const servers = useQuery(serversQuery);
+  const secrets = useQuery(secretsQuery(projectId));
   const projectServers = (servers.data?.items ?? []).filter((s) => s.project_id === projectId);
   const config = environment?.config;
   const [serverId, setServerId] = useState<string | null>(environment?.server_id ?? null);
@@ -118,6 +122,7 @@ function EnvironmentForm({
   const [bindAddress, setBindAddress] = useState(config?.bind_address ?? "127.0.0.1");
   const [restart, setRestart] = useState(config?.restart ?? "unless-stopped");
   const [healthType, setHealthType] = useState<string>(config?.health_check.type ?? "auto");
+  const [secretNames, setSecretNames] = useState<string[]>(config?.secrets ?? []);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -146,6 +151,7 @@ function EnvironmentForm({
         published_port: parseOptionalNumber(text("published_port")),
         bind_address: bindAddress as ServiceConfig["bind_address"],
         env: parseEnv(text("env")),
+        secrets: secretNames,
         volumes: parseVolumes(text("volumes")),
         restart: restart as ServiceConfig["restart"],
         memory_mb: parseOptionalNumber(text("memory_mb")),
@@ -322,6 +328,32 @@ function EnvironmentForm({
                     </Description>
                     <FieldError />
                   </TextField>
+                  <CheckboxGroup value={secretNames} onChange={setSecretNames} name="secrets">
+                    <Label>Secrets</Label>
+                    {secrets.isSuccess && secrets.data.length === 0 && (
+                      <Description>
+                        No secrets in this project yet. Add them in the project's Secrets tab.
+                      </Description>
+                    )}
+                    {/* A listed secret that was deleted still shows, so it can be unticked. */}
+                    {[...new Set([...(secrets.data ?? []).map((s) => s.name), ...secretNames])].map(
+                      (name) => (
+                        <Checkbox key={name} value={name}>
+                          <Checkbox.Control>
+                            <Checkbox.Indicator />
+                          </Checkbox.Control>
+                          <Checkbox.Content>
+                            <Label className="font-mono">{name}</Label>
+                          </Checkbox.Content>
+                        </Checkbox>
+                      ),
+                    )}
+                    <Description>
+                      The service receives each ticked secret as an environment variable of the same
+                      name at its next deployment.
+                    </Description>
+                    <FieldError />
+                  </CheckboxGroup>
                   <TextField name="volumes" defaultValue={volumesToText(config?.volumes ?? [])}>
                     <Label>Volumes</Label>
                     <TextArea rows={2} placeholder="app-data:/var/lib/app" />

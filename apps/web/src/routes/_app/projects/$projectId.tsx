@@ -7,10 +7,11 @@ import { ApplicationsSection } from "../../../components/project/ApplicationsSec
 import { GitSection } from "../../../components/project/GitSection";
 import { MembersSection } from "../../../components/project/MembersSection";
 import { RegistriesSection } from "../../../components/project/RegistriesSection";
+import { SecretsSection } from "../../../components/project/SecretsSection";
 import { QueryError } from "../../../components/QueryError";
 import { RoleChip } from "../../../components/RoleChip";
 
-const tabs = ["applications", "git", "registries", "members"] as const;
+const tabs = ["applications", "git", "registries", "secrets", "members"] as const;
 type Tab = (typeof tabs)[number];
 
 const gitErrors: Record<string, string> = {
@@ -91,6 +92,10 @@ function ProjectPage() {
               Registries
               <Tabs.Indicator />
             </Tabs.Tab>
+            <Tabs.Tab id="secrets">
+              Secrets
+              <Tabs.Indicator />
+            </Tabs.Tab>
             <Tabs.Tab id="members">
               Members
               <Tabs.Indicator />
@@ -105,6 +110,9 @@ function ProjectPage() {
         </Tabs.Panel>
         <Tabs.Panel id="registries" className="pt-4">
           <RegistriesSection projectId={projectId} />
+        </Tabs.Panel>
+        <Tabs.Panel id="secrets" className="pt-4">
+          <SecretsSection projectId={projectId} />
         </Tabs.Panel>
         <Tabs.Panel id="members" className="pt-4">
           <MembersSection projectId={projectId} />
