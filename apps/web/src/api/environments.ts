@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
+import { pagedQuery } from "./paged";
 import type { JobStatus, List } from "./types";
 
 export type HealthCheck = {
@@ -127,6 +128,21 @@ export const releasesQuery = (environmentId: string, limit = 20) =>
     queryKey: ["environments", environmentId, "releases", { limit }],
     queryFn: ({ signal }) =>
       api<List<Release>>(`/environments/${environmentId}/releases?limit=${limit}`, { signal }),
+  });
+
+export const deploymentListQuery = (environmentId: string) =>
+  pagedQuery<Deployment>({
+    key: ["environments", environmentId, "deployments"],
+    path: `/environments/${environmentId}/deployments`,
+    // Loaded pages are refetched together, so an active deployment's stage stays current.
+    refetchInterval: (data) =>
+      data?.pages.some((page) => page.items.some(isDeploymentActive)) ? DEPLOYMENT_POLL_MS : false,
+  });
+
+export const releaseListQuery = (environmentId: string) =>
+  pagedQuery<Release>({
+    key: ["environments", environmentId, "releases"],
+    path: `/environments/${environmentId}/releases`,
   });
 
 export function deployBuild(environmentId: string, buildJobId: string) {

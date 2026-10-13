@@ -1,19 +1,21 @@
 import { Card } from "@heroui/react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { applicationQuery } from "../../../api/applications";
 import {
   type Deployment,
-  deploymentsQuery,
+  deploymentListQuery,
   environmentQuery,
   isDeploymentActive,
   releasesQuery,
 } from "../../../api/environments";
+import { loadedItems } from "../../../api/paged";
 import { serversQuery } from "../../../api/servers";
 import { DeploymentFailure } from "../../../components/environment/DeploymentFailure";
 import { DeploymentStages } from "../../../components/environment/DeploymentStages";
 import { ReleaseHistory } from "../../../components/environment/ReleaseHistory";
 import { JobStatusChip } from "../../../components/JobStatusChip";
+import { LoadMore } from "../../../components/LoadMore";
 import { QueryBoundary, StaleNotice, waitingFor } from "../../../components/QueryBoundary";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { duration } from "../../../lib/describeJob";
@@ -111,15 +113,18 @@ function CurrentRelease({ environmentId }: { environmentId: string }) {
 }
 
 function Deployments({ environmentId }: { environmentId: string }) {
-  const deployments = useQuery(deploymentsQuery(environmentId));
-  useRefreshReleases(environmentId, deployments.data?.items.some(isDeploymentActive) ?? false);
+  const deployments = useInfiniteQuery(deploymentListQuery(environmentId));
+  useRefreshReleases(
+    environmentId,
+    deployments.data?.pages.some((page) => page.items.some(isDeploymentActive)) ?? false,
+  );
   return (
     <section aria-label="Deployments" className="flex flex-col gap-3">
       <h2 className="text-base font-semibold">Deployments</h2>
       <QueryBoundary
         query={deployments}
         label="deployments"
-        isEmpty={(data) => data.items.length === 0}
+        isEmpty={(data) => loadedItems(data).length === 0}
         empty={
           <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
             No deployments yet.
@@ -129,13 +134,14 @@ function Deployments({ environmentId }: { environmentId: string }) {
         {(data) => (
           <Card className="p-0">
             <ul className="divide-y divide-[var(--separator)]">
-              {data.items.map((d) => (
+              {loadedItems(data).map((d) => (
                 <DeploymentRow key={d.id} deployment={d} />
               ))}
             </ul>
           </Card>
         )}
       </QueryBoundary>
+      <LoadMore query={deployments} />
     </section>
   );
 }

@@ -69,12 +69,16 @@ SELECT projects.id, projects.name, projects.slug, projects.created_by, projects.
 FROM projects
 JOIN project_members ON project_members.project_id = projects.id
 WHERE project_members.user_id = $1
+  AND ($2::text IS NULL
+       OR projects.name ILIKE '%' || $2::text || '%'
+       OR projects.slug ILIKE '%' || $2::text || '%')
 ORDER BY projects.name, projects.id
-LIMIT $3 OFFSET $2
+LIMIT $4 OFFSET $3
 `
 
 type ListProjectsForUserParams struct {
 	UserID     uuid.UUID
+	Search     *string
 	PageOffset int32
 	PageLimit  int32
 }
@@ -85,7 +89,12 @@ type ListProjectsForUserRow struct {
 }
 
 func (q *Queries) ListProjectsForUser(ctx context.Context, arg ListProjectsForUserParams) ([]ListProjectsForUserRow, error) {
-	rows, err := q.db.Query(ctx, listProjectsForUser, arg.UserID, arg.PageOffset, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listProjectsForUser,
+		arg.UserID,
+		arg.Search,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

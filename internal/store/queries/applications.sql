@@ -16,6 +16,9 @@ SELECT * FROM applications WHERE id = $1;
 -- name: ListApplications :many
 SELECT * FROM applications
 WHERE project_id = @project_id
+  AND (sqlc.narg(search)::text IS NULL
+       OR name ILIKE '%' || sqlc.narg(search)::text || '%'
+       OR repository_full_name ILIKE '%' || sqlc.narg(search)::text || '%')
 ORDER BY name, id
 LIMIT @page_limit OFFSET @page_offset;
 

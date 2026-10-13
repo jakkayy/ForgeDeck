@@ -219,18 +219,27 @@ func (q *Queries) GetApplication(ctx context.Context, id uuid.UUID) (Application
 const listApplications = `-- name: ListApplications :many
 SELECT id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at, registry_connection_id, image_repository FROM applications
 WHERE project_id = $1
+  AND ($2::text IS NULL
+       OR name ILIKE '%' || $2::text || '%'
+       OR repository_full_name ILIKE '%' || $2::text || '%')
 ORDER BY name, id
-LIMIT $3 OFFSET $2
+LIMIT $4 OFFSET $3
 `
 
 type ListApplicationsParams struct {
 	ProjectID  uuid.UUID
+	Search     *string
 	PageOffset int32
 	PageLimit  int32
 }
 
 func (q *Queries) ListApplications(ctx context.Context, arg ListApplicationsParams) ([]Application, error) {
-	rows, err := q.db.Query(ctx, listApplications, arg.ProjectID, arg.PageOffset, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listApplications,
+		arg.ProjectID,
+		arg.Search,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

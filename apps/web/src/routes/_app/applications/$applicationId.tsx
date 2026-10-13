@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Modal, toast } from "@heroui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import {
@@ -11,12 +11,14 @@ import {
 } from "../../../api/applications";
 import { isApiError } from "../../../api/client";
 import { listJobs } from "../../../api/jobs";
+import { loadedItems } from "../../../api/paged";
 import { registriesQuery } from "../../../api/registries";
 import type { Job } from "../../../api/types";
 import { ApiForm } from "../../../components/ApiForm";
 import { ImageFields, type ImageValue } from "../../../components/application/ImageFields";
 import { EnvironmentsSection } from "../../../components/environment/EnvironmentsSection";
 import { JobStatusChip } from "../../../components/JobStatusChip";
+import { LoadMore } from "../../../components/LoadMore";
 import { QueryBoundary, StaleNotice, waitingFor } from "../../../components/QueryBoundary";
 import { duration } from "../../../lib/describeJob";
 import { timeAgo } from "../../../lib/time";
@@ -195,11 +197,15 @@ function EditImageDialog({ app }: { app: Application }) {
 const isActive = (job: Job) => job.status === "queued" || job.status === "running";
 
 function BuildHistory({ app }: { app: Application }) {
-  const builds = useQuery({
-    queryKey: ["jobs", { application_id: app.id, type: "build" }],
-    queryFn: ({ signal }) => listJobs({ application_id: app.id, type: "build", limit: 20 }, signal),
+  const builds = useInfiniteQuery({
+    queryKey: ["jobs", "builds", app.id],
+    queryFn: ({ pageParam, signal }) =>
+      listJobs({ application_id: app.id, type: "build", cursor: pageParam }, signal),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
     // Refresh only while a build is still in progress.
-    refetchInterval: (query) => (query.state.data?.items.some(isActive) ? ACTIVE_POLL_MS : false),
+    refetchInterval: (query) =>
+      query.state.data?.pages.some((page) => page.items.some(isActive)) ? ACTIVE_POLL_MS : false,
   });
 
   return (
@@ -208,7 +214,7 @@ function BuildHistory({ app }: { app: Application }) {
       <QueryBoundary
         query={builds}
         label="builds"
-        isEmpty={(data) => data.items.length === 0}
+        isEmpty={(data) => loadedItems(data).length === 0}
         empty={
           <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
             No builds yet. Push to {app.branch} or start one with the Build button.
@@ -218,13 +224,14 @@ function BuildHistory({ app }: { app: Application }) {
         {(data) => (
           <Card className="p-0">
             <ul className="divide-y divide-[var(--separator)]">
-              {data.items.map((job) => (
+              {loadedItems(data).map((job) => (
                 <BuildRow key={job.id} job={job} />
               ))}
             </ul>
           </Card>
         )}
       </QueryBoundary>
+      <LoadMore query={builds} />
     </section>
   );
 }

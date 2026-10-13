@@ -2,6 +2,7 @@ package applications_test
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/google/uuid"
@@ -199,4 +200,22 @@ func TestApplicationImageSettings(t *testing.T) {
 		RequireStatus(http.StatusCreated).Decode(&foreign)
 	f.owner.Do(http.MethodPatch, path, map[string]any{"registry_connection_id": foreign.ID, "image_repository": "acme/api"}).
 		RequireStatus(http.StatusNotFound)
+}
+
+func TestListApplicationsFiltersByNameOrRepository(t *testing.T) {
+	f := newFixture(t)
+	f.create(t, map[string]any{"name": "Storefront"}).RequireStatus(http.StatusCreated)
+	f.create(t, map[string]any{"name": "Worker"}).RequireStatus(http.StatusCreated)
+
+	count := func(query string) int {
+		var list httpx.List[applications.Application]
+		f.owner.Do(http.MethodGet, "/api/v1/projects/"+f.projectID.String()+"/applications?q="+url.QueryEscape(query), nil).
+			RequireStatus(http.StatusOK).Decode(&list)
+		return len(list.Items)
+	}
+	for query, want := range map[string]int{"store": 1, "WORK": 1, "acme/shop": 2, "zzz": 0, "": 2} {
+		if got := count(query); got != want {
+			t.Errorf("q=%q: %d applications, want %d", query, got, want)
+		}
+	}
 }

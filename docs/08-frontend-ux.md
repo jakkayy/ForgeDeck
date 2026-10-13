@@ -77,6 +77,8 @@ Each row should make it easy to scan:
 
 Use pagination or filtering for large lists.
 
+Every list that can grow loads 25 rows at a time with **Load more**: projects, servers, applications, builds, deployments, releases, jobs, and the audit log. Searchable lists (projects, servers, applications) have a search field that asks the API after 300 ms without typing, so the filter applies to everything, not only the rows already loaded; servers also filter by status, and jobs by status and type. The previous rows stay on screen while a new filter loads, and an empty result says that nothing *matches* rather than that nothing exists. Pickers inside dialogs (a project or a server to choose) show the first 100 entries.
+
 ## 6. Application detail
 
 Show:

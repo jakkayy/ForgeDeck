@@ -18,22 +18,30 @@ const statuses: (JobStatus | "all")[] = [
   "cancelled",
 ];
 
+const jobTypes = [
+  { id: "build", label: "Builds" },
+  { id: "deploy_image", label: "Deployments" },
+  { id: "container_action", label: "Container actions" },
+  { id: "fetch_logs", label: "Log fetches" },
+];
+
 export const Route = createFileRoute("/_app/jobs/")({
-  validateSearch: (search: Record<string, unknown>): { status?: JobStatus } => ({
+  validateSearch: (search: Record<string, unknown>): { status?: JobStatus; type?: string } => ({
     status:
       statuses.includes(search.status as JobStatus) && search.status !== "all"
         ? (search.status as JobStatus)
         : undefined,
+    type: jobTypes.some((t) => t.id === search.type) ? (search.type as string) : undefined,
   }),
   component: JobsPage,
 });
 
 function JobsPage() {
-  const { status } = Route.useSearch();
+  const { status, type } = Route.useSearch();
   const navigate = Route.useNavigate();
   const jobs = useInfiniteQuery({
-    queryKey: ["jobs", { status }],
-    queryFn: ({ pageParam, signal }) => listJobs({ status, cursor: pageParam }, signal),
+    queryKey: ["jobs", { status, type }],
+    queryFn: ({ pageParam, signal }) => listJobs({ status, type, cursor: pageParam }, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
     // Only this page polls, and only the first page while it is open.
@@ -46,29 +54,61 @@ function JobsPage() {
         title="Jobs"
         description="Builds and server operations, newest first."
         actions={
-          <Select
-            aria-label="Filter by status"
-            className="w-40"
-            selectedKey={status ?? "all"}
-            onSelectionChange={(key) =>
-              navigate({ search: { status: key === "all" ? undefined : (key as JobStatus) } })
-            }
-          >
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {statuses.map((s) => (
-                  <ListBox.Item key={s} id={s} textValue={s}>
-                    {s === "all" ? "All statuses" : s}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+          <div className="flex flex-wrap gap-2">
+            <Select
+              aria-label="Filter by type"
+              className="w-48"
+              selectedKey={type ?? "all"}
+              onSelectionChange={(key) =>
+                navigate({
+                  search: (prev) => ({ ...prev, type: key === "all" ? undefined : String(key) }),
+                })
+              }
+            >
+              <Select.Trigger>
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {[{ id: "all", label: "All types" }, ...jobTypes].map((t) => (
+                    <ListBox.Item key={t.id} id={t.id} textValue={t.label}>
+                      {t.label}
+                      <ListBox.ItemIndicator />
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+            <Select
+              aria-label="Filter by status"
+              className="w-40"
+              selectedKey={status ?? "all"}
+              onSelectionChange={(key) =>
+                navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    status: key === "all" ? undefined : (key as JobStatus),
+                  }),
+                })
+              }
+            >
+              <Select.Trigger>
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  {statuses.map((s) => (
+                    <ListBox.Item key={s} id={s} textValue={s}>
+                      {s === "all" ? "All statuses" : s}
+                      <ListBox.ItemIndicator />
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </div>
         }
       />
       <QueryBoundary
@@ -77,7 +117,9 @@ function JobsPage() {
         isEmpty={(data) => data.pages[0]?.items.length === 0}
         empty={
           <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-            No jobs yet. They appear when you push code or operate a container.
+            {status || type
+              ? "No jobs match these filters."
+              : "No jobs yet. They appear when you push code or operate a container."}
           </Card>
         }
       >

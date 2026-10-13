@@ -1,38 +1,55 @@
 import { AlertDialog, Button, Card, toast } from "@heroui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type Application, applicationsQuery, deleteApplication } from "../../api/applications";
+import { useState } from "react";
+import {
+  type Application,
+  applicationListQuery,
+  applicationsQuery,
+  deleteApplication,
+} from "../../api/applications";
+import { loadedItems } from "../../api/paged";
+import { useDebouncedValue } from "../../lib/useDebouncedValue";
 import { useHasRole } from "../../lib/useHasRole";
+import { LoadMore } from "../LoadMore";
 import { QueryBoundary } from "../QueryBoundary";
+import { SearchBox } from "../SearchBox";
 import { NewApplicationDialog } from "./NewApplicationDialog";
 
 /** The project's applications and what each builds from. */
 export function ApplicationsSection({ projectId }: { projectId: string }) {
-  const apps = useQuery(applicationsQuery(projectId));
+  const [search, setSearch] = useState("");
+  const q = useDebouncedValue(search.trim()) || undefined;
+  const apps = useInfiniteQuery(applicationListQuery(projectId, q));
   const canManage = useHasRole(projectId, "admin");
 
   return (
     <section aria-label="Applications" className="flex flex-col gap-3">
-      {canManage && (
-        <div className="flex justify-end">
-          <NewApplicationDialog projectId={projectId} />
-        </div>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SearchBox
+          label="Search applications"
+          placeholder="Search by name or repository"
+          value={search}
+          onChange={setSearch}
+        />
+        {canManage && <NewApplicationDialog projectId={projectId} />}
+      </div>
       <QueryBoundary
         query={apps}
         label="applications"
-        isEmpty={(data) => data.items.length === 0}
+        isEmpty={(data) => loadedItems(data).length === 0}
         empty={
           <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-            No applications yet. An application builds a Docker image from one repository and branch
-            on every push, and pushes it to a registry.
+            {q
+              ? "No applications match."
+              : "No applications yet. An application builds a Docker image from one repository and branch on every push, and pushes it to a registry."}
           </Card>
         }
       >
         {(data) => (
           <Card className="p-0">
             <ul className="divide-y divide-[var(--separator)]">
-              {data.items.map((app) => (
+              {loadedItems(data).map((app) => (
                 <li key={app.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
                   <div className="min-w-48 flex-1">
                     <Link
@@ -58,6 +75,7 @@ export function ApplicationsSection({ projectId }: { projectId: string }) {
           </Card>
         )}
       </QueryBoundary>
+      <LoadMore query={apps} />
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
+import { pagedQuery } from "./paged";
 import type { ContainerList, EnrollmentToken, List, QueuedJob, Server } from "./types";
 
 /** Matches the Agent heartbeat interval, so status is never more than one beat behind. */
@@ -10,6 +11,14 @@ export const serversQuery = queryOptions({
   queryFn: ({ signal }) => api<List<Server>>("/servers?limit=100", { signal }),
   refetchInterval: SERVER_REFRESH_MS,
 });
+
+export const serverListQuery = (filter: { q?: string; status?: string }) =>
+  pagedQuery<Server>({
+    key: ["servers"],
+    path: "/servers",
+    params: filter,
+    refetchInterval: SERVER_REFRESH_MS,
+  });
 
 export function createEnrollmentToken(projectId: string, serverName: string) {
   return api<EnrollmentToken>(`/projects/${projectId}/servers/enrollment-tokens`, {

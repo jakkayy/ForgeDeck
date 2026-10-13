@@ -35,6 +35,7 @@
 @import "@heroui/styles/components/checkbox.css" layer(components);
 @import "@heroui/styles/components/checkbox-group.css" layer(components);
 @import "@heroui/styles/components/textarea.css" layer(components);
+@import "@heroui/styles/components/search-field.css" layer(components);
 
 /*
  * ForgeDeck design tokens on top of the HeroUI theme (unlayered, so they

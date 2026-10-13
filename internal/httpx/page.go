@@ -96,3 +96,21 @@ func DecodeTimeCursor(s string) (createdAt *time.Time, id *uuid.UUID, ok bool) {
 	t := time.UnixMicro(us)
 	return &t, &parsed, true
 }
+
+// maxSearchLength bounds ?q= so a filter cannot be used to send large patterns.
+const maxSearchLength = 100
+
+// ParseSearch reads ?q=, a case-insensitive "contains" filter. It returns nil
+// when there is none. LIKE wildcards in the text are escaped, so the user's
+// input only ever matches itself.
+func ParseSearch(r *http.Request) (*string, error) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		return nil, nil //nolint:nilnil // nil means "no filter"
+	}
+	if len([]rune(q)) > maxSearchLength {
+		return nil, BadRequest("invalid_query", "q is too long.")
+	}
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q)
+	return &escaped, nil
+}

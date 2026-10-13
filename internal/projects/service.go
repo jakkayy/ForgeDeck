@@ -167,9 +167,9 @@ func (s *Service) Delete(ctx context.Context, userID, projectID uuid.UUID, confi
 }
 
 // List returns the projects userID belongs to, ordered by name.
-func (s *Service) List(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]Project, error) {
+func (s *Service) List(ctx context.Context, userID uuid.UUID, search *string, limit, offset int32) ([]Project, error) {
 	rows, err := s.queries.ListProjectsForUser(ctx, store.ListProjectsForUserParams{
-		UserID: userID, PageLimit: limit, PageOffset: offset,
+		UserID: userID, Search: search, PageLimit: limit, PageOffset: offset,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list projects: %w", err)

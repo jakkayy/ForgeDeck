@@ -8,7 +8,9 @@ Base path: `/api/v1`
 - Use UTC timestamps in ISO 8601 format.
 - Authenticate browser requests with secure sessions.
 - Authorize every resource access server-side.
-- Paginate list endpoints.
+- Paginate list endpoints: `?limit=` (default 50, at most 100) and an opaque `?cursor=` taken from the previous response's `next_cursor`; `next_cursor` is `null` on the last page.
+- Lists that people search accept `?q=`, a case-insensitive "contains" filter of at most 100 characters (`400 invalid_query` beyond that); `%` and `_` in it are plain text. `GET /projects` matches name or slug, `GET /servers` the name (and also takes `?status=pending|online|unreachable|offline`, `400 invalid_status` otherwise), `GET /projects/{projectID}/applications` the name or repository. `GET /jobs` filters by `status`, `type`, `application_id`, `server_id`, and `project_id`.
+- A few small collections are returned whole, without a cursor: a project's registries, Git connections and secrets, and an application's environments. They are not expected to grow past a handful of rows; if that changes they need pagination first.
 - Validate request sizes and fields.
 - Do not return secret values after creation.
 - API examples are illustrative and must be finalized alongside implementation.

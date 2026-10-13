@@ -8,6 +8,9 @@ SELECT sqlc.embed(projects), project_members.role
 FROM projects
 JOIN project_members ON project_members.project_id = projects.id
 WHERE project_members.user_id = @user_id
+  AND (sqlc.narg(search)::text IS NULL
+       OR projects.name ILIKE '%' || sqlc.narg(search)::text || '%'
+       OR projects.slug ILIKE '%' || sqlc.narg(search)::text || '%')
 ORDER BY projects.name, projects.id
 LIMIT @page_limit OFFSET @page_offset;
 

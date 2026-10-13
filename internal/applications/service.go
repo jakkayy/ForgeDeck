@@ -147,11 +147,11 @@ func (s *Service) Get(ctx context.Context, userID, applicationID uuid.UUID) (App
 }
 
 // List returns a project's applications by name.
-func (s *Service) List(ctx context.Context, userID, projectID uuid.UUID, limit, offset int32) ([]Application, error) {
+func (s *Service) List(ctx context.Context, userID, projectID uuid.UUID, search *string, limit, offset int32) ([]Application, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ViewProject); err != nil {
 		return nil, err
 	}
-	rows, err := s.queries.ListApplications(ctx, store.ListApplicationsParams{ProjectID: projectID, PageLimit: limit, PageOffset: offset})
+	rows, err := s.queries.ListApplications(ctx, store.ListApplicationsParams{ProjectID: projectID, Search: search, PageLimit: limit, PageOffset: offset})
 	if err != nil {
 		return nil, fmt.Errorf("list applications: %w", err)
 	}

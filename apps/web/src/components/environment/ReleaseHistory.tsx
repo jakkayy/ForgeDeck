@@ -1,16 +1,18 @@
 import { AlertDialog, Button, Card, Chip, toast } from "@heroui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type Release, releasesQuery, rollbackRelease } from "../../api/environments";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { type Release, releaseListQuery, rollbackRelease } from "../../api/environments";
+import { loadedItems } from "../../api/paged";
 import { shortImage } from "../../lib/serviceConfig";
 import { timeAgo } from "../../lib/time";
 import { useHasRole } from "../../lib/useHasRole";
+import { LoadMore } from "../LoadMore";
 import { QueryBoundary } from "../QueryBoundary";
 
 type Props = { environmentId: string; projectId: string };
 
 /** Every release of an environment, newest first, each one a point to roll back to. */
 export function ReleaseHistory({ environmentId, projectId }: Props) {
-  const releases = useQuery(releasesQuery(environmentId, 50));
+  const releases = useInfiniteQuery(releaseListQuery(environmentId));
   const canDeploy = useHasRole(projectId, "developer");
 
   return (
@@ -19,7 +21,7 @@ export function ReleaseHistory({ environmentId, projectId }: Props) {
       <QueryBoundary
         query={releases}
         label="releases"
-        isEmpty={(data) => data.items.length === 0}
+        isEmpty={(data) => loadedItems(data).length === 0}
         empty={
           <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
             No releases yet. A release is recorded when a deployment passes its health check.
@@ -29,7 +31,7 @@ export function ReleaseHistory({ environmentId, projectId }: Props) {
         {(data) => (
           <Card className="p-0">
             <ul className="divide-y divide-[var(--separator)]">
-              {data.items.map((release) => (
+              {loadedItems(data).map((release) => (
                 <li
                   key={release.id}
                   className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3"
@@ -52,6 +54,7 @@ export function ReleaseHistory({ environmentId, projectId }: Props) {
           </Card>
         )}
       </QueryBoundary>
+      <LoadMore query={releases} />
     </section>
   );
 }

@@ -54,10 +54,19 @@ func (s *Service) Get(ctx context.Context, userID, serverID uuid.UUID) (Server, 
 	return s.toServer(row.Server, row.ProjectName), nil
 }
 
+// ListFilter narrows a server list. Search is a LIKE-escaped substring of the
+// name; Status is one of the connectivity statuses.
+type ListFilter struct {
+	Search *string
+	Status *string
+}
+
 // ListForUser returns servers across every project the user belongs to.
-func (s *Service) ListForUser(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]Server, error) {
+func (s *Service) ListForUser(ctx context.Context, userID uuid.UUID, filter ListFilter, limit, offset int32) ([]Server, error) {
+	online, unreachable := ConnectivityCutoffs(s.now())
 	rows, err := s.queries.ListServersForUser(ctx, store.ListServersForUserParams{
-		UserID: userID, PageLimit: limit, PageOffset: offset,
+		UserID: userID, Search: filter.Search, Status: filter.Status,
+		OnlineAfter: online, UnreachableAfter: unreachable, PageLimit: limit, PageOffset: offset,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list servers: %w", err)

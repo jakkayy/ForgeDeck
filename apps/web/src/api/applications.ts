@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
+import { pagedQuery } from "./paged";
 import type { JobStatus, List } from "./types";
 
 export type Application = {
@@ -53,6 +54,13 @@ export const applicationsQuery = (projectId: string) =>
     queryKey: ["projects", projectId, "applications"],
     queryFn: ({ signal }) =>
       api<List<Application>>(`/projects/${projectId}/applications?limit=100`, { signal }),
+  });
+
+export const applicationListQuery = (projectId: string, q?: string) =>
+  pagedQuery<Application>({
+    key: ["projects", projectId, "applications"],
+    path: `/projects/${projectId}/applications`,
+    params: { q },
   });
 
 export const applicationQuery = (applicationId: string) =>
