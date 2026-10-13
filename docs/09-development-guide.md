@@ -34,6 +34,14 @@ For a Runner: `make create-runner NAME=build-01`, then
 `FORGEDECK_RUNNER_CREDENTIAL=fdr_… make run-runner` (optional `URL=` and `WORK_DIR=`).
 `make build` produces the single-binary build in `bin/`; `make db-down` stops PostgreSQL.
 
+## 2b. End-to-end test
+
+`internal/e2e` runs the product's golden path with real components: a webhook push, the Runner (git over HTTP, BuildKit build, tests, push to a throwaway registry), an Agent managing the local Docker through Compose, an automatic deployment with an HTTP health check, a second version, a version that never becomes healthy (the previous one must keep serving and no release may be recorded), and a rollback. It needs Docker, the Compose plugin, git and git-http-backend, so it runs only with `FORGEDECK_TEST_DOCKER=1` (about 80 seconds):
+
+```sh
+FORGEDECK_TEST_DOCKER=1 go test ./internal/e2e/
+```
+
 ## 3. Suggested repository layout
 
 ```text
