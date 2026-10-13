@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"github.com/jakkayy/ForgeDeck/internal/auth"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
@@ -22,6 +23,7 @@ func NewHandler(svc *Service) *Handler {
 
 // Routes mounts the job endpoints on r.
 func (h *Handler) Routes(r chi.Router) {
+	r.Get("/jobs", httpx.Handle(h.history))
 	r.Get("/jobs/{jobID}", httpx.Handle(h.get))
 	r.Get("/jobs/{jobID}/logs", httpx.Handle(h.logs))
 	r.Post("/jobs/{jobID}/cancel", httpx.Handle(h.cancel))
@@ -37,6 +39,57 @@ func (h *Handler) cancel(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.WriteJSON(w, http.StatusOK, job)
+}
+
+var validStatuses = map[Status]bool{
+	StatusQueued: true, StatusRunning: true, StatusSucceeded: true, StatusFailed: true, StatusCancelled: true,
+}
+
+// history lists jobs newest first, filtered by ?project_id=, ?application_id=,
+// ?server_id=, ?status=, ?type=, and paged with ?cursor=.
+func (h *Handler) history(w http.ResponseWriter, r *http.Request) error {
+	limit, err := httpx.ParseLimit(r)
+	if err != nil {
+		return err
+	}
+	q := r.URL.Query()
+	after, ok := DecodeHistoryCursor(q.Get("cursor"))
+	if !ok {
+		return httpx.BadRequest("invalid_cursor", "cursor is not valid.")
+	}
+	var filter Filter
+	for name, dst := range map[string]**uuid.UUID{
+		"project_id": &filter.ProjectID, "application_id": &filter.ApplicationID, "server_id": &filter.ServerID,
+	} {
+		if raw := q.Get(name); raw != "" {
+			id, err := uuid.Parse(raw)
+			if err != nil {
+				return httpx.BadRequest("invalid_filter", name+" must be a UUID.")
+			}
+			*dst = &id
+		}
+	}
+	if raw := q.Get("status"); raw != "" {
+		status := Status(raw)
+		if !validStatuses[status] {
+			return httpx.BadRequest("invalid_filter", "status must be queued, running, succeeded, failed or cancelled.")
+		}
+		filter.Status = &status
+	}
+	if raw := q.Get("type"); raw != "" {
+		filter.Type = &raw
+	}
+
+	jobs, next, err := h.svc.History(r.Context(), auth.UserFrom(r.Context()).ID, filter, after, limit)
+	if err != nil {
+		return err
+	}
+	list := httpx.List[Job]{Items: jobs}
+	if next != nil {
+		cursor := next.Encode()
+		list.NextCursor = &cursor
+	}
+	return httpx.WriteJSON(w, http.StatusOK, list)
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
@@ -58,7 +111,7 @@ func (h *Handler) logs(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	page, err := httpx.ParsePage(r)
+	limit, err := httpx.ParseLimit(r)
 	if err != nil {
 		return err
 	}
@@ -66,7 +119,7 @@ func (h *Handler) logs(w http.ResponseWriter, r *http.Request) error {
 	if !ok {
 		return httpx.BadRequest("invalid_cursor", "after must look like <attempt>.<sequence>.")
 	}
-	lines, err := h.svc.Logs(r.Context(), auth.UserFrom(r.Context()).ID, jobID, after, page.Limit)
+	lines, err := h.svc.Logs(r.Context(), auth.UserFrom(r.Context()).ID, jobID, after, limit)
 	if err != nil {
 		return err
 	}

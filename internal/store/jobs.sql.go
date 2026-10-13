@@ -472,6 +472,85 @@ func (q *Queries) ListJobLogs(ctx context.Context, arg ListJobLogsParams) ([]Lis
 	return items, nil
 }
 
+const listJobsForUser = `-- name: ListJobsForUser :many
+SELECT jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id FROM jobs
+JOIN project_members ON project_members.project_id = jobs.project_id AND project_members.user_id = $1
+WHERE ($2::uuid IS NULL OR jobs.project_id = $2::uuid)
+  AND ($3::uuid IS NULL OR jobs.application_id = $3::uuid)
+  AND ($4::uuid IS NULL OR jobs.target_server_id = $4::uuid)
+  AND ($5::text IS NULL OR jobs.status = $5::text)
+  AND ($6::text IS NULL OR jobs.type = $6::text)
+  AND ($7::timestamptz IS NULL
+       OR (jobs.created_at, jobs.id) < ($7::timestamptz, $8::uuid))
+ORDER BY jobs.created_at DESC, jobs.id DESC
+LIMIT $9
+`
+
+type ListJobsForUserParams struct {
+	UserID          uuid.UUID
+	ProjectID       *uuid.UUID
+	ApplicationID   *uuid.UUID
+	ServerID        *uuid.UUID
+	Status          *string
+	Type            *string
+	BeforeCreatedAt *time.Time
+	BeforeID        *uuid.UUID
+	PageLimit       int32
+}
+
+// Newest first, only in projects the user belongs to. The cursor is the
+// (created_at, id) of the last job on the previous page.
+func (q *Queries) ListJobsForUser(ctx context.Context, arg ListJobsForUserParams) ([]Job, error) {
+	rows, err := q.db.Query(ctx, listJobsForUser,
+		arg.UserID,
+		arg.ProjectID,
+		arg.ApplicationID,
+		arg.ServerID,
+		arg.Status,
+		arg.Type,
+		arg.BeforeCreatedAt,
+		arg.BeforeID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Job{}
+	for rows.Next() {
+		var i Job
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Type,
+			&i.WorkerKind,
+			&i.TargetServerID,
+			&i.Status,
+			&i.Payload,
+			&i.Result,
+			&i.ErrorCode,
+			&i.ErrorMessage,
+			&i.AttemptCount,
+			&i.MaxAttempts,
+			&i.LeaseOwner,
+			&i.LeaseExpiresAt,
+			&i.IdempotencyKey,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.ApplicationID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const notifyWorkers = `-- name: NotifyWorkers :exec
 SELECT pg_notify($1::text, $2::text)
 `

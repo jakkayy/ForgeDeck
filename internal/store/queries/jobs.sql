@@ -146,3 +146,18 @@ WITH target AS (
       AND target.status = 'running'
 )
 SELECT status FROM target;
+
+-- name: ListJobsForUser :many
+-- Newest first, only in projects the user belongs to. The cursor is the
+-- (created_at, id) of the last job on the previous page.
+SELECT jobs.* FROM jobs
+JOIN project_members ON project_members.project_id = jobs.project_id AND project_members.user_id = @user_id
+WHERE (sqlc.narg(project_id)::uuid IS NULL OR jobs.project_id = sqlc.narg(project_id)::uuid)
+  AND (sqlc.narg(application_id)::uuid IS NULL OR jobs.application_id = sqlc.narg(application_id)::uuid)
+  AND (sqlc.narg(server_id)::uuid IS NULL OR jobs.target_server_id = sqlc.narg(server_id)::uuid)
+  AND (sqlc.narg(status)::text IS NULL OR jobs.status = sqlc.narg(status)::text)
+  AND (sqlc.narg(type)::text IS NULL OR jobs.type = sqlc.narg(type)::text)
+  AND (sqlc.narg(before_created_at)::timestamptz IS NULL
+       OR (jobs.created_at, jobs.id) < (sqlc.narg(before_created_at)::timestamptz, sqlc.narg(before_id)::uuid))
+ORDER BY jobs.created_at DESC, jobs.id DESC
+LIMIT @page_limit;

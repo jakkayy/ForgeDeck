@@ -134,7 +134,7 @@ Never accept a client-supplied Docker socket, host address, or Docker API path.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/jobs` | Paginated job history |
+| GET | `/jobs` | Job history, newest first; filters `project_id`, `application_id`, `server_id`, `status`, `type`; keyset `cursor` |
 | GET | `/jobs/{jobID}` | Job detail |
 | GET | `/jobs/{jobID}/logs` | Stored log lines after a keyset cursor (`?after=<attempt>.<sequence>&limit=`) |
 | GET | `/jobs/{jobID}/events` | SSE stream for live logs/events |
