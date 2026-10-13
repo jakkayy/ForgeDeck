@@ -6,7 +6,8 @@ import { join } from "node:path";
 const KB = 1024;
 const budget = {
   initialJs: 130 * KB, // everything loaded before the first route renders
-  css: 15 * KB,
+  // Grows about 1–2 KB per HeroUI component in use; see docs/08 before raising.
+  css: 20 * KB,
   routeChunk: 60 * KB, // any lazily loaded chunk
 };
 
