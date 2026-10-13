@@ -127,23 +127,25 @@ function Stat({
   tone?: "danger";
   to?: "/servers";
 }) {
-  const body = (
-    <Card className="h-full gap-1 p-4">
-      <dt className="text-xs text-[var(--muted)]">{label}</dt>
+  return (
+    <Card className="relative h-full gap-1 p-4">
+      <dt className="text-xs text-[var(--muted)]">
+        {to ? (
+          // Stretched over the whole card, so the card is the click target.
+          <Link to={to} className="after:absolute after:inset-0 after:content-['']">
+            {label}
+          </Link>
+        ) : (
+          label
+        )}
+      </dt>
       <dd
         className={`text-2xl font-semibold tabular-nums ${tone === "danger" ? "text-[var(--danger)]" : ""}`}
       >
         {value}
       </dd>
-      {hint && <p className="text-xs text-[var(--muted)]">{hint}</p>}
+      {hint && <dd className="text-xs text-[var(--muted)]">{hint}</dd>}
     </Card>
-  );
-  return to ? (
-    <Link to={to} className="block">
-      {body}
-    </Link>
-  ) : (
-    <div>{body}</div>
   );
 }
 

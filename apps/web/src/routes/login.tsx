@@ -44,7 +44,7 @@ function LoginPage() {
     <main className="grid min-h-dvh place-items-center px-4">
       <Card className="w-full max-w-sm">
         <Card.Header>
-          <Card.Title className="text-xl font-semibold">Sign in to ForgeDeck</Card.Title>
+          <h1 className="card__title text-xl font-semibold">Sign in to ForgeDeck</h1>
           <Card.Description>Use the account your administrator created for you.</Card.Description>
         </Card.Header>
         <Card.Content>

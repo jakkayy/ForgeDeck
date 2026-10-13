@@ -71,7 +71,7 @@ function BuildSummary({ job }: { job: Job }) {
         <Link
           to="/applications/$applicationId"
           params={{ applicationId: payload.application_id }}
-          className="text-[var(--muted)] hover:text-[var(--foreground)] hover:underline"
+          className="text-[var(--muted)] underline underline-offset-2 hover:text-[var(--foreground)]"
         >
           Application
         </Link>
@@ -94,7 +94,7 @@ function DeploySummary({ job }: { job: Job }) {
       <Link
         to="/environments/$environmentId"
         params={{ environmentId: payload.environment_id }}
-        className="text-[var(--muted)] hover:text-[var(--foreground)] hover:underline"
+        className="text-[var(--muted)] underline underline-offset-2 hover:text-[var(--foreground)]"
       >
         Environment
       </Link>

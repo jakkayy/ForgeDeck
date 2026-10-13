@@ -98,7 +98,7 @@ function CurrentRelease({ environmentId }: { environmentId: string }) {
       <p className="text-xs text-[var(--muted)]">Running now</p>
       {current ? (
         <>
-          <p className="font-mono text-sm">
+          <p className="break-all font-mono text-sm">
             <code>{current.commit_sha.slice(0, 7)}</code> · {current.image_ref}
           </p>
           <p className="text-xs text-[var(--muted)]">Healthy since {timeAgo(current.created_at)}</p>
@@ -165,7 +165,7 @@ function DeploymentRow({ deployment }: { deployment: Deployment }) {
           <Link
             to="/jobs/$jobId"
             params={{ jobId: deployment.job_id }}
-            className="text-sm text-[var(--accent)] hover:underline"
+            className="text-sm text-[var(--link)] hover:underline"
           >
             Log
           </Link>

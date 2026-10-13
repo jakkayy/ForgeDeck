@@ -51,6 +51,43 @@
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
+/*
+ * Contrast fixes for the HeroUI defaults, which miss WCAG AA (4.5:1 for text):
+ * muted text on light surfaces, white on the accent and danger fills, and the
+ * soft success chip. Ratios were measured; keep them when changing a value.
+ * --link is accent as *text*: the fill color is too dark to read on a dark page.
+ */
+[data-theme="light"] {
+  --muted: oklch(0.48 0.0138 285.94);
+  --danger: oklch(0.56 0.23 26);
+  --success-soft-foreground: oklch(0.44 0.1 152);
+  --link: var(--accent);
+}
+
+[data-theme="dark"] {
+  --danger: oklch(0.57 0.2 24.63);
+  --link: oklch(0.72 0.15 253.83);
+}
+
+:root {
+  --accent: oklch(0.54 0.19 253.83);
+}
+
+/*
+ * People who ask their system for less motion get no pulsing or sliding.
+ * Unlayered, so it beats the layered component and utility styles without !important.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

@@ -177,7 +177,7 @@ How the dashboard implements them:
 ## 13. Performance
 
 - Split code per route so a page only loads what it uses.
-- Enforce a bundle size budget in CI (`bun run size`: initial JS ≤ 130 KB, CSS ≤ 20 KB, each route chunk ≤ 60 KB, all gzip). The CSS budget was raised from 15 KB in Phase 2: all component CSS ships in one global file and grows about 1–2 KB per HeroUI component used. Splitting component CSS per route is the next step if it keeps growing (Phase 6) and review it when adding dependencies. HeroUI and its animation dependency are the largest expected contributors; import components individually and measure.
+- Enforce a bundle size budget in CI (`bun run size`: initial JS ≤ 130 KB, CSS ≤ 22 KB, each route chunk ≤ 60 KB, all gzip). The CSS budget was raised from 15 KB in Phase 2 and from 20 KB in Phase 6 (the search field, scrollable tabs, and the skip link): all component CSS ships in one global file and grows about 1–2 KB per HeroUI component used. Splitting component CSS per route is the next step if it keeps growing (Phase 6) and review it when adding dependencies. HeroUI and its animation dependency are the largest expected contributors; import components individually and measure.
 - Serve hashed assets with long-lived cache headers and `index.html` with no-cache.
 - Fetch only the data needed for the current page.
 - Use pagination and server-side filtering.
@@ -199,6 +199,20 @@ These are targets, not guarantees.
 ## 14. Responsive behavior
 
 Prioritize desktop for server administration, while keeping core flows usable on tablet and mobile. On small screens, simplify tables and move secondary actions into a menu instead of forcing horizontal overflow.
+
+## 14a. Accessibility
+
+The target is WCAG 2.2 AA. What is in place, and how it was checked:
+
+- **Navigation:** a *Skip to content* link is the first tab stop. Because nothing reloads when the page changes, the document title follows the page's `<h1>` ("Servers · ForgeDeck") and keyboard focus moves to the start of the new page's content; neither happens on first load or for changes inside a page (tabs, filters).
+- **Landmarks and headings:** one `<main>`, a labelled main navigation, one `<h1>` per page (the sign-in page included).
+- **Contrast:** HeroUI's default muted text, white-on-accent and white-on-danger fills, and soft success chip fall short of 4.5:1, so `index.css` overrides them (`--muted`, `--accent`, `--danger`, `--success-soft-foreground`). Accent *text* uses `--link`, which is lighter in dark mode. The ratios were computed, not guessed; re-check them when changing a token. Status is never color alone: chips and the deployment tracker carry text ("failed", "Health check (failed)" for screen readers).
+- **Keyboard:** everything is reachable and operable by keyboard; dialogs trap focus, close on Escape, and return focus to the button that opened them. The scrollable log is focusable so its keys scroll it.
+- **Links in running text** are underlined, not distinguished by color.
+- **Motion:** with `prefers-reduced-motion`, animations and transitions are effectively off.
+- **Responsive:** no page scrolls sideways from 320 px up (long digests and image references wrap; the six project tabs scroll inside their own row).
+
+Checked with axe-core (WCAG 2.0/2.1/2.2 A and AA plus best-practice rules) in Chrome on every page and the main dialogs, in light and dark mode at 1280, 768, 375 and 320 px wide, with no violations left. One known exception: while react-aria announces a change to screen readers it briefly inserts hidden `role="img"` nodes with no text, which axe reports as `role-img-alt`; they are the library's own live-region mechanism and are removed again. Automated rules find roughly a third of accessibility problems: a manual pass with a screen reader is still owed before calling this done.
 
 ## 15. Open decisions
 

@@ -71,6 +71,8 @@ export function LogView({ lines }: { lines: LogLine[] }) {
         ref={scroller}
         role="log"
         aria-label="Log output"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be reachable by keyboard
+        tabIndex={0}
         onScroll={(event) => {
           const el = event.currentTarget;
           setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < FOLLOW_SLACK);
