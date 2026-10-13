@@ -14,6 +14,9 @@ export function AuditSection({ projectId }: { projectId: string }) {
     queryFn: ({ pageParam, signal }) => listAudit(projectId, { action, cursor: pageParam }, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
+    // People open this to see what just happened, so never show a cached copy.
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   const entries = events.data?.pages.flatMap((page) => page.items) ?? [];
 
