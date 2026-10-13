@@ -99,3 +99,29 @@ WHERE job_id = @job_id
   AND (attempt_number, sequence_number) > (@after_attempt::integer, @after_sequence::bigint)
 ORDER BY attempt_number, sequence_number
 LIMIT @page_limit;
+
+-- name: RecoverExpiredLeases :many
+-- Requeues running jobs whose worker stopped renewing the lease, or fails
+-- them when no attempts are left, and marks the abandoned attempt as lost.
+WITH expired AS (
+    SELECT stale.id FROM jobs AS stale
+    WHERE stale.status = 'running' AND stale.lease_expires_at < @now::timestamptz
+    FOR UPDATE SKIP LOCKED
+), recovered AS (
+    UPDATE jobs
+    SET status           = CASE WHEN jobs.attempt_count < jobs.max_attempts THEN 'queued' ELSE 'failed' END,
+        lease_expires_at = NULL,
+        error_code       = CASE WHEN jobs.attempt_count < jobs.max_attempts THEN NULL ELSE 'lease_expired' END,
+        error_message    = CASE WHEN jobs.attempt_count < jobs.max_attempts THEN NULL
+                                ELSE 'The worker stopped responding before the job finished.' END,
+        finished_at      = CASE WHEN jobs.attempt_count < jobs.max_attempts THEN NULL ELSE @now::timestamptz END
+    FROM expired
+    WHERE jobs.id = expired.id
+    RETURNING jobs.id, jobs.status, jobs.attempt_count, jobs.worker_kind, jobs.target_server_id
+), lost AS (
+    UPDATE job_attempts
+    SET status = 'lost', finished_at = @now::timestamptz
+    FROM recovered
+    WHERE job_attempts.job_id = recovered.id AND job_attempts.attempt_number = recovered.attempt_count
+)
+SELECT id, status, worker_kind, target_server_id FROM recovered;

@@ -452,6 +452,65 @@ func (q *Queries) NotifyWorkers(ctx context.Context, arg NotifyWorkersParams) er
 	return err
 }
 
+const recoverExpiredLeases = `-- name: RecoverExpiredLeases :many
+WITH expired AS (
+    SELECT stale.id FROM jobs AS stale
+    WHERE stale.status = 'running' AND stale.lease_expires_at < $1::timestamptz
+    FOR UPDATE SKIP LOCKED
+), recovered AS (
+    UPDATE jobs
+    SET status           = CASE WHEN jobs.attempt_count < jobs.max_attempts THEN 'queued' ELSE 'failed' END,
+        lease_expires_at = NULL,
+        error_code       = CASE WHEN jobs.attempt_count < jobs.max_attempts THEN NULL ELSE 'lease_expired' END,
+        error_message    = CASE WHEN jobs.attempt_count < jobs.max_attempts THEN NULL
+                                ELSE 'The worker stopped responding before the job finished.' END,
+        finished_at      = CASE WHEN jobs.attempt_count < jobs.max_attempts THEN NULL ELSE $1::timestamptz END
+    FROM expired
+    WHERE jobs.id = expired.id
+    RETURNING jobs.id, jobs.status, jobs.attempt_count, jobs.worker_kind, jobs.target_server_id
+), lost AS (
+    UPDATE job_attempts
+    SET status = 'lost', finished_at = $1::timestamptz
+    FROM recovered
+    WHERE job_attempts.job_id = recovered.id AND job_attempts.attempt_number = recovered.attempt_count
+)
+SELECT id, status, worker_kind, target_server_id FROM recovered
+`
+
+type RecoverExpiredLeasesRow struct {
+	ID             uuid.UUID
+	Status         string
+	WorkerKind     string
+	TargetServerID *uuid.UUID
+}
+
+// Requeues running jobs whose worker stopped renewing the lease, or fails
+// them when no attempts are left, and marks the abandoned attempt as lost.
+func (q *Queries) RecoverExpiredLeases(ctx context.Context, now time.Time) ([]RecoverExpiredLeasesRow, error) {
+	rows, err := q.db.Query(ctx, recoverExpiredLeases, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RecoverExpiredLeasesRow{}
+	for rows.Next() {
+		var i RecoverExpiredLeasesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Status,
+			&i.WorkerKind,
+			&i.TargetServerID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const renewJobLease = `-- name: RenewJobLease :one
 UPDATE jobs
 SET lease_expires_at = $1::timestamptz

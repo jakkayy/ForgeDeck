@@ -29,7 +29,8 @@ import (
 )
 
 // NewRouter wires every module and returns the root HTTP handler. It also
-// starts background work (the job notifier) that stops when ctx is cancelled.
+// starts background work (job notifier, lease recovery) that stops when ctx
+// is cancelled.
 func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.Handler {
 	authService := auth.NewService(store.New(pool), time.Now)
 	authHandler := auth.NewHandler(authService, cfg.CookieSecure)
@@ -40,6 +41,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	serverHandler := servers.NewHandler(serverService)
 	notifier := jobs.NewNotifier(pool, logger)
 	go notifier.Run(ctx)
+	go jobService.RunRecovery(ctx, logger)
 	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier)
 	var githubClient *github.Client
 	if cfg.GitHub != nil {
