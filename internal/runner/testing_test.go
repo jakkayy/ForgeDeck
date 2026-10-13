@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 )
 
 // recordLog collects job output for assertions.
@@ -58,4 +60,8 @@ func sourceRepo(t *testing.T, files map[string]string) (string, string) {
 	git("add", "--all")
 	git("commit", "--quiet", "--message", "initial")
 	return "file://" + dir, git("rev-parse", "HEAD")
+}
+
+func gitCredentials(url string) agentproto.GitCredentials {
+	return agentproto.GitCredentials{URL: url}
 }

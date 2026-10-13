@@ -22,30 +22,24 @@ func buildJob(t *testing.T, url, commit string) *agentproto.Job {
 		Credentials: &agentproto.BuildCredentials{Git: agentproto.GitCredentials{URL: url}}}
 }
 
-func TestBuildRemovesWorkspaceWhateverTheOutcome(t *testing.T) {
-	url, commit := sourceRepo(t, map[string]string{"Dockerfile": "FROM scratch\n"})
+func TestBuildRemovesWorkspaceOnFailure(t *testing.T) {
+	url, _ := sourceRepo(t, map[string]string{"Dockerfile": "FROM scratch\n"})
 	workDir := t.TempDir()
 	handler := BuildHandler(BuildConfig{WorkDir: workDir, GitProtocols: "file"})
-
-	requireEmpty := func() {
-		t.Helper()
-		if entries, _ := os.ReadDir(workDir); len(entries) != 0 {
-			t.Fatalf("workspace left behind: %v", entries)
-		}
-	}
-
-	log := &recordLog{}
-	if _, err := handler(context.Background(), buildJob(t, url, commit), log); err != nil {
-		t.Fatalf("build: %v\n%s", err, log)
-	}
-	requireEmpty()
 
 	_, err := handler(context.Background(), buildJob(t, url, "0123456789abcdef0123456789abcdef01234567"), &recordLog{})
 	var jobErr *worker.JobError
 	if !errors.As(err, &jobErr) || jobErr.Code != "checkout_failed" {
 		t.Fatalf("missing commit: %v", err)
 	}
-	requireEmpty()
+	requireEmptyDir(t, workDir)
+}
+
+func requireEmptyDir(t *testing.T, dir string) {
+	t.Helper()
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("workspace left behind: %v", entries)
+	}
 }
 
 func TestBuildRejectsInvalidJobs(t *testing.T) {

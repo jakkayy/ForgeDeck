@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/worker"
@@ -25,6 +26,7 @@ var (
 	errInvalidBuild = &worker.JobError{Code: "invalid_payload", Message: "The build job is not valid for this Runner."}
 	errNoCredential = &worker.JobError{Code: "missing_credentials", Message: "The Control Plane sent no repository credentials. Upgrade the Control Plane."}
 	errCheckout     = &worker.JobError{Code: "checkout_failed", Message: "The commit could not be fetched. See the build log."}
+	errImageBuild   = &worker.JobError{Code: "image_build_failed", Message: "The Docker image could not be built. See the build log."}
 )
 
 // BuildHandler runs build jobs in a fresh workspace that is removed when the
@@ -69,5 +71,18 @@ func (b *build) run(ctx context.Context) (any, error) {
 		b.log.Log("system", err.Error())
 		return nil, errCheckout
 	}
+
+	b.log.Log("system", "Building "+b.payload.DockerfilePath+" in "+b.payload.BuildContext)
+	if err := buildImage(ctx, b.exec, b.ws.src, b.payload.DockerfilePath, b.payload.BuildContext,
+		b.payload.CommitSHA, b.localTag()); err != nil {
+		b.log.Log("system", err.Error())
+		return nil, errImageBuild
+	}
 	return BuildResult{CommitSHA: b.payload.CommitSHA}, nil
+}
+
+// localTag names the image on the build host until it is pushed. It is
+// unique per workspace, so concurrent builds never share a tag.
+func (b *build) localTag() string {
+	return "forgedeck-build:" + filepath.Base(b.ws.root)
 }
