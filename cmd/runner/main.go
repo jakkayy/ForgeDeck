@@ -42,6 +42,7 @@ func run(args []string) error {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	controlPlaneURL := flags.String("url", os.Getenv("FORGEDECK_URL"), "Control Plane URL, e.g. https://forgedeck.example.com")
 	credentialFile := flags.String("credential-file", "", "file holding the Runner credential (default: $FORGEDECK_RUNNER_CREDENTIAL)")
+	workDir := flags.String("work-dir", "/var/lib/forgedeck-runner", "directory for per-job build workspaces")
 	allowInsecure := flags.Bool("allow-insecure", false, "allow a non-HTTPS Control Plane URL")
 	logLevel := flags.String("log-level", "info", "debug, info, warn or error")
 	if err := flags.Parse(args[1:]); err != nil {
@@ -56,6 +57,10 @@ func run(args []string) error {
 	}
 	logger, err := logging.New(os.Stderr, *logLevel, "text")
 	if err != nil {
+		return err
+	}
+
+	if err := runner.RemoveStaleWorkspaces(*workDir); err != nil {
 		return err
 	}
 
