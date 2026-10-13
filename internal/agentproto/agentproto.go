@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/jakkayy/ForgeDeck/internal/servicecfg"
 )
 
 // ProtocolVersion is the Agent protocol spoken by this build.
@@ -191,12 +193,36 @@ type CompleteRequest struct {
 	ErrorMessage string          `json:"error_message,omitempty"`
 }
 
-// Job types. Agents run container jobs; Runners run builds.
+// Job types. Agents run container and deployment jobs; Runners run builds.
 const (
 	JobContainerAction = "container_action"
 	JobFetchLogs       = "fetch_logs"
+	JobDeployImage     = "deploy_image"
 	JobBuild           = "build"
 )
+
+// BuildResult is a successful build's job result. Deployments use
+// ImageRef, which pins the exact image pushed.
+type BuildResult struct {
+	CommitSHA string `json:"commit_sha"`
+	Image     string `json:"image"`     // e.g. ghcr.io/acme/shop-api
+	Tag       string `json:"tag"`       // short commit SHA
+	Digest    string `json:"digest"`    // sha256:…
+	ImageRef  string `json:"image_ref"` // Image@Digest
+}
+
+// DeployImagePayload deploys one image digest to one environment on the
+// Agent's server. It never carries secrets: registry credentials are added
+// to the claimed job, not stored in the payload. The Agent re-validates
+// Config before rendering it.
+type DeployImagePayload struct {
+	DeploymentID  uuid.UUID         `json:"deployment_id"`
+	EnvironmentID uuid.UUID         `json:"environment_id"`
+	ApplicationID uuid.UUID         `json:"application_id"`
+	CommitSHA     string            `json:"commit_sha"`
+	ImageRef      string            `json:"image_ref"` // registry/repo@sha256:…
+	Config        servicecfg.Config `json:"config"`
+}
 
 // BuildPayload builds and pushes an image for one commit. The Runner checks
 // out exactly CommitSHA, never the moving branch.

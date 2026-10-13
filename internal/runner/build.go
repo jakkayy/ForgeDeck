@@ -28,16 +28,6 @@ const DefaultBuildTimeout = 20 * time.Minute
 
 const removeImagesTimeout = time.Minute
 
-// BuildResult is a successful build's job result. Deployments use
-// ImageRef, which pins the exact image pushed.
-type BuildResult struct {
-	CommitSHA string `json:"commit_sha"`
-	Image     string `json:"image"`     // e.g. ghcr.io/acme/shop-api
-	Tag       string `json:"tag"`       // short commit SHA
-	Digest    string `json:"digest"`    // sha256:…
-	ImageRef  string `json:"image_ref"` // Image@Digest
-}
-
 var (
 	errInvalidBuild = &worker.JobError{Code: "invalid_payload", Message: "The build job is not valid for this Runner."}
 	errNoCredential = &worker.JobError{Code: "missing_credentials", Message: "The Control Plane sent no repository credentials. Upgrade the Control Plane."}
@@ -124,7 +114,7 @@ func (b *build) run(ctx context.Context) (any, error) {
 		return nil, errPush
 	}
 	b.log.Log("system", "Pushed "+image+"@"+digest)
-	return BuildResult{CommitSHA: b.payload.CommitSHA, Image: image, Tag: tag, Digest: digest, ImageRef: image + "@" + digest}, nil
+	return agentproto.BuildResult{CommitSHA: b.payload.CommitSHA, Image: image, Tag: tag, Digest: digest, ImageRef: image + "@" + digest}, nil
 }
 
 // removeImages deletes the build's tags from the build host. The pushed

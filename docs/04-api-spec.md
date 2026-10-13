@@ -172,7 +172,7 @@ Never accept a client-supplied Docker socket, host address, or Docker API path.
 
 Follow it like any job (`GET /jobs/{jobID}`, `/events`). A succeeded build's `result` holds `image`, `tag`, `digest`, and `image_ref` ([14](14-runner.md)).
 
-A deployment request should specify a validated commit or previously built image, target environment, and optional safe configuration overrides. Do not accept arbitrary shell commands as a deployment payload.
+`POST /environments/{environmentID}/deployments` (developer or higher) takes `{ "build_job_id": "<uuid>" }`: a **succeeded build of the same application**, whose result holds an image digest. The deployment uses the environment's current configuration and the image's digest, never a tag. It returns `202` with the deployment (`status: queued`) and queues a `deploy_image` job for the environment's server, in one transaction. `422` if the build is not usable (still running, failed, another application's, or without a digest). A deployment follows its job: `queued → running → succeeded | failed`, with `error.code` and `error.message` on failure. `GET /deployments/{deploymentID}` and `GET /environments/{environmentID}/deployments` (paginated, newest first) read it. Rollback to a release is `POST /releases/{releaseID}/rollback`. Arbitrary shell commands are never accepted as a deployment payload.
 
 ## 8. Webhooks
 

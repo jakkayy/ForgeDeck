@@ -136,6 +136,7 @@ Retry policy (Phase 2): a job is retried only when its worker is lost (the lease
 | `container_action` | 1 | A restart that looked lost may have happened; repeating could restart twice |
 | `fetch_logs` | 2 | Read-only |
 | `build` | 2 | Pinned to one commit and keyed by it, so rebuilding is safe |
+| `deploy_image` | 2 | Pull plus `compose up` converges to the same state, so repeating is safe |
 
 A job that fails on its own (tests fail, Docker error) is not retried automatically.
 

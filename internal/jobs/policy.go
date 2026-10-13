@@ -13,6 +13,9 @@ var attemptsByType = map[string]int32{
 	agentproto.JobFetchLogs: 2,
 	// Builds are pinned to one commit and keyed by it, so rebuilding is safe.
 	agentproto.JobBuild: 2,
+	// Applying a deployment converges to the same state (pull, then compose
+	// up), so repeating one whose Agent was lost is safe.
+	agentproto.JobDeployImage: 2,
 }
 
 // maxAttempts returns the attempts for a job: the explicit value when set,

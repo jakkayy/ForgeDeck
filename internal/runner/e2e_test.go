@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/applications"
 	"github.com/jakkayy/ForgeDeck/internal/builds"
@@ -176,7 +177,7 @@ func TestSampleRepositoryBuilds(t *testing.T) {
 	if good.Status != jobs.StatusSucceeded {
 		t.Fatalf("good build %+v\n%s", good.Error, f.logs(t, good))
 	}
-	var result BuildResult
+	var result agentproto.BuildResult
 	if err := json.Unmarshal(good.Result, &result); err != nil {
 		t.Fatal(err)
 	}
