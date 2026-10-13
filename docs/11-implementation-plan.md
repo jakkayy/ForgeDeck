@@ -252,6 +252,16 @@ Added during Phase 2:
 | 3.15 | Runner setup ใน `deploy/runner` | `chore(runner): add isolated runner deployment setup` |
 | 3.16 | Test: build repo ตัวอย่างได้ และ test ล้มแล้ว job failed | `test(runner): add sample repository build test` |
 
+Added during Phase 3 (each shipped inside the commit of the item it supports, not as a separate commit):
+
+| # | งาน | อยู่ใน commit ของ |
+|---|---|---|
+| 3.4b | `applications.registry_connection_id` + `image_repository` และ field ที่ API/UI | 3.4 |
+| 3.5b | แยก client/heartbeat/worker loop ที่ Agent กับ Runner ใช้ร่วมกันเป็น `internal/worker` (Agent protocol ไม่เปลี่ยน; error code `agent_error` เปลี่ยนเป็น `worker_error`) | 3.5 |
+| 3.7b | Mint credential ตอน claim (GitHub token แบบ read-only เฉพาะ repo, registry password) และ fail attempt ทันทีถ้าทำไม่ได้ | 3.7, 3.10 |
+| 3.13b | Permission `builds.run` (developer ขึ้นไป) และ commit lookup ผ่าน provider API | 3.13 |
+| 3.14b | แท็บ Registries, หน้า Application, และแก้ layout ของ dialog ยาว (`ApiForm` เป็น `display: contents`) | 3.14 |
+
 ---
 
 ## Phase 4 — Deployment and releases
