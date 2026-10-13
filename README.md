@@ -58,14 +58,15 @@ bin/forgedeck-api serve  # เปิด http://localhost:8080
 
 ## ต่อ Agent (จัดการ Docker ของเครื่องอื่น)
 
-ใน UI ไปที่ **Servers > Add server** จะได้ token และคำสั่ง จากนั้นบนเครื่องปลายทาง:
+ใน UI ไปที่ **Servers > Add server** จะได้ token จากนั้นบนเครื่องปลายทาง (Linux + systemd + Docker + Compose plugin):
 
 ```sh
-bin/forgedeck-agent enroll --url https://forgedeck.example.com
-bin/forgedeck-agent run
+sudo FORGEDECK_ENROLLMENT_TOKEN=<token> deploy/agent/install.sh --url https://forgedeck.example.com --binary bin/forgedeck-agent
 ```
 
-ถ้า Control Plane ไม่ใช่ HTTPS (เช่นทดลองใน LAN) ให้เพิ่ม `--allow-insecure`
+ติดตั้งเป็น service ที่รันด้วย user เฉพาะ อัปเกรดได้โดยรันซ้ำ รายละเอียดและข้อควรระวังเรื่องสิทธิ์ใน [deploy/agent](deploy/agent/README.md)
+
+ทดลองแบบไม่ติดตั้ง service: `bin/forgedeck-agent enroll --url http://localhost:8080 --allow-insecure` แล้ว `bin/forgedeck-agent run` (ถ้า Control Plane ไม่ใช่ HTTPS ต้องเพิ่ม `--allow-insecure`)
 
 ## ต่อ Runner (build image)
 
