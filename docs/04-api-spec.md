@@ -120,6 +120,7 @@ Servers belong to a project. Every server-scoped endpoint resolves the project t
 | POST | `/projects/{projectID}/servers/enrollment-tokens` | Create short-lived enrollment token bound to the project |
 | GET | `/servers/{serverID}` | Server detail |
 | DELETE | `/servers/{serverID}` | Remove/revoke server access |
+| POST | `/servers/{serverID}/credential-rotation` | Ask the server's Agent to rotate its credential at its next heartbeat (admin) |
 | GET | `/servers/{serverID}/containers` | List containers from the latest snapshot |
 | POST | `/servers/{serverID}/containers/{containerID}/actions` | Queue start/stop/restart (`container_action` job) |
 | POST | `/servers/{serverID}/containers/{containerID}/logs` | Queue a bounded log fetch (`fetch_logs` job); developer or higher, as is reading the job's `/logs` and `/events` |
@@ -208,7 +209,8 @@ These endpoints are machine-to-machine and require Agent authentication:
 | Method | Endpoint | Purpose |
 |---|---|---|
 | POST | `/agent/enroll` | Exchange enrollment token for Agent credential |
-| POST | `/agent/heartbeat` | Liveness, version, resource summary |
+| POST | `/agent/heartbeat` | Liveness, version, resource summary; the response may ask the Agent to rotate its credential |
+| POST | `/agent/rotate-credential` | Replace the Agent's credential; the old one works for a 15-minute grace period |
 | POST | `/agent/containers/snapshot` | Replace the server's container snapshot |
 | POST | `/agent/jobs/claim` | Long-poll for the next job targeted at this server |
 | POST | `/agent/jobs/{jobID}/heartbeat` | Renew job lease |

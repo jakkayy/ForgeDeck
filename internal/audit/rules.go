@@ -55,6 +55,7 @@ var Rules = map[string]Rule{
 
 	"POST " + api + "/projects/{projectID}/servers/enrollment-tokens": {Action: "enrollment_token.create", TargetType: "server", Kind: KindProject, Param: "projectID", FromResponse: true},
 	"DELETE " + api + "/servers/{serverID}":                           {Action: "server.delete", TargetType: "server", Kind: KindServer, Param: "serverID"},
+	"POST " + api + "/servers/{serverID}/credential-rotation":         {Action: "server.credential_rotation_request", TargetType: "server", Kind: KindServer, Param: "serverID"},
 	"POST " + api + "/servers/{serverID}/containers/{containerID}/actions": {
 		Action: "container.action", TargetType: "container", Kind: KindServer, Param: "serverID", TargetIDParam: "containerID", RequestFields: []string{"action"},
 	},
@@ -87,6 +88,9 @@ var Rules = map[string]Rule{
 	},
 	"POST " + api + "/releases/{releaseID}/rollback": {Action: "release.rollback", TargetType: "release", Kind: KindRelease, Param: "releaseID", TargetIDParam: "releaseID"},
 	"POST " + api + "/jobs/{jobID}/cancel":           {Action: "job.cancel", TargetType: "job", Kind: KindJob, Param: "jobID", TargetIDParam: "jobID"},
+
+	// An Agent replacing its credential: the server is named in the response.
+	"POST " + api + "/agent/rotate-credential": {Action: "server.credential_rotate", TargetType: "server", Actor: ActorAgent, ResponseServer: true},
 
 	// An Agent exchanging its enrollment token: the server is named in the response.
 	"POST " + api + "/agent/enroll": {Action: "server.enroll", TargetType: "server", Actor: ActorAgent, ResponseServer: true},

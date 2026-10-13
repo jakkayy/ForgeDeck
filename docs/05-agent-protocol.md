@@ -200,6 +200,22 @@ When an Agent is revoked:
 
 A disconnected Agent cannot receive a revocation message immediately, so jobs should use short leases and sensitive operations should revalidate authorization as appropriate. A pending long-poll claim from a revoked Agent must be ended without returning a job.
 
+### Credential rotation
+
+An Agent replaces its credential without being re-enrolled. The Control Plane decides when, and tells the Agent in the heartbeat response (`rotate_credential: true`) when:
+
+- the credential is **older than 90 days**;
+- an **administrator asked** (`POST /servers/{id}/credential-rotation`, admin role; it takes effect at the Agent's next heartbeat, within about 20 seconds when it is online and is remembered until the Agent acts); or
+- the Agent **presented a credential that was already replaced** (see below).
+
+The Agent then calls `POST /agent/rotate-credential`, authenticated with its current credential, and gets `{ server_id, credential }`. The response is the only time the new value is shown (`Cache-Control: no-store`). The Agent **saves it to its state file first** (atomic write, owner-only) and only then starts using it.
+
+**Grace period.** The credential presented in a rotation keeps working for 15 minutes. That covers the failure modes that would otherwise lock an Agent out: the response is lost, the Agent crashes before saving, or the disk refuses the write. In each case the Agent still holds a credential that works, is told again to rotate (a replaced credential in its grace period makes the heartbeat ask for rotation), and rotates again with it. Rotating with a replaced credential in its grace period is allowed; the credential it issues replaces whatever the previous rotation issued, so at most two credentials of an Agent are valid at any moment. After the grace period the replaced credential is rejected with `401`.
+
+Requests in flight during a rotation, including a pending long-poll claim, finish with the credential they started with. A rotation and each request for one are audited (`server.credential_rotate`, actor `agent`; `server.credential_rotation_request`, the admin).
+
+Runner credentials are not rotated this way: an operator creates a new Runner with `forgedeck-api create-runner` and deletes the old one.
+
 ## 12. Docker operation safety
 
 The Agent may support a limited allowlist such as list, inspect, logs, start, stop, restart, and deployment of a validated image/configuration. Enforce operation-specific authorization and resource constraints.

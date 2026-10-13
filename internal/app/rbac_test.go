@@ -46,6 +46,7 @@ var (
 		{"POST /api/v1/projects/{projectID}/servers/enrollment-tokens", admin, map[string]string{"server_name": "new-server"}},
 		{"GET /api/v1/servers/{serverID}", viewer, nil},
 		{"DELETE /api/v1/servers/{serverID}", admin, nil},
+		{"POST /api/v1/servers/{serverID}/credential-rotation", admin, nil},
 		{"GET /api/v1/servers/{serverID}/containers", viewer, nil},
 		{"POST /api/v1/servers/{serverID}/containers/{containerID}/actions", developer, map[string]string{"action": "restart"}},
 		{"POST /api/v1/servers/{serverID}/containers/{containerID}/logs", developer, map[string]any{"tail_lines": 10}},

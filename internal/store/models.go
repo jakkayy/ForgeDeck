@@ -12,10 +12,14 @@ import (
 )
 
 type Agent struct {
-	ID             uuid.UUID
-	ServerID       uuid.UUID
-	CredentialHash []byte
-	CreatedAt      time.Time
+	ID                     uuid.UUID
+	ServerID               uuid.UUID
+	CredentialHash         []byte
+	CreatedAt              time.Time
+	PreviousCredentialHash []byte
+	PreviousExpiresAt      *time.Time
+	CredentialRotatedAt    time.Time
+	RotationRequestedAt    *time.Time
 }
 
 type Application struct {

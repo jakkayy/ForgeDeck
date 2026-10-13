@@ -26,6 +26,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/servers", httpx.Handle(h.listForUser))
 	r.Get("/servers/{serverID}", httpx.Handle(h.get))
 	r.Delete("/servers/{serverID}", httpx.Handle(h.delete))
+	r.Post("/servers/{serverID}/credential-rotation", httpx.Handle(h.requestRotation))
 	r.Get("/servers/{serverID}/containers", httpx.Handle(h.listContainers))
 	r.Post("/servers/{serverID}/containers/{containerID}/actions", httpx.Handle(h.containerAction))
 	r.Post("/servers/{serverID}/containers/{containerID}/logs", httpx.Handle(h.containerLogs))
@@ -82,6 +83,20 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+// requestRotation asks the server's Agent to replace its credential at its
+// next heartbeat. It returns at once; the Agent does the work.
+func (h *Handler) requestRotation(w http.ResponseWriter, r *http.Request) error {
+	serverID, err := httpx.UUIDParam(r, "serverID")
+	if err != nil {
+		return err
+	}
+	if err := h.svc.RequestRotation(r.Context(), auth.UserFrom(r.Context()).ID, serverID); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusAccepted)
 	return nil
 }
 

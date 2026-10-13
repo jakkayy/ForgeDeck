@@ -21,6 +21,14 @@ type Heartbeater struct {
 	version string
 	status  StatusFunc
 	logger  *slog.Logger
+	rotate  func(ctx context.Context) error
+}
+
+// OnRotate sets what to do when the Control Plane asks for a new credential.
+// A failure is logged and retried at the next heartbeat.
+func (h *Heartbeater) OnRotate(rotate func(ctx context.Context) error) *Heartbeater {
+	h.rotate = rotate
+	return h
 }
 
 // NewHeartbeater returns a heartbeat loop for client.
@@ -48,6 +56,11 @@ func (h *Heartbeater) Run(ctx context.Context) error {
 			h.logger.Warn("heartbeat failed", "error", err)
 		case err == nil && resp.IntervalSeconds > 0:
 			interval = time.Duration(resp.IntervalSeconds) * time.Second
+		}
+		if err == nil && resp.RotateCredential && h.rotate != nil {
+			if err := h.rotate(ctx); err != nil && ctx.Err() == nil {
+				h.logger.Warn("credential rotation failed; will retry", "error", err)
+			}
 		}
 
 		select {
