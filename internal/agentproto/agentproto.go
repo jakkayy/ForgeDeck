@@ -166,11 +166,27 @@ type CompleteRequest struct {
 	ErrorMessage string          `json:"error_message,omitempty"`
 }
 
-// Agent job types.
+// Job types. Agents run container jobs; Runners run builds.
 const (
 	JobContainerAction = "container_action"
 	JobFetchLogs       = "fetch_logs"
+	JobBuild           = "build"
 )
+
+// BuildPayload builds and pushes an image for one commit. The Runner checks
+// out exactly CommitSHA, never the moving branch.
+type BuildPayload struct {
+	ApplicationID      uuid.UUID `json:"application_id"`
+	GitConnectionID    uuid.UUID `json:"git_connection_id"`
+	RepositoryID       string    `json:"repository_id"`
+	RepositoryFullName string    `json:"repository_full_name"`
+	Branch             string    `json:"branch"`
+	CommitSHA          string    `json:"commit_sha"`
+	CommitMessage      string    `json:"commit_message,omitempty"`
+	DockerfilePath     string    `json:"dockerfile_path"`
+	BuildContext       string    `json:"build_context"`
+	TestCommand        *string   `json:"test_command,omitempty"`
+}
 
 // Container actions accepted by JobContainerAction.
 const (

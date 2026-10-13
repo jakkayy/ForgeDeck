@@ -59,7 +59,7 @@ SET status           = 'running',
     started_at       = COALESCE(started_at, $3::timestamptz)
 FROM next
 WHERE jobs.id = next.id
-RETURNING jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at
+RETURNING jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id
 `
 
 type ClaimAgentJobParams struct {
@@ -97,6 +97,7 @@ func (q *Queries) ClaimAgentJob(ctx context.Context, arg ClaimAgentJobParams) (J
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.ApplicationID,
 	)
 	return i, err
 }
@@ -204,7 +205,7 @@ func (q *Queries) GetAgentAttemptOutcome(ctx context.Context, arg GetAgentAttemp
 }
 
 const getJob = `-- name: GetJob :one
-SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at FROM jobs WHERE id = $1
+SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id FROM jobs WHERE id = $1
 `
 
 func (q *Queries) GetJob(ctx context.Context, id uuid.UUID) (Job, error) {
@@ -230,18 +231,58 @@ func (q *Queries) GetJob(ctx context.Context, id uuid.UUID) (Job, error) {
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.ApplicationID,
+	)
+	return i, err
+}
+
+const getJobByIdempotencyKey = `-- name: GetJobByIdempotencyKey :one
+SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id FROM jobs WHERE project_id = $1 AND idempotency_key = $2
+`
+
+type GetJobByIdempotencyKeyParams struct {
+	ProjectID      uuid.UUID
+	IdempotencyKey *string
+}
+
+func (q *Queries) GetJobByIdempotencyKey(ctx context.Context, arg GetJobByIdempotencyKeyParams) (Job, error) {
+	row := q.db.QueryRow(ctx, getJobByIdempotencyKey, arg.ProjectID, arg.IdempotencyKey)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Type,
+		&i.WorkerKind,
+		&i.TargetServerID,
+		&i.Status,
+		&i.Payload,
+		&i.Result,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.LeaseOwner,
+		&i.LeaseExpiresAt,
+		&i.IdempotencyKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.ApplicationID,
 	)
 	return i, err
 }
 
 const insertJob = `-- name: InsertJob :one
-INSERT INTO jobs (project_id, type, worker_kind, target_server_id, payload, max_attempts, idempotency_key, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at
+INSERT INTO jobs (project_id, application_id, type, worker_kind, target_server_id, payload, max_attempts, idempotency_key, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (project_id, idempotency_key) DO NOTHING
+RETURNING id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id
 `
 
 type InsertJobParams struct {
 	ProjectID      uuid.UUID
+	ApplicationID  *uuid.UUID
 	Type           string
 	WorkerKind     string
 	TargetServerID *uuid.UUID
@@ -251,9 +292,11 @@ type InsertJobParams struct {
 	CreatedBy      *uuid.UUID
 }
 
+// Returns no row when a job with the same idempotency key already exists.
 func (q *Queries) InsertJob(ctx context.Context, arg InsertJobParams) (Job, error) {
 	row := q.db.QueryRow(ctx, insertJob,
 		arg.ProjectID,
+		arg.ApplicationID,
 		arg.Type,
 		arg.WorkerKind,
 		arg.TargetServerID,
@@ -283,6 +326,7 @@ func (q *Queries) InsertJob(ctx context.Context, arg InsertJobParams) (Job, erro
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
+		&i.ApplicationID,
 	)
 	return i, err
 }

@@ -5,6 +5,7 @@ package jobs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -59,42 +60,64 @@ func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, now func() tim
 // jobs and must be nil for Runner jobs.
 type NewJob struct {
 	ProjectID      uuid.UUID
+	ApplicationID  *uuid.UUID
 	Type           string
 	WorkerKind     WorkerKind
 	TargetServerID *uuid.UUID
 	Payload        any
 	MaxAttempts    int32
 	CreatedBy      *uuid.UUID
+	// IdempotencyKey, when set, makes Enqueue return the existing job for the
+	// same key in the project instead of queueing a duplicate.
+	IdempotencyKey string
 }
 
 // Enqueue stores a queued job and notifies waiting workers when the
-// transaction commits.
+// transaction commits. With an IdempotencyKey already used in the project it
+// returns that earlier job and created is false.
 func (s *Service) Enqueue(ctx context.Context, job NewJob) (store.Job, error) {
+	created, _, err := s.EnqueueOnce(ctx, job)
+	return created, err
+}
+
+// EnqueueOnce is Enqueue that also reports whether a new job was created.
+func (s *Service) EnqueueOnce(ctx context.Context, job NewJob) (store.Job, bool, error) {
 	payload, err := json.Marshal(job.Payload)
 	if err != nil {
-		return store.Job{}, fmt.Errorf("encode job payload: %w", err)
+		return store.Job{}, false, fmt.Errorf("encode job payload: %w", err)
 	}
-	maxAttempts := max(job.MaxAttempts, 1)
+	var key *string
+	if job.IdempotencyKey != "" {
+		key = &job.IdempotencyKey
+	}
 
-	var created store.Job
+	var stored store.Job
+	isNew := true
 	err = database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.queries.WithTx(tx)
 		var err error
-		created, err = q.InsertJob(ctx, store.InsertJobParams{
+		stored, err = q.InsertJob(ctx, store.InsertJobParams{
 			ProjectID:      job.ProjectID,
+			ApplicationID:  job.ApplicationID,
 			Type:           job.Type,
 			WorkerKind:     string(job.WorkerKind),
 			TargetServerID: job.TargetServerID,
 			Payload:        payload,
-			MaxAttempts:    maxAttempts,
+			MaxAttempts:    max(job.MaxAttempts, 1),
+			IdempotencyKey: key,
 			CreatedBy:      job.CreatedBy,
 		})
+		if errors.Is(err, pgx.ErrNoRows) && key != nil {
+			isNew = false
+			stored, err = q.GetJobByIdempotencyKey(ctx, store.GetJobByIdempotencyKeyParams{ProjectID: job.ProjectID, IdempotencyKey: key})
+			return err
+		}
 		if err != nil {
 			return fmt.Errorf("insert job: %w", err)
 		}
 		return q.NotifyWorkers(ctx, store.NotifyWorkersParams{Channel: NotifyChannel, Payload: notifyKey(job)})
 	})
-	return created, err
+	return stored, isNew, err
 }
 
 func notifyKey(job NewJob) string {

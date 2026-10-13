@@ -11,6 +11,103 @@ import (
 	"github.com/google/uuid"
 )
 
+const applicationsForGitHubPush = `-- name: ApplicationsForGitHubPush :many
+SELECT applications.id, applications.project_id, applications.name, applications.git_connection_id, applications.repository_id, applications.repository_full_name, applications.branch, applications.dockerfile_path, applications.build_context, applications.test_command, applications.provider_webhook_id, applications.created_by, applications.created_at, applications.updated_at FROM applications
+JOIN git_connections ON git_connections.id = applications.git_connection_id
+WHERE git_connections.installation_id = $1
+  AND applications.repository_id = $2
+  AND applications.branch = $3
+`
+
+type ApplicationsForGitHubPushParams struct {
+	InstallationID *int64
+	RepositoryID   string
+	Branch         string
+}
+
+func (q *Queries) ApplicationsForGitHubPush(ctx context.Context, arg ApplicationsForGitHubPushParams) ([]Application, error) {
+	rows, err := q.db.Query(ctx, applicationsForGitHubPush, arg.InstallationID, arg.RepositoryID, arg.Branch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Application{}
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Name,
+			&i.GitConnectionID,
+			&i.RepositoryID,
+			&i.RepositoryFullName,
+			&i.Branch,
+			&i.DockerfilePath,
+			&i.BuildContext,
+			&i.TestCommand,
+			&i.ProviderWebhookID,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const applicationsForGitLabPush = `-- name: ApplicationsForGitLabPush :many
+SELECT id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at FROM applications
+WHERE git_connection_id = $1
+  AND repository_id = $2
+  AND branch = $3
+`
+
+type ApplicationsForGitLabPushParams struct {
+	GitConnectionID uuid.UUID
+	RepositoryID    string
+	Branch          string
+}
+
+func (q *Queries) ApplicationsForGitLabPush(ctx context.Context, arg ApplicationsForGitLabPushParams) ([]Application, error) {
+	rows, err := q.db.Query(ctx, applicationsForGitLabPush, arg.GitConnectionID, arg.RepositoryID, arg.Branch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Application{}
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Name,
+			&i.GitConnectionID,
+			&i.RepositoryID,
+			&i.RepositoryFullName,
+			&i.Branch,
+			&i.DockerfilePath,
+			&i.BuildContext,
+			&i.TestCommand,
+			&i.ProviderWebhookID,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createApplication = `-- name: CreateApplication :one
 INSERT INTO applications (
     project_id, name, git_connection_id, repository_id, repository_full_name,

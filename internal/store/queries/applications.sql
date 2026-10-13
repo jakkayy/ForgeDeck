@@ -30,3 +30,16 @@ RETURNING *;
 
 -- name: DeleteApplication :exec
 DELETE FROM applications WHERE id = $1;
+
+-- name: ApplicationsForGitHubPush :many
+SELECT applications.* FROM applications
+JOIN git_connections ON git_connections.id = applications.git_connection_id
+WHERE git_connections.installation_id = @installation_id
+  AND applications.repository_id = @repository_id
+  AND applications.branch = @branch;
+
+-- name: ApplicationsForGitLabPush :many
+SELECT * FROM applications
+WHERE git_connection_id = @git_connection_id
+  AND repository_id = @repository_id
+  AND branch = @branch;

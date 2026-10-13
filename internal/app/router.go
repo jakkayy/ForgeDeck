@@ -64,7 +64,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		authHandler.Routes(api)
 		agentHandler.Routes(api)
 		gitHandler.PublicRoutes(api)
-		webhooks.NewHandler(cfg.GitHubWebhookSecret, gitService, store.New(pool)).Routes(api)
+		webhooks.NewHandler(cfg.GitHubWebhookSecret, gitService, store.New(pool), jobService).Routes(api)
 
 		api.Group(func(signedIn chi.Router) {
 			signedIn.Use(authHandler.RequireUser)

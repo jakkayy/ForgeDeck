@@ -82,6 +82,7 @@ type Job struct {
 	CreatedAt      time.Time
 	StartedAt      *time.Time
 	FinishedAt     *time.Time
+	ApplicationID  *uuid.UUID
 }
 
 type JobAttempt struct {

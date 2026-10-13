@@ -3,6 +3,7 @@ package webhooks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
+	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
@@ -28,11 +30,12 @@ type Handler struct {
 	gitHubSecret string // empty when the GitHub App is not configured
 	gitLab       SecretSource
 	queries      *store.Queries
+	jobs         *jobs.Service
 }
 
 // NewHandler returns webhook endpoints.
-func NewHandler(gitHubSecret string, gitLab SecretSource, queries *store.Queries) *Handler {
-	return &Handler{gitHubSecret: gitHubSecret, gitLab: gitLab, queries: queries}
+func NewHandler(gitHubSecret string, gitLab SecretSource, queries *store.Queries, jobService *jobs.Service) *Handler {
+	return &Handler{gitHubSecret: gitHubSecret, gitLab: gitLab, queries: queries, jobs: jobService}
 }
 
 // Routes mounts the webhook endpoints on r.
@@ -74,18 +77,21 @@ func (h *Handler) gitlab(w http.ResponseWriter, r *http.Request) error {
 		return httpx.BadRequest("invalid_payload", err.Error())
 	}
 	d := delivery{provider: "gitlab", id: r.Header.Get("X-Gitlab-Event-UUID"), eventType: event, connectionID: &connectionID}
-	return h.handleOnce(w, r, d, func(context.Context) (string, error) {
-		return pushResult(push, ok), nil
+	return h.handleOnce(w, r, d, func(ctx context.Context) (string, error) {
+		if !ok {
+			return ignoredRef, nil
+		}
+		apps, err := h.queries.ApplicationsForGitLabPush(ctx, store.ApplicationsForGitLabPushParams{
+			GitConnectionID: connectionID, RepositoryID: push.RepositoryID, Branch: push.Branch,
+		})
+		if err != nil {
+			return "", fmt.Errorf("find applications: %w", err)
+		}
+		return h.queueBuilds(ctx, apps, push)
 	})
 }
 
-// pushResult describes a push that has been accepted but not yet acted on.
-func pushResult(push Push, buildable bool) string {
-	if !buildable {
-		return "ignored: not a branch push"
-	}
-	return "accepted push to " + push.Branch
-}
+const ignoredRef = "ignored: not a branch push"
 
 func (h *Handler) github(w http.ResponseWriter, r *http.Request) error {
 	if h.gitHubSecret == "" {
@@ -103,13 +109,24 @@ func (h *Handler) github(w http.ResponseWriter, r *http.Request) error {
 	case "ping":
 		return httpx.WriteJSON(w, http.StatusOK, map[string]string{"result": "pong"})
 	case "push":
-		push, _, ok, err := parseGitHubPush(body)
+		push, installationID, ok, err := parseGitHubPush(body)
 		if err != nil {
 			return httpx.BadRequest("invalid_payload", err.Error())
 		}
 		d := delivery{provider: "github", id: r.Header.Get("X-GitHub-Delivery"), eventType: event}
-		return h.handleOnce(w, r, d, func(context.Context) (string, error) {
-			return pushResult(push, ok), nil
+		return h.handleOnce(w, r, d, func(ctx context.Context) (string, error) {
+			if !ok {
+				return ignoredRef, nil
+			}
+			// One installation can be connected to several projects; all of
+			// their applications on this repository and branch build.
+			apps, err := h.queries.ApplicationsForGitHubPush(ctx, store.ApplicationsForGitHubPushParams{
+				InstallationID: &installationID, RepositoryID: push.RepositoryID, Branch: push.Branch,
+			})
+			if err != nil {
+				return "", fmt.Errorf("find applications: %w", err)
+			}
+			return h.queueBuilds(ctx, apps, push)
 		})
 	default:
 		return httpx.WriteJSON(w, http.StatusOK, map[string]string{"result": "ignored: event not used"})

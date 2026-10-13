@@ -1,7 +1,12 @@
 -- name: InsertJob :one
-INSERT INTO jobs (project_id, type, worker_kind, target_server_id, payload, max_attempts, idempotency_key, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+-- Returns no row when a job with the same idempotency key already exists.
+INSERT INTO jobs (project_id, application_id, type, worker_kind, target_server_id, payload, max_attempts, idempotency_key, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (project_id, idempotency_key) DO NOTHING
 RETURNING *;
+
+-- name: GetJobByIdempotencyKey :one
+SELECT * FROM jobs WHERE project_id = $1 AND idempotency_key = $2;
 
 -- name: NotifyWorkers :exec
 SELECT pg_notify(@channel::text, @payload::text);
