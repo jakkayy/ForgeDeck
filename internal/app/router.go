@@ -28,6 +28,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/registries"
 	"github.com/jakkayy/ForgeDeck/internal/runnerapi"
 	"github.com/jakkayy/ForgeDeck/internal/runners"
+	"github.com/jakkayy/ForgeDeck/internal/secrets"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/webhooks"
@@ -58,6 +59,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	})
 	gitHandler := gitconn.NewHandler(gitService, logger)
 	registryService := registries.NewService(store.New(pool), authorizer, cfg.Keyring)
+	secretService := secrets.NewService(store.New(pool), authorizer, cfg.Keyring)
 	runnerHandler := runnerapi.NewHandler(runnerapi.Deps{
 		Shutdown: ctx, Runners: runners.NewService(store.New(pool), time.Now), Jobs: jobService, Notifier: notifier,
 		Credentials: builds.NewCredentials(store.New(pool), gitService, registryService), Logger: logger,
@@ -94,6 +96,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			gitHandler.Routes(signedIn)
 			appHandler.Routes(signedIn)
 			registries.NewHandler(registryService).Routes(signedIn)
+			secrets.NewHandler(secretService).Routes(signedIn)
 			deploymentHandler.Routes(signedIn)
 			environments.NewHandler(environments.NewService(store.New(pool), authorizer)).Routes(signedIn)
 			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)

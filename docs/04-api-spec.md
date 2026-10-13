@@ -75,6 +75,18 @@ See [13 — Git Providers](13-git-providers.md) for provider setup.
 
 An application's image destination is `registry_connection_id` plus `image_repository` (e.g. `acme/shop-api`, no host or tag), set together on create or update; `"image_repository": ""` removes both. The registry must belong to the application's project. Registry passwords are write-only.
 
+### Project secrets
+
+See [15 — Deployments §4](15-deployments.md#4-project-secrets-phase-5).
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/projects/{projectID}/secrets` | List secrets: `name`, `version`, timestamps; never a value |
+| PUT | `/projects/{projectID}/secrets/{name}` | Create (`201`) or replace (`200`, `version` + 1) with `{ "value": "…" }` (admin) |
+| DELETE | `/projects/{projectID}/secrets/{name}` | Delete (`409 secret_in_use` while an environment lists it) (admin) |
+
+`name` is `[A-Z_][A-Z0-9_]{0,63}`; the value is 6 bytes to 4 KB. A secret is used by listing its name in an environment's `config.secrets`.
+
 ### Environments
 
 See [15 — Deployments](15-deployments.md) for the model and the `config` fields.

@@ -157,6 +157,18 @@ type ProjectMember struct {
 	CreatedAt time.Time
 }
 
+type ProjectSecret struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	Name       string
+	Ciphertext []byte
+	KeyID      string
+	Version    int32
+	CreatedBy  *uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
 type RegistryConnection struct {
 	ID                 uuid.UUID
 	ProjectID          uuid.UUID

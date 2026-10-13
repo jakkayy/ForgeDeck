@@ -137,3 +137,24 @@ A deployment stops the old container and starts the new one, so the service is d
 ### Secrets and configuration
 
 Environment variables are stored in the environment's configuration and in each release's snapshot, and are visible to project members. They are not for secrets. A rollback restores the variables the old release had, which can include a value that has since been rotated. Secret references arrive in Phase 5.
+
+## 4. Project secrets (Phase 5)
+
+Environment variables in a configuration are visible to every project member and are copied into each release's snapshot, so they are not for secrets. A **project secret** is a named value that is stored encrypted, is write-only, and is injected into a service at deployment time.
+
+### Model
+
+- A secret belongs to a project: a `name` (`[A-Z_][A-Z0-9_]*`, at most 64 characters) and a `value` (6 bytes to 4 KB). The value is sealed with the keyring (AES-256-GCM, bound to the secret's row) like Git tokens and registry passwords.
+- It is **write-only**: the API lists names with `version` and `updated_at`, and never returns a value. Setting a secret again replaces the value and increments `version`.
+- An environment uses a secret by listing its name in `config.secrets`. The service then sees an environment variable of that name. A secret name may not also appear in `config.env`. The environment form checks that every listed secret exists.
+- **Releases store references, not values.** A release's snapshot holds the secret names. A rollback restores the old image and configuration and then uses the **current** value of each secret: rotating a secret is never undone by a rollback, and no old secret value is kept anywhere.
+- A change to a secret takes effect on the **next deployment** of each environment that uses it; nothing restarts on its own.
+- A secret that an environment lists cannot be deleted (`409 secret_in_use`); remove it from the environment first.
+- Setting, replacing, or deleting a secret requires the admin role (the same as managing applications). Members can list names.
+
+### Delivery and handling
+
+- The Control Plane decrypts the secrets of the claimed deployment (and of the previous release it may restore) when the Agent claims the job and adds them to the claim response, like registry credentials ([05 §8](05-agent-protocol.md)). They are never in the job payload, a release, or a log.
+- The Agent passes them to `docker compose` in the **process environment** and the Compose file only refers to them (`NAME: ${NAME}`), so no secret value is written to disk by ForgeDeck. The running container's configuration still holds the value, as it does for any Docker environment variable: anyone who can run `docker inspect` on the server can read it. Treat access to the Docker host as access to the secrets.
+- The Agent masks the values in the job log. The Control Plane also masks every project secret in log lines it receives (defense in depth, including container logs fetched for a server); secrets shorter than 6 bytes cannot be created because they could not be masked reliably.
+- If a listed secret no longer exists when the job is claimed, the attempt fails at once with `secret_not_found`.
