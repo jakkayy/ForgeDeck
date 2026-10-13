@@ -14,7 +14,8 @@ ForgeDeck จัดการ Application, Docker server, Git repository แล�
 | 2 | Git integration (GitHub/GitLab), webhook, job queue | เสร็จ |
 | 3 | Runner แยกจาก production: checkout → build → test → push | เสร็จ |
 | 4 | Environment, deploy ผ่าน Agent + Compose, health check, release, rollback | เสร็จ |
-| 5–6 | Secrets, hardening, production readiness | ยังไม่เริ่ม |
+| 5 | Secrets, audit log, RBAC, rate limit, retention, backup, production compose, Agent installer, upgrade guide | เสร็จ |
+| 6 | Usability และ performance | ยังไม่เริ่ม |
 
 รายละเอียดของแต่ละข้อดูที่ [docs/11-implementation-plan.md](docs/11-implementation-plan.md)
 
