@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
 
@@ -14,7 +16,12 @@ const (
 	maxNameLength        = 100
 	maxPathLength        = 255
 	maxTestCommandLength = 1000
+	maxImageLength       = 255
 )
+
+// validImageRepository is the path part of a Docker image reference:
+// lowercase components separated by "/", without host or tag.
+var validImageRepository = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`)
 
 // validBranch is a conservative subset of git-check-ref-format.
 var validBranch = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$`)
@@ -46,4 +53,19 @@ func checkTestCommand(errs validate.Errors, command string) {
 	if len(command) > maxTestCommandLength || strings.ContainsRune(command, 0) {
 		errs.Add("test_command", fmt.Sprintf("Test command must be at most %d characters.", maxTestCommandLength))
 	}
+}
+
+// checkImage validates a registry and image repository given together and
+// returns the repository to store (nil when both are absent).
+func checkImage(errs validate.Errors, registryID *uuid.UUID, repository string) *string {
+	repository = strings.TrimSpace(repository)
+	switch {
+	case registryID == nil && repository == "":
+		return nil
+	case registryID == nil:
+		errs.Add("registry_connection_id", "Choose the registry to push this image to.")
+	case len(repository) > maxImageLength || !validImageRepository.MatchString(repository):
+		errs.Add("image_repository", "Use a lowercase image path without host or tag, such as acme/shop-api.")
+	}
+	return &repository
 }

@@ -23,7 +23,8 @@ This document describes the initial logical schema, not a final migration. Colum
 | `projects` | Project metadata and owner |
 | `project_members` | Project membership and role |
 | `git_connections` | Provider and encrypted credential reference |
-| `applications` | Repository/build configuration |
+| `registry_connections` | Container registry host, username, and encrypted password |
+| `applications` | Repository/build configuration and image destination |
 | `environments` | Target environment and deployment settings |
 | `servers` | Registered machine metadata, owned by a project |
 | `agents` | Agent identity, version, last heartbeat, revocation |
@@ -45,6 +46,7 @@ users ──< sessions
 projects ──< enrollment_tokens
 projects ──< applications
 projects ──< git_connections
+projects ──< registry_connections ──< applications
 projects ──< servers
 applications ──< environments
 environments ──< releases
@@ -113,9 +115,23 @@ Allowed roles should be constrained to the roles defined in the authorization de
 - `default_branch TEXT`
 - `dockerfile_path TEXT`
 - `build_context TEXT`
+- `registry_connection_id UUID REFERENCES registry_connections(id) ON DELETE RESTRICT`
+- `image_repository TEXT` — image path without host or tag, e.g. `acme/shop-api`; set together with the registry
 - `created_at`, `updated_at`
 
 Avoid storing provider access tokens directly on the application row.
+
+### `registry_connections`
+
+- `id UUID PRIMARY KEY`
+- `project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE`
+- `name TEXT NOT NULL`, unique per project
+- `host TEXT NOT NULL` — e.g. `ghcr.io`, `registry.example.com:5000`
+- `username TEXT NOT NULL`
+- `password_ciphertext BYTEA NOT NULL`, `password_key_id TEXT NOT NULL` — AES-GCM, bound to the row ID
+- `created_by`, `created_at`
+
+Credentials are not checked when stored; the Runner's first push reports a bad password as a failed build.
 
 ### `environments`
 

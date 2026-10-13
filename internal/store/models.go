@@ -19,20 +19,22 @@ type Agent struct {
 }
 
 type Application struct {
-	ID                 uuid.UUID
-	ProjectID          uuid.UUID
-	Name               string
-	GitConnectionID    uuid.UUID
-	RepositoryID       string
-	RepositoryFullName string
-	Branch             string
-	DockerfilePath     string
-	BuildContext       string
-	TestCommand        *string
-	ProviderWebhookID  *string
-	CreatedBy          *uuid.UUID
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                   uuid.UUID
+	ProjectID            uuid.UUID
+	Name                 string
+	GitConnectionID      uuid.UUID
+	RepositoryID         string
+	RepositoryFullName   string
+	Branch               string
+	DockerfilePath       string
+	BuildContext         string
+	TestCommand          *string
+	ProviderWebhookID    *string
+	CreatedBy            *uuid.UUID
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	RegistryConnectionID *uuid.UUID
+	ImageRepository      *string
 }
 
 type EnrollmentToken struct {
@@ -121,6 +123,18 @@ type ProjectMember struct {
 	UserID    uuid.UUID
 	Role      string
 	CreatedAt time.Time
+}
+
+type RegistryConnection struct {
+	ID                 uuid.UUID
+	ProjectID          uuid.UUID
+	Name               string
+	Host               string
+	Username           string
+	PasswordCiphertext []byte
+	PasswordKeyID      string
+	CreatedBy          *uuid.UUID
+	CreatedAt          time.Time
 }
 
 type Runner struct {

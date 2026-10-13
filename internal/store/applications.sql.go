@@ -12,7 +12,7 @@ import (
 )
 
 const applicationsForGitHubPush = `-- name: ApplicationsForGitHubPush :many
-SELECT applications.id, applications.project_id, applications.name, applications.git_connection_id, applications.repository_id, applications.repository_full_name, applications.branch, applications.dockerfile_path, applications.build_context, applications.test_command, applications.provider_webhook_id, applications.created_by, applications.created_at, applications.updated_at FROM applications
+SELECT applications.id, applications.project_id, applications.name, applications.git_connection_id, applications.repository_id, applications.repository_full_name, applications.branch, applications.dockerfile_path, applications.build_context, applications.test_command, applications.provider_webhook_id, applications.created_by, applications.created_at, applications.updated_at, applications.registry_connection_id, applications.image_repository FROM applications
 JOIN git_connections ON git_connections.id = applications.git_connection_id
 WHERE git_connections.installation_id = $1
   AND applications.repository_id = $2
@@ -49,6 +49,8 @@ func (q *Queries) ApplicationsForGitHubPush(ctx context.Context, arg Application
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RegistryConnectionID,
+			&i.ImageRepository,
 		); err != nil {
 			return nil, err
 		}
@@ -61,7 +63,7 @@ func (q *Queries) ApplicationsForGitHubPush(ctx context.Context, arg Application
 }
 
 const applicationsForGitLabPush = `-- name: ApplicationsForGitLabPush :many
-SELECT id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at FROM applications
+SELECT id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at, registry_connection_id, image_repository FROM applications
 WHERE git_connection_id = $1
   AND repository_id = $2
   AND branch = $3
@@ -97,6 +99,8 @@ func (q *Queries) ApplicationsForGitLabPush(ctx context.Context, arg Application
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RegistryConnectionID,
+			&i.ImageRepository,
 		); err != nil {
 			return nil, err
 		}
@@ -111,26 +115,30 @@ func (q *Queries) ApplicationsForGitLabPush(ctx context.Context, arg Application
 const createApplication = `-- name: CreateApplication :one
 INSERT INTO applications (
     project_id, name, git_connection_id, repository_id, repository_full_name,
-    branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by
+    branch, dockerfile_path, build_context, test_command, provider_webhook_id,
+    registry_connection_id, image_repository, created_by
 ) VALUES (
     $1, $2, $3, $4, $5,
-    $6, $7, $8, $9, $10, $11
+    $6, $7, $8, $9, $10,
+    $11, $12, $13
 )
-RETURNING id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at
+RETURNING id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at, registry_connection_id, image_repository
 `
 
 type CreateApplicationParams struct {
-	ProjectID          uuid.UUID
-	Name               string
-	GitConnectionID    uuid.UUID
-	RepositoryID       string
-	RepositoryFullName string
-	Branch             string
-	DockerfilePath     string
-	BuildContext       string
-	TestCommand        *string
-	ProviderWebhookID  *string
-	CreatedBy          *uuid.UUID
+	ProjectID            uuid.UUID
+	Name                 string
+	GitConnectionID      uuid.UUID
+	RepositoryID         string
+	RepositoryFullName   string
+	Branch               string
+	DockerfilePath       string
+	BuildContext         string
+	TestCommand          *string
+	ProviderWebhookID    *string
+	RegistryConnectionID *uuid.UUID
+	ImageRepository      *string
+	CreatedBy            *uuid.UUID
 }
 
 func (q *Queries) CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error) {
@@ -145,6 +153,8 @@ func (q *Queries) CreateApplication(ctx context.Context, arg CreateApplicationPa
 		arg.BuildContext,
 		arg.TestCommand,
 		arg.ProviderWebhookID,
+		arg.RegistryConnectionID,
+		arg.ImageRepository,
 		arg.CreatedBy,
 	)
 	var i Application
@@ -163,6 +173,8 @@ func (q *Queries) CreateApplication(ctx context.Context, arg CreateApplicationPa
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RegistryConnectionID,
+		&i.ImageRepository,
 	)
 	return i, err
 }
@@ -177,7 +189,7 @@ func (q *Queries) DeleteApplication(ctx context.Context, id uuid.UUID) error {
 }
 
 const getApplication = `-- name: GetApplication :one
-SELECT id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at FROM applications WHERE id = $1
+SELECT id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at, registry_connection_id, image_repository FROM applications WHERE id = $1
 `
 
 func (q *Queries) GetApplication(ctx context.Context, id uuid.UUID) (Application, error) {
@@ -198,12 +210,14 @@ func (q *Queries) GetApplication(ctx context.Context, id uuid.UUID) (Application
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RegistryConnectionID,
+		&i.ImageRepository,
 	)
 	return i, err
 }
 
 const listApplications = `-- name: ListApplications :many
-SELECT id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at FROM applications
+SELECT id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at, registry_connection_id, image_repository FROM applications
 WHERE project_id = $1
 ORDER BY name, id
 LIMIT $3 OFFSET $2
@@ -239,6 +253,8 @@ func (q *Queries) ListApplications(ctx context.Context, arg ListApplicationsPara
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RegistryConnectionID,
+			&i.ImageRepository,
 		); err != nil {
 			return nil, err
 		}
@@ -257,19 +273,25 @@ SET name            = COALESCE($1, name),
     dockerfile_path = COALESCE($3, dockerfile_path),
     build_context   = COALESCE($4, build_context),
     test_command    = CASE WHEN $5::boolean THEN $6 ELSE test_command END,
+    registry_connection_id = CASE WHEN $7::boolean
+        THEN $8::uuid ELSE registry_connection_id END,
+    image_repository = CASE WHEN $7::boolean THEN $9 ELSE image_repository END,
     updated_at      = now()
-WHERE id = $7
-RETURNING id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at
+WHERE id = $10
+RETURNING id, project_id, name, git_connection_id, repository_id, repository_full_name, branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by, created_at, updated_at, registry_connection_id, image_repository
 `
 
 type UpdateApplicationParams struct {
-	Name           *string
-	Branch         *string
-	DockerfilePath *string
-	BuildContext   *string
-	SetTestCommand bool
-	TestCommand    *string
-	ID             uuid.UUID
+	Name                 *string
+	Branch               *string
+	DockerfilePath       *string
+	BuildContext         *string
+	SetTestCommand       bool
+	TestCommand          *string
+	SetImage             bool
+	RegistryConnectionID *uuid.UUID
+	ImageRepository      *string
+	ID                   uuid.UUID
 }
 
 func (q *Queries) UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error) {
@@ -280,6 +302,9 @@ func (q *Queries) UpdateApplication(ctx context.Context, arg UpdateApplicationPa
 		arg.BuildContext,
 		arg.SetTestCommand,
 		arg.TestCommand,
+		arg.SetImage,
+		arg.RegistryConnectionID,
+		arg.ImageRepository,
 		arg.ID,
 	)
 	var i Application
@@ -298,6 +323,8 @@ func (q *Queries) UpdateApplication(ctx context.Context, arg UpdateApplicationPa
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RegistryConnectionID,
+		&i.ImageRepository,
 	)
 	return i, err
 }

@@ -69,6 +69,11 @@ See [13 — Git Providers](13-git-providers.md) for provider setup.
 | GET | `/applications/{applicationID}` | Get application |
 | PATCH | `/applications/{applicationID}` | Update application |
 | DELETE | `/applications/{applicationID}` | Delete application after safeguards |
+| GET | `/projects/{projectID}/registries` | List container registries |
+| POST | `/projects/{projectID}/registries` | Add a registry: `name`, `host`, `username`, `password` (admin) |
+| DELETE | `/registries/{registryID}` | Remove a registry (`409 registry_in_use` while applications push to it) |
+
+An application's image destination is `registry_connection_id` plus `image_repository` (e.g. `acme/shop-api`, no host or tag), set together on create or update; `"image_repository": ""` removes both. The registry must belong to the application's project. Registry passwords are write-only.
 
 ## 6. Servers and containers
 

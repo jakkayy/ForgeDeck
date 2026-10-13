@@ -36,6 +36,7 @@ type Env struct {
 	t      testing.TB
 	Pool   *pgxpool.Pool
 	Server *httptest.Server
+	Config config.Config
 }
 
 // Option adjusts the configuration of the API under test.
@@ -60,7 +61,7 @@ func New(t testing.TB, options ...Option) *Env {
 		cancel()
 		server.Close()
 	})
-	return &Env{t: t, Pool: pool, Server: server}
+	return &Env{t: t, Pool: pool, Server: server, Config: cfg}
 }
 
 // CreateUser stores a user with Password and returns its ID.

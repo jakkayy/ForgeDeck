@@ -158,3 +158,45 @@ func TestGitLabApplicationNeedsPublicURL(t *testing.T) {
 		t.Fatalf("code %s", resp.ErrorCode())
 	}
 }
+
+func TestApplicationImageSettings(t *testing.T) {
+	f := newFixture(t)
+	var registry struct{ ID uuid.UUID }
+	f.owner.Do(http.MethodPost, "/api/v1/projects/"+f.projectID.String()+"/registries",
+		map[string]string{"name": "GHCR", "host": "ghcr.io", "username": "bot", "password": "secret"}).
+		RequireStatus(http.StatusCreated).Decode(&registry)
+
+	f.create(t, map[string]any{"name": "x", "image_repository": "acme/api"}).RequireStatus(http.StatusUnprocessableEntity)
+	f.create(t, map[string]any{"name": "x", "registry_connection_id": registry.ID, "image_repository": "Acme/API:latest"}).
+		RequireStatus(http.StatusUnprocessableEntity)
+	f.create(t, map[string]any{"name": "x", "registry_connection_id": uuid.New(), "image_repository": "acme/api"}).
+		RequireStatus(http.StatusNotFound)
+
+	var app applications.Application
+	f.create(t, map[string]any{"name": "API", "registry_connection_id": registry.ID, "image_repository": "acme/shop-api"}).
+		RequireStatus(http.StatusCreated).Decode(&app)
+	if app.RegistryConnectionID == nil || *app.RegistryConnectionID != registry.ID || *app.ImageRepository != "acme/shop-api" {
+		t.Fatalf("app %+v", app)
+	}
+
+	f.owner.Do(http.MethodDelete, "/api/v1/registries/"+registry.ID.String(), nil).RequireStatus(http.StatusConflict)
+	path := "/api/v1/applications/" + app.ID.String()
+	f.owner.Do(http.MethodPatch, path, map[string]any{"branch": "dev"}).RequireStatus(http.StatusOK).Decode(&app)
+	if app.ImageRepository == nil {
+		t.Fatal("unrelated update cleared the image")
+	}
+	f.owner.Do(http.MethodPatch, path, map[string]any{"image_repository": ""}).RequireStatus(http.StatusOK).Decode(&app)
+	if app.RegistryConnectionID != nil || app.ImageRepository != nil {
+		t.Fatalf("image not cleared: %+v", app)
+	}
+	f.owner.Do(http.MethodDelete, "/api/v1/registries/"+registry.ID.String(), nil).RequireStatus(http.StatusNoContent)
+
+	// A registry from another project is refused.
+	other := f.owner.CreateProject("Other")
+	var foreign struct{ ID uuid.UUID }
+	f.owner.Do(http.MethodPost, "/api/v1/projects/"+other.String()+"/registries",
+		map[string]string{"name": "GHCR", "host": "ghcr.io", "username": "bot", "password": "secret"}).
+		RequireStatus(http.StatusCreated).Decode(&foreign)
+	f.owner.Do(http.MethodPatch, path, map[string]any{"registry_connection_id": foreign.ID, "image_repository": "acme/api"}).
+		RequireStatus(http.StatusNotFound)
+}

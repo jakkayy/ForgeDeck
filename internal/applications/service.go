@@ -16,6 +16,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/database"
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
+	"github.com/jakkayy/ForgeDeck/internal/registries"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
@@ -37,20 +38,25 @@ type Application struct {
 	DockerfilePath     string    `json:"dockerfile_path"`
 	BuildContext       string    `json:"build_context"`
 	TestCommand        *string   `json:"test_command"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	// RegistryConnectionID and ImageRepository are both set or both nil;
+	// images are pushed to <registry host>/<image repository>.
+	RegistryConnectionID *uuid.UUID `json:"registry_connection_id"`
+	ImageRepository      *string    `json:"image_repository"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 // Service implements application operations.
 type Service struct {
-	queries *store.Queries
-	authz   *authz.Authorizer
-	git     *gitconn.Service
+	queries    *store.Queries
+	authz      *authz.Authorizer
+	git        *gitconn.Service
+	registries *registries.Service
 }
 
 // NewService returns an application Service.
-func NewService(queries *store.Queries, authorizer *authz.Authorizer, git *gitconn.Service) *Service {
-	return &Service{queries: queries, authz: authorizer, git: git}
+func NewService(queries *store.Queries, authorizer *authz.Authorizer, git *gitconn.Service, registryService *registries.Service) *Service {
+	return &Service{queries: queries, authz: authorizer, git: git, registries: registryService}
 }
 
 // CreateInput describes a new application. Branch defaults to the
@@ -63,6 +69,9 @@ type CreateInput struct {
 	DockerfilePath  string
 	BuildContext    string
 	TestCommand     string
+	// Image is optional; without it the application cannot be built yet.
+	RegistryConnectionID *uuid.UUID
+	ImageRepository      string
 }
 
 // Create stores an application after checking the repository is reachable
@@ -80,7 +89,11 @@ func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in Cr
 	if in.Branch != "" {
 		checkBranch(errs, in.Branch)
 	}
+	imageRepository := checkImage(errs, in.RegistryConnectionID, in.ImageRepository)
 	if err := errs.Err(); err != nil {
+		return Application{}, err
+	}
+	if err := s.checkRegistry(ctx, projectID, in.RegistryConnectionID); err != nil {
 		return Application{}, err
 	}
 
@@ -97,17 +110,19 @@ func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in Cr
 	}
 
 	row, err := s.queries.CreateApplication(ctx, store.CreateApplicationParams{
-		ProjectID:          projectID,
-		Name:               in.Name,
-		GitConnectionID:    in.GitConnectionID,
-		RepositoryID:       repo.ID,
-		RepositoryFullName: repo.FullName,
-		Branch:             in.Branch,
-		DockerfilePath:     path.Clean(in.DockerfilePath),
-		BuildContext:       path.Clean(in.BuildContext),
-		TestCommand:        optional(in.TestCommand),
-		ProviderWebhookID:  hookID,
-		CreatedBy:          &userID,
+		ProjectID:            projectID,
+		Name:                 in.Name,
+		GitConnectionID:      in.GitConnectionID,
+		RepositoryID:         repo.ID,
+		RepositoryFullName:   repo.FullName,
+		Branch:               in.Branch,
+		DockerfilePath:       path.Clean(in.DockerfilePath),
+		BuildContext:         path.Clean(in.BuildContext),
+		TestCommand:          optional(in.TestCommand),
+		ProviderWebhookID:    hookID,
+		RegistryConnectionID: in.RegistryConnectionID,
+		ImageRepository:      imageRepository,
+		CreatedBy:            &userID,
 	})
 	if err != nil {
 		// Do not leave a webhook behind for an application that does not exist.
@@ -154,12 +169,17 @@ type UpdateInput struct {
 	DockerfilePath *string
 	BuildContext   *string
 	TestCommand    *string
+	// ImageRepository non-nil changes the image; "" removes it, together
+	// with the registry.
+	RegistryConnectionID *uuid.UUID
+	ImageRepository      *string
 }
 
 // Update changes build settings. The repository is fixed; create a new
 // application to build from another one.
 func (s *Service) Update(ctx context.Context, userID, applicationID uuid.UUID, in UpdateInput) (Application, error) {
-	if _, err := s.authorize(ctx, userID, applicationID, authz.ManageApps); err != nil {
+	current, err := s.authorize(ctx, userID, applicationID, authz.ManageApps)
+	if err != nil {
 		return Application{}, err
 	}
 	params := store.UpdateApplicationParams{ID: applicationID}
@@ -189,7 +209,15 @@ func (s *Service) Update(ctx context.Context, userID, applicationID uuid.UUID, i
 		params.SetTestCommand = true
 		params.TestCommand = optional(strings.TrimSpace(*in.TestCommand))
 	}
+	if in.ImageRepository != nil {
+		params.SetImage = true
+		params.RegistryConnectionID = in.RegistryConnectionID
+		params.ImageRepository = checkImage(errs, in.RegistryConnectionID, *in.ImageRepository)
+	}
 	if err := errs.Err(); err != nil {
+		return Application{}, err
+	}
+	if err := s.checkRegistry(ctx, current.ProjectID, params.RegistryConnectionID); err != nil {
 		return Application{}, err
 	}
 
@@ -235,6 +263,14 @@ func (s *Service) authorize(ctx context.Context, userID, applicationID uuid.UUID
 	return row, nil
 }
 
+// checkRegistry rejects a registry from another project, as if it did not exist.
+func (s *Service) checkRegistry(ctx context.Context, projectID uuid.UUID, registryID *uuid.UUID) error {
+	if registryID == nil {
+		return nil
+	}
+	return s.registries.CheckInProject(ctx, projectID, *registryID)
+}
+
 func withDefaults(in CreateInput) CreateInput {
 	in.Name = strings.TrimSpace(in.Name)
 	in.Branch = strings.TrimSpace(in.Branch)
@@ -253,6 +289,7 @@ func toApplication(row store.Application) Application {
 		ID: row.ID, ProjectID: row.ProjectID, Name: row.Name, GitConnectionID: row.GitConnectionID,
 		RepositoryID: row.RepositoryID, RepositoryFullName: row.RepositoryFullName, Branch: row.Branch,
 		DockerfilePath: row.DockerfilePath, BuildContext: row.BuildContext, TestCommand: row.TestCommand,
+		RegistryConnectionID: row.RegistryConnectionID, ImageRepository: row.ImageRepository,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
 }

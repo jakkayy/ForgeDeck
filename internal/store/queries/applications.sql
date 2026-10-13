@@ -1,10 +1,12 @@
 -- name: CreateApplication :one
 INSERT INTO applications (
     project_id, name, git_connection_id, repository_id, repository_full_name,
-    branch, dockerfile_path, build_context, test_command, provider_webhook_id, created_by
+    branch, dockerfile_path, build_context, test_command, provider_webhook_id,
+    registry_connection_id, image_repository, created_by
 ) VALUES (
     @project_id, @name, @git_connection_id, @repository_id, @repository_full_name,
-    @branch, @dockerfile_path, @build_context, @test_command, @provider_webhook_id, @created_by
+    @branch, @dockerfile_path, @build_context, @test_command, @provider_webhook_id,
+    @registry_connection_id, @image_repository, @created_by
 )
 RETURNING *;
 
@@ -24,6 +26,9 @@ SET name            = COALESCE(sqlc.narg(name), name),
     dockerfile_path = COALESCE(sqlc.narg(dockerfile_path), dockerfile_path),
     build_context   = COALESCE(sqlc.narg(build_context), build_context),
     test_command    = CASE WHEN @set_test_command::boolean THEN sqlc.narg(test_command) ELSE test_command END,
+    registry_connection_id = CASE WHEN @set_image::boolean
+        THEN sqlc.narg(registry_connection_id)::uuid ELSE registry_connection_id END,
+    image_repository = CASE WHEN @set_image::boolean THEN sqlc.narg(image_repository) ELSE image_repository END,
     updated_at      = now()
 WHERE id = @id
 RETURNING *;

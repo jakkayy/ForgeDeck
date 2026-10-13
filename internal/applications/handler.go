@@ -46,13 +46,15 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 }
 
 type createRequest struct {
-	Name            string    `json:"name"`
-	GitConnectionID uuid.UUID `json:"git_connection_id"`
-	RepositoryID    string    `json:"repository_id"`
-	Branch          string    `json:"branch"`
-	DockerfilePath  string    `json:"dockerfile_path"`
-	BuildContext    string    `json:"build_context"`
-	TestCommand     string    `json:"test_command"`
+	Name                 string     `json:"name"`
+	GitConnectionID      uuid.UUID  `json:"git_connection_id"`
+	RepositoryID         string     `json:"repository_id"`
+	Branch               string     `json:"branch"`
+	DockerfilePath       string     `json:"dockerfile_path"`
+	BuildContext         string     `json:"build_context"`
+	TestCommand          string     `json:"test_command"`
+	RegistryConnectionID *uuid.UUID `json:"registry_connection_id"`
+	ImageRepository      string     `json:"image_repository"`
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) error {
@@ -84,11 +86,13 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
 }
 
 type updateRequest struct {
-	Name           *string `json:"name"`
-	Branch         *string `json:"branch"`
-	DockerfilePath *string `json:"dockerfile_path"`
-	BuildContext   *string `json:"build_context"`
-	TestCommand    *string `json:"test_command"`
+	Name                 *string    `json:"name"`
+	Branch               *string    `json:"branch"`
+	DockerfilePath       *string    `json:"dockerfile_path"`
+	BuildContext         *string    `json:"build_context"`
+	TestCommand          *string    `json:"test_command"`
+	RegistryConnectionID *uuid.UUID `json:"registry_connection_id"`
+	ImageRepository      *string    `json:"image_repository"`
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) error {

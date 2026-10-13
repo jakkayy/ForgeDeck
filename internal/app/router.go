@@ -22,6 +22,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/projects"
+	"github.com/jakkayy/ForgeDeck/internal/registries"
 	"github.com/jakkayy/ForgeDeck/internal/runnerapi"
 	"github.com/jakkayy/ForgeDeck/internal/runners"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
@@ -55,7 +56,8 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		PublicURL: cfg.PublicURL, Now: time.Now,
 	})
 	gitHandler := gitconn.NewHandler(gitService, logger)
-	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService))
+	registryService := registries.NewService(store.New(pool), authorizer, cfg.Keyring)
+	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService, registryService))
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, middleware.GetHead)
@@ -79,6 +81,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			jobs.NewHandler(ctx, jobService, notifier).Routes(signedIn)
 			gitHandler.Routes(signedIn)
 			appHandler.Routes(signedIn)
+			registries.NewHandler(registryService).Routes(signedIn)
 		})
 	})
 	router.Get("/*", webui.Handler(webui.FS()).ServeHTTP)
