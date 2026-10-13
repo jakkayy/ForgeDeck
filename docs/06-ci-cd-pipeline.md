@@ -164,7 +164,9 @@ Avoid building a general-purpose CI YAML language in the first version.
 
 ## 13. Open decisions
 
-- Whether deploy starts automatically after a successful build or requires approval in production.
+Resolved in [15 — Deployments and Releases](15-deployments.md): automatic deploy is a per-environment opt-in (default off); rollback after a failed health check is automatic; deployment and release are separate records.
+
+- Whether deploy starts automatically after a successful build or requires approval in production. *(Resolved: opt-in per environment.)*
 - How Compose files are provided, validated, and versioned.
 - Whether to support multiple services in one application in MVP.
 - Rollback policy after health-check failure.

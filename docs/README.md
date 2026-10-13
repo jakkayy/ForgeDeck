@@ -30,6 +30,7 @@ ForgeDeck คือแพลตฟอร์ม DevOps แบบ Self-hosted ส�
 | [12 — Measurements](12-measurements.md) | ผลวัด latency และทรัพยากร |
 | [13 — Git Providers](13-git-providers.md) | ตั้งค่า GitHub App และ GitLab |
 | [14 — Runner](14-runner.md) | Protocol, ขั้นตอน build และ isolation ของ Runner |
+| [15 — Deployments](15-deployments.md) | Environment, deployment, release, rollback, service configuration |
 | [AGENTS.md](../AGENTS.md) | กฎสำหรับ AI coding agents |
 
 ---
