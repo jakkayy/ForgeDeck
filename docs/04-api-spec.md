@@ -75,6 +75,20 @@ See [13 — Git Providers](13-git-providers.md) for provider setup.
 
 An application's image destination is `registry_connection_id` plus `image_repository` (e.g. `acme/shop-api`, no host or tag), set together on create or update; `"image_repository": ""` removes both. The registry must belong to the application's project. Registry passwords are write-only.
 
+### Environments
+
+See [15 — Deployments](15-deployments.md) for the model and the `config` fields.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/applications/{applicationID}/environments` | List environments |
+| POST | `/applications/{applicationID}/environments` | Create: `name`, `server_id`, optional `auto_deploy`, optional `config` (admin) |
+| GET | `/environments/{environmentID}` | Get |
+| PATCH | `/environments/{environmentID}` | Change `name`, `server_id`, `auto_deploy`, or replace `config` (admin) |
+| DELETE | `/environments/{environmentID}` | Delete; volumes on the server are left in place (admin) |
+
+`config` is validated and returned with defaults filled (loopback bind, `unless-stopped`, a health check). The server must belong to the application's project, and a published port may be used once per server (`422` otherwise). A server with environments cannot be removed (`409 server_in_use`). Unknown `config` fields are rejected.
+
 ## 6. Servers and containers
 
 Servers belong to a project. Every server-scoped endpoint resolves the project through `servers.project_id` and checks the caller's membership and role.

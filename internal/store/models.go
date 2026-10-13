@@ -49,6 +49,19 @@ type EnrollmentToken struct {
 	ServerID   *uuid.UUID
 }
 
+type Environment struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	Name          string
+	ServerID      uuid.UUID
+	AutoDeploy    bool
+	Config        json.RawMessage
+	PublishedPort *int32
+	CreatedBy     *uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type GitConnection struct {
 	ID                uuid.UUID
 	ProjectID         uuid.UUID

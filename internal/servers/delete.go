@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/jakkayy/ForgeDeck/internal/apperr"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/database"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
@@ -23,7 +24,11 @@ func (s *Service) Delete(ctx context.Context, userID, serverID uuid.UUID) error 
 	}
 	return database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.queries.WithTx(tx)
-		if err := q.DeleteServer(ctx, serverID); err != nil {
+		err := q.DeleteServer(ctx, serverID)
+		if database.IsForeignKeyViolation(err) {
+			return apperr.Conflict("server_in_use", "Environments still deploy to this server. Move or delete them first.")
+		}
+		if err != nil {
 			return fmt.Errorf("delete server: %w", err)
 		}
 		return q.NotifyWorkers(ctx, store.NotifyWorkersParams{Channel: jobs.NotifyChannel, Payload: serverID.String()})
