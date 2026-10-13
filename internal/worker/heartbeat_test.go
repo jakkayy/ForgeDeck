@@ -1,4 +1,4 @@
-package agent_test
+package worker_test
 
 import (
 	"context"
@@ -8,18 +8,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jakkayy/ForgeDeck/internal/agent"
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-func enrolledClient(t *testing.T) (*apitest.Env, *apitest.Client, apitest.Agent, *agent.Client) {
+func enrolledClient(t *testing.T) (*apitest.Env, *apitest.Client, apitest.Agent, *worker.Client) {
 	t.Helper()
 	env := apitest.New(t)
 	owner, _ := env.NewUser("owner@example.com")
 	enrolled := env.EnrollAgent(owner, owner.CreateProject("Infra"), "prod-01")
-	return env, owner, enrolled, agent.NewClient(env.Server.URL, enrolled.Credential)
+	return env, owner, enrolled, worker.NewClient(env.Server.URL, worker.AgentAPI, enrolled.Credential)
 }
 
 func dockerUp(context.Context) (agentproto.Docker, *agentproto.Resources) {
@@ -31,7 +31,7 @@ func TestHeartbeaterMarksServerOnline(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- agent.NewHeartbeater(client, "0.3.0", dockerUp, slog.New(slog.DiscardHandler)).Run(ctx)
+		done <- worker.NewHeartbeater(client, "0.3.0", dockerUp, slog.New(slog.DiscardHandler)).Run(ctx)
 	}()
 
 	deadline := time.Now().Add(5 * time.Second)
@@ -60,8 +60,8 @@ func TestHeartbeaterStopsWhenServerRemoved(t *testing.T) {
 	_, owner, enrolled, client := enrolledClient(t)
 	owner.Do(http.MethodDelete, "/api/v1/servers/"+enrolled.ServerID.String(), nil).RequireStatus(http.StatusNoContent)
 
-	err := agent.NewHeartbeater(client, "0.3.0", dockerUp, slog.New(slog.DiscardHandler)).Run(context.Background())
-	if !errors.Is(err, agent.ErrUnauthorized) {
+	err := worker.NewHeartbeater(client, "0.3.0", dockerUp, slog.New(slog.DiscardHandler)).Run(context.Background())
+	if !errors.Is(err, worker.ErrUnauthorized) {
 		t.Fatalf("got %v, want ErrUnauthorized", err)
 	}
 }

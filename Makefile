@@ -5,7 +5,7 @@ export
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 GO_BUILD = CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
 
-.PHONY: fmt lint test generate web build build-api build-agent migrate-up migrate-down migrate-status
+.PHONY: fmt lint test generate web build build-api build-agent build-runner migrate-up migrate-down migrate-status
 
 fmt:
 	golangci-lint fmt
@@ -25,13 +25,16 @@ web:
 	find internal/webui/dist -mindepth 1 ! -name .gitkeep -delete
 	cp -R apps/web/dist/. internal/webui/dist/
 
-build: web build-api build-agent
+build: web build-api build-agent build-runner
 
 build-api:
 	$(GO_BUILD) -o bin/forgedeck-api ./cmd/api
 
 build-agent:
 	$(GO_BUILD) -o bin/forgedeck-agent ./cmd/agent
+
+build-runner:
+	$(GO_BUILD) -o bin/forgedeck-runner ./cmd/runner
 
 migrate-up:
 	go run ./cmd/api migrate up

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agent/docker"
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
 // ContainerOperator performs container lifecycle actions.
@@ -21,21 +22,21 @@ type ContainerOperator interface {
 }
 
 var (
-	errInvalidPayload = &JobError{Code: "invalid_payload", Message: "The job payload is not valid for this Agent."}
-	errSelfAction     = &JobError{Code: "agent_container", Message: "Refusing to act on the Agent's own container; it would disconnect this server."}
-	errNoContainer    = &JobError{Code: "container_not_found", Message: "The container no longer exists on this server."}
+	errInvalidPayload = &worker.JobError{Code: "invalid_payload", Message: "The job payload is not valid for this Agent."}
+	errSelfAction     = &worker.JobError{Code: "agent_container", Message: "Refusing to act on the Agent's own container; it would disconnect this server."}
+	errNoContainer    = &worker.JobError{Code: "container_not_found", Message: "The container no longer exists on this server."}
 	shortContainerID  = regexp.MustCompile(`^[a-f0-9]{12,64}$`)
 )
 
 // ContainerActionHandler starts, stops, or restarts a container. selfID is
 // the Agent's own container ID ("" when it runs outside a container).
-func ContainerActionHandler(engine ContainerOperator, selfID string) Handler {
+func ContainerActionHandler(engine ContainerOperator, selfID string) worker.Handler {
 	actions := map[string]func(context.Context, string) error{
 		agentproto.ActionStart:   engine.Start,
 		agentproto.ActionStop:    engine.Stop,
 		agentproto.ActionRestart: engine.Restart,
 	}
-	return func(ctx context.Context, raw json.RawMessage, log Logger) (any, error) {
+	return func(ctx context.Context, raw json.RawMessage, log worker.Logger) (any, error) {
 		var p agentproto.ContainerActionPayload
 		if err := json.Unmarshal(raw, &p); err != nil || !shortContainerID.MatchString(p.ContainerID) {
 			return nil, errInvalidPayload
@@ -53,7 +54,7 @@ func ContainerActionHandler(engine ContainerOperator, selfID string) Handler {
 			if errors.Is(err, docker.ErrContainerNotFound) {
 				return nil, errNoContainer
 			}
-			return nil, &JobError{Code: "docker_error", Message: err.Error()}
+			return nil, &worker.JobError{Code: "docker_error", Message: err.Error()}
 		}
 		log.Log(agentproto.StreamSystem, "done")
 		return p, nil

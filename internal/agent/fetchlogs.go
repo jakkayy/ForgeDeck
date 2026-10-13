@@ -10,6 +10,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agent/docker"
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
 // LogReader reads a container's past output.
@@ -28,8 +29,8 @@ var errLogBudget = errors.New("log byte budget exhausted")
 
 // FetchLogsHandler streams a bounded range of past container output as job
 // logs. Limits are enforced here regardless of what the payload asks for.
-func FetchLogsHandler(engine LogReader) Handler {
-	return func(ctx context.Context, raw json.RawMessage, log Logger) (any, error) {
+func FetchLogsHandler(engine LogReader) worker.Handler {
+	return func(ctx context.Context, raw json.RawMessage, log worker.Logger) (any, error) {
 		var p agentproto.FetchLogsPayload
 		if err := json.Unmarshal(raw, &p); err != nil || !shortContainerID.MatchString(p.ContainerID) {
 			return nil, errInvalidPayload
@@ -50,7 +51,7 @@ func FetchLogsHandler(engine LogReader) Handler {
 		case errors.Is(err, docker.ErrContainerNotFound):
 			return nil, errNoContainer
 		case err != nil && !errors.Is(err, errLogBudget):
-			return nil, &JobError{Code: "docker_error", Message: err.Error()}
+			return nil, &worker.JobError{Code: "docker_error", Message: err.Error()}
 		}
 		result := FetchLogsResult{Lines: budget.lines, Truncated: budget.exhausted}
 		if result.Truncated {
@@ -70,7 +71,7 @@ type logBudget struct {
 // lineWriter turns a byte stream into log lines.
 type lineWriter struct {
 	stream  string
-	log     Logger
+	log     worker.Logger
 	budget  *logBudget
 	partial []byte
 }

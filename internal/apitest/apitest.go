@@ -223,8 +223,14 @@ func (a Agent) ReportContainers(t testing.TB, ids ...string) {
 	}
 }
 
+// Runner is a registered Runner with a client that authenticates as it.
+type Runner struct {
+	Credential string
+	*Client
+}
+
 // NewRunner registers a Runner and returns a client authenticated as it.
-func (e *Env) NewRunner(name string) *Client {
+func (e *Env) NewRunner(name string) Runner {
 	e.t.Helper()
 	_, credential, err := runners.NewService(store.New(e.Pool), time.Now).Create(context.Background(), name)
 	if err != nil {
@@ -232,7 +238,7 @@ func (e *Env) NewRunner(name string) *Client {
 	}
 	client := e.Anonymous()
 	client.bearer = credential
-	return client
+	return Runner{Credential: credential, Client: client}
 }
 
 // CreateProject creates a project owned by the client's user and returns its ID.

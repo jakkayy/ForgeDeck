@@ -1,4 +1,6 @@
-package agent
+// Package worker is the client side of the job protocol shared by Agents and
+// Runners: the Control Plane client, the heartbeat loop, and the job loop.
+package worker
 
 import (
 	"bytes"
@@ -19,10 +21,10 @@ import (
 const requestTimeout = 30 * time.Second
 
 var (
-	// ErrUnauthorized means the credential was rejected: the server was
-	// removed from ForgeDeck. The Agent must stop and be re-enrolled.
-	ErrUnauthorized = errors.New("control plane rejected the agent credential")
-	// ErrLeaseLost means a job attempt no longer belongs to this Agent.
+	// ErrUnauthorized means the credential was rejected: the server or
+	// Runner was removed from ForgeDeck. The worker must stop.
+	ErrUnauthorized = errors.New("control plane rejected the credential")
+	// ErrLeaseLost means a job attempt no longer belongs to this worker.
 	ErrLeaseLost = errors.New("job lease lost")
 )
 
@@ -37,30 +39,33 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("control plane returned %d %s: %s", e.Status, e.Code, e.Message)
 }
 
-// Client calls the Control Plane's Agent API.
+// API base paths for each kind of worker.
+const (
+	AgentAPI  = "/api/v1/agent"
+	RunnerAPI = "/api/v1/runner"
+)
+
+// Client calls one worker API (AgentAPI or RunnerAPI) of the Control Plane.
 type Client struct {
 	baseURL    string
 	credential string
 	http       *http.Client
 }
 
-// NewClient returns a client for baseURL. credential may be empty before
-// enrollment.
-func NewClient(baseURL, credential string) *Client {
+// NewClient returns a client for the API at controlPlaneURL+api. credential
+// may be empty before enrollment.
+func NewClient(controlPlaneURL, api, credential string) *Client {
 	return &Client{
-		baseURL:    strings.TrimRight(baseURL, "/"),
+		baseURL:    strings.TrimRight(controlPlaneURL, "/") + api,
 		credential: credential,
 		http:       &http.Client{},
 	}
 }
 
-// Enroll exchanges a single-use token for this Agent's credential.
-func (c *Client) Enroll(ctx context.Context, token, version string) (agentproto.EnrollResponse, error) {
-	var resp agentproto.EnrollResponse
-	err := c.do(ctx, requestTimeout, "/api/v1/agent/enroll", agentproto.EnrollRequest{
-		Token: token, AgentVersion: version, ProtocolVersion: agentproto.ProtocolVersion,
-	}, &resp)
-	return resp, err
+// Post sends body to an endpoint below the client's API, such as "/enroll",
+// and decodes the JSON response into out when non-nil.
+func (c *Client) Post(ctx context.Context, path string, body, out any) error {
+	return c.do(ctx, requestTimeout, path, body, out)
 }
 
 // do POSTs body as JSON and decodes a JSON response into out when non-nil.
@@ -124,14 +129,7 @@ func apiError(status int, body []byte) error {
 // Heartbeat reports liveness and status.
 func (c *Client) Heartbeat(ctx context.Context, req agentproto.HeartbeatRequest) (agentproto.HeartbeatResponse, error) {
 	var resp agentproto.HeartbeatResponse
-	err := c.do(ctx, requestTimeout, "/api/v1/agent/heartbeat", req, &resp)
-	return resp, err
-}
-
-// Snapshot replaces the server's container list on the Control Plane.
-func (c *Client) Snapshot(ctx context.Context, snapshot agentproto.ContainerSnapshot) (agentproto.SnapshotResponse, error) {
-	var resp agentproto.SnapshotResponse
-	err := c.do(ctx, requestTimeout, "/api/v1/agent/containers/snapshot", snapshot, &resp)
+	err := c.do(ctx, requestTimeout, "/heartbeat", req, &resp)
 	return resp, err
 }
 
@@ -140,7 +138,7 @@ func (c *Client) Snapshot(ctx context.Context, snapshot agentproto.ContainerSnap
 func (c *Client) Claim(ctx context.Context, wait time.Duration) (*agentproto.Job, error) {
 	seconds := int(wait / time.Second)
 	var job agentproto.Job
-	if err := c.do(ctx, wait+requestTimeout, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &seconds}, &job); err != nil {
+	if err := c.do(ctx, wait+requestTimeout, "/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &seconds}, &job); err != nil {
 		return nil, err
 	}
 	if job.ID == uuid.Nil {
@@ -151,18 +149,18 @@ func (c *Client) Claim(ctx context.Context, wait time.Duration) (*agentproto.Job
 
 // RenewLease extends the lease on a job attempt.
 func (c *Client) RenewLease(ctx context.Context, job *agentproto.Job) error {
-	return c.do(ctx, requestTimeout, "/api/v1/agent/jobs/"+job.ID.String()+"/heartbeat",
+	return c.do(ctx, requestTimeout, "/jobs/"+job.ID.String()+"/heartbeat",
 		agentproto.LeaseRequest{Attempt: job.Attempt}, nil)
 }
 
 // SendEvents appends log events to a job attempt.
 func (c *Client) SendEvents(ctx context.Context, job *agentproto.Job, events []agentproto.LogEvent) error {
-	return c.do(ctx, requestTimeout, "/api/v1/agent/jobs/"+job.ID.String()+"/events",
+	return c.do(ctx, requestTimeout, "/jobs/"+job.ID.String()+"/events",
 		agentproto.EventsRequest{Attempt: job.Attempt, Events: events}, nil)
 }
 
 // Complete reports the outcome of a job attempt.
 func (c *Client) Complete(ctx context.Context, job *agentproto.Job, req agentproto.CompleteRequest) error {
 	req.Attempt = job.Attempt
-	return c.do(ctx, requestTimeout, "/api/v1/agent/jobs/"+job.ID.String()+"/complete", req, nil)
+	return c.do(ctx, requestTimeout, "/jobs/"+job.ID.String()+"/complete", req, nil)
 }

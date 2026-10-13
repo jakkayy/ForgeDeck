@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jakkayy/ForgeDeck/internal/agent/docker"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
 type recordingEngine struct {
@@ -36,7 +37,7 @@ func runAction(t *testing.T, engine *recordingEngine, selfID string, payload map
 }
 
 func jobErrorCode(err error) string {
-	var jobErr *JobError
+	var jobErr *worker.JobError
 	if errors.As(err, &jobErr) {
 		return jobErr.Code
 	}

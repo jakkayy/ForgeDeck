@@ -1,4 +1,4 @@
-package agent_test
+package worker_test
 
 import (
 	"context"
@@ -11,19 +11,19 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jakkayy/ForgeDeck/internal/agent"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
 	"github.com/jakkayy/ForgeDeck/internal/store"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
 type workerFixture struct {
 	env       *apitest.Env
 	owner     *apitest.Client
 	enrolled  apitest.Agent
-	client    *agent.Client
+	client    *worker.Client
 	projectID uuid.UUID
 }
 
@@ -34,7 +34,7 @@ func newWorkerFixture(t *testing.T) workerFixture {
 	projectID := owner.CreateProject("Infra")
 	enrolled := env.EnrollAgent(owner, projectID, "prod-01")
 	return workerFixture{env: env, owner: owner, enrolled: enrolled, projectID: projectID,
-		client: agent.NewClient(env.Server.URL, enrolled.Credential)}
+		client: worker.NewClient(env.Server.URL, worker.AgentAPI, enrolled.Credential)}
 }
 
 func (f workerFixture) enqueue(t *testing.T, jobType string) uuid.UUID {
@@ -66,13 +66,13 @@ func (f workerFixture) waitForJob(t *testing.T, id uuid.UUID) jobs.Job {
 	}
 }
 
-func startWorker(t *testing.T, f workerFixture, handlers map[string]agent.Handler, afterJob func()) {
+func startWorker(t *testing.T, f workerFixture, handlers map[string]worker.Handler, afterJob func()) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		_ = agent.NewWorker(f.client, handlers, afterJob, slog.New(slog.DiscardHandler)).Run(ctx)
+		_ = worker.NewWorker(f.client, handlers, afterJob, slog.New(slog.DiscardHandler)).Run(ctx)
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -83,18 +83,18 @@ func startWorker(t *testing.T, f workerFixture, handlers map[string]agent.Handle
 func TestWorkerRunsHandlersAndReportsOutcome(t *testing.T) {
 	f := newWorkerFixture(t)
 	afterJobs := make(chan struct{}, 10)
-	startWorker(t, f, map[string]agent.Handler{
-		"echo": func(_ context.Context, payload json.RawMessage, log agent.Logger) (any, error) {
+	startWorker(t, f, map[string]worker.Handler{
+		"echo": func(_ context.Context, payload json.RawMessage, log worker.Logger) (any, error) {
 			var p map[string]string
 			_ = json.Unmarshal(payload, &p)
 			log.Log("stdout", p["greeting"])
 			log.Log("system", "done")
 			return map[string]string{"echoed": p["greeting"]}, nil
 		},
-		"boom": func(context.Context, json.RawMessage, agent.Logger) (any, error) {
-			return nil, &agent.JobError{Code: "container_not_found", Message: "No such container."}
+		"boom": func(context.Context, json.RawMessage, worker.Logger) (any, error) {
+			return nil, &worker.JobError{Code: "container_not_found", Message: "No such container."}
 		},
-		"crash": func(context.Context, json.RawMessage, agent.Logger) (any, error) {
+		"crash": func(context.Context, json.RawMessage, worker.Logger) (any, error) {
 			return nil, errors.New("docker daemon unreachable")
 		},
 	}, func() { afterJobs <- struct{}{} })
@@ -114,7 +114,7 @@ func TestWorkerRunsHandlersAndReportsOutcome(t *testing.T) {
 	if boom := f.waitForJob(t, f.enqueue(t, "boom")); boom.Error == nil || boom.Error.Code != "container_not_found" {
 		t.Fatalf("boom job %+v", boom)
 	}
-	if crash := f.waitForJob(t, f.enqueue(t, "crash")); crash.Error == nil || crash.Error.Code != "agent_error" {
+	if crash := f.waitForJob(t, f.enqueue(t, "crash")); crash.Error == nil || crash.Error.Code != "worker_error" {
 		t.Fatalf("crash job %+v", crash)
 	}
 	if unknown := f.waitForJob(t, f.enqueue(t, "deploy_image")); unknown.Error == nil || unknown.Error.Code != "unsupported_job_type" {

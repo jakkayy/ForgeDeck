@@ -25,6 +25,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/agent/docker"
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/logging"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -62,7 +63,7 @@ func enroll(ctx context.Context, args []string) error {
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if err := agent.ValidateControlPlaneURL(*controlPlaneURL, *allowInsecure); err != nil {
+	if err := worker.ValidateControlPlaneURL(*controlPlaneURL, *allowInsecure); err != nil {
 		return err
 	}
 	token, err := enrollmentToken(os.Stdin)
@@ -108,7 +109,7 @@ func runAgent(ctx context.Context, args []string) error {
 	}
 	defer func() { _ = engine.Close() }()
 
-	handlers := map[string]agent.Handler{
+	handlers := map[string]worker.Handler{
 		agentproto.JobContainerAction: agent.ContainerActionHandler(engine, agent.SelfContainerID()),
 		agentproto.JobFetchLogs:       agent.FetchLogsHandler(engine),
 	}

@@ -1,4 +1,4 @@
-package agent
+package worker
 
 import (
 	"context"
@@ -37,7 +37,7 @@ type Logger interface {
 // success with that result; errors are reported as failures.
 type Handler func(ctx context.Context, payload json.RawMessage, log Logger) (result any, err error)
 
-// Worker claims jobs for this server and runs them one at a time.
+// Worker claims jobs and runs them one at a time.
 type Worker struct {
 	client   *Client
 	handlers map[string]Handler
@@ -68,7 +68,7 @@ func (w *Worker) Run(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return nil
-			case <-time.After(jitter(backoff)):
+			case <-time.After(Jitter(backoff)):
 			}
 			backoff = min(backoff*2, maxClaimBackoff)
 			continue
@@ -112,7 +112,7 @@ func (w *Worker) execute(ctx context.Context, job *agentproto.Job) {
 func (w *Worker) run(ctx context.Context, job *agentproto.Job, output Logger) (any, error) {
 	handler, ok := w.handlers[job.Type]
 	if !ok {
-		return nil, &JobError{Code: "unsupported_job_type", Message: fmt.Sprintf("This Agent cannot run %q jobs. Upgrade the Agent.", job.Type)}
+		return nil, &JobError{Code: "unsupported_job_type", Message: fmt.Sprintf("This worker cannot run %q jobs. Upgrade it.", job.Type)}
 	}
 	return handler(ctx, job.Payload, output)
 }
@@ -139,7 +139,7 @@ func completion(result any, err error) agentproto.CompleteRequest {
 	if err != nil {
 		var jobErr *JobError
 		if !errors.As(err, &jobErr) {
-			jobErr = &JobError{Code: "agent_error", Message: err.Error()}
+			jobErr = &JobError{Code: "worker_error", Message: err.Error()}
 		}
 		return agentproto.CompleteRequest{Outcome: agentproto.OutcomeFailed, ErrorCode: jobErr.Code, ErrorMessage: jobErr.Message}
 	}

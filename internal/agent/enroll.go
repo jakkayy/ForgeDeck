@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"net/url"
+
+	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
 // Enroll registers this host with the Control Plane and stores the identity.
@@ -18,7 +19,10 @@ func Enroll(ctx context.Context, state *State, controlPlaneURL, token, version s
 		return Identity{}, err
 	}
 
-	resp, err := NewClient(controlPlaneURL, "").Enroll(ctx, token, version)
+	var resp agentproto.EnrollResponse
+	err := worker.NewClient(controlPlaneURL, worker.AgentAPI, "").Post(ctx, "/enroll", agentproto.EnrollRequest{
+		Token: token, AgentVersion: version, ProtocolVersion: agentproto.ProtocolVersion,
+	}, &resp)
 	if err != nil {
 		return Identity{}, fmt.Errorf("enroll: %w", err)
 	}
@@ -32,25 +36,4 @@ func Enroll(ctx context.Context, state *State, controlPlaneURL, token, version s
 		return Identity{}, err
 	}
 	return identity, nil
-}
-
-// ValidateControlPlaneURL requires HTTPS so the credential is never sent in
-// clear text, except to a loopback address or when allowInsecure is set.
-func ValidateControlPlaneURL(raw string, allowInsecure bool) error {
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
-		return fmt.Errorf("control plane URL %q must look like https://forgedeck.example.com", raw)
-	}
-	if u.Scheme == "https" || allowInsecure || isLoopback(u.Hostname()) {
-		return nil
-	}
-	return fmt.Errorf("control plane URL %q is not HTTPS; use https or pass --allow-insecure for a trusted network", raw)
-}
-
-func isLoopback(host string) bool {
-	if host == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }

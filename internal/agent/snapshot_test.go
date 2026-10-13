@@ -9,8 +9,18 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/agent"
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
+
+func enrolledClient(t *testing.T) (*apitest.Env, *apitest.Client, apitest.Agent, *worker.Client) {
+	t.Helper()
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	enrolled := env.EnrollAgent(owner, owner.CreateProject("Infra"), "prod-01")
+	return env, owner, enrolled, worker.NewClient(env.Server.URL, worker.AgentAPI, enrolled.Credential)
+}
 
 type fakeEngine struct {
 	containers chan []agentproto.Container

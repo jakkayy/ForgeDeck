@@ -1,4 +1,4 @@
-package agent
+package worker
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func NewHeartbeater(client *Client, version string, status StatusFunc, logger *s
 }
 
 // Run sends heartbeats until ctx ends. It returns ErrUnauthorized when the
-// credential is rejected, which means the server was removed. Other errors
+// credential is rejected, which means the server or Runner was removed. Other errors
 // are logged and retried on the next tick.
 func (h *Heartbeater) Run(ctx context.Context) error {
 	interval := defaultHeartbeatInterval
@@ -53,13 +53,13 @@ func (h *Heartbeater) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(jitter(interval)):
+		case <-time.After(Jitter(interval)):
 		}
 	}
 }
 
-// jitter spreads Agents out by ±10% so they do not report in lockstep.
-func jitter(d time.Duration) time.Duration {
+// Jitter spreads workers out by ±10% so they do not report in lockstep.
+func Jitter(d time.Duration) time.Duration {
 	spread := d / 10
 	return d - spread + rand.N(2*spread+1) //nolint:gosec // timing jitter, not security sensitive
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
+	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
 // snapshotInterval keeps the dashboard's container list well inside the
@@ -21,14 +22,14 @@ type ContainerLister interface {
 // SnapshotReporter sends the full container list periodically and whenever
 // Trigger is called (for example after a container action).
 type SnapshotReporter struct {
-	client  *Client
+	client  *worker.Client
 	engine  ContainerLister
 	logger  *slog.Logger
 	trigger chan struct{}
 }
 
 // NewSnapshotReporter returns a reporter for engine's containers.
-func NewSnapshotReporter(client *Client, engine ContainerLister, logger *slog.Logger) *SnapshotReporter {
+func NewSnapshotReporter(client *worker.Client, engine ContainerLister, logger *slog.Logger) *SnapshotReporter {
 	return &SnapshotReporter{client: client, engine: engine, logger: logger, trigger: make(chan struct{}, 1)}
 }
 
@@ -40,13 +41,13 @@ func (r *SnapshotReporter) Trigger() {
 	}
 }
 
-// Run reports until ctx ends. It returns ErrUnauthorized when the
+// Run reports until ctx ends. It returns worker.ErrUnauthorized when the
 // credential is rejected; other failures are logged and retried.
 func (r *SnapshotReporter) Run(ctx context.Context) error {
 	ticker := time.NewTicker(snapshotInterval)
 	defer ticker.Stop()
 	for {
-		if err := r.report(ctx); errors.Is(err, ErrUnauthorized) {
+		if err := r.report(ctx); errors.Is(err, worker.ErrUnauthorized) {
 			return err
 		} else if err != nil && ctx.Err() == nil {
 			r.logger.Warn("container snapshot failed", "error", err)
@@ -71,6 +72,6 @@ func (r *SnapshotReporter) report(ctx context.Context) error {
 			"total", len(containers), "reported", agentproto.MaxSnapshotContainers)
 		containers = containers[:agentproto.MaxSnapshotContainers]
 	}
-	_, err = r.client.Snapshot(ctx, agentproto.ContainerSnapshot{ObservedAt: observedAt, Containers: containers})
-	return err
+	return r.client.Post(ctx, "/containers/snapshot",
+		agentproto.ContainerSnapshot{ObservedAt: observedAt, Containers: containers}, nil)
 }
