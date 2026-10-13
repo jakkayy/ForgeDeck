@@ -9,6 +9,7 @@ import { GitSection } from "../../../components/project/GitSection";
 import { MembersSection } from "../../../components/project/MembersSection";
 import { RegistriesSection } from "../../../components/project/RegistriesSection";
 import { SecretsSection } from "../../../components/project/SecretsSection";
+import { SetupGuide } from "../../../components/project/SetupGuide";
 import { QueryError } from "../../../components/QueryError";
 import { RoleChip } from "../../../components/RoleChip";
 import { useHasRole } from "../../../lib/useHasRole";
@@ -77,6 +78,7 @@ function ProjectPage() {
           <RoleChip role={project.data.role} />
         </div>
       </div>
+      <SetupGuide projectId={projectId} />
       {/* isolate keeps the tab indicator's z-index from rising above dialogs */}
       <Tabs
         className="isolate"
