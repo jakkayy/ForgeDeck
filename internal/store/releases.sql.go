@@ -7,9 +7,51 @@ package store
 
 import (
 	"context"
+	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+const createRelease = `-- name: CreateRelease :one
+INSERT INTO releases (application_id, environment_id, deployment_id, commit_sha, image_ref, config)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (deployment_id) DO NOTHING
+RETURNING id, application_id, environment_id, deployment_id, commit_sha, image_ref, config, created_at
+`
+
+type CreateReleaseParams struct {
+	ApplicationID uuid.UUID
+	EnvironmentID uuid.UUID
+	DeploymentID  uuid.UUID
+	CommitSha     string
+	ImageRef      string
+	Config        json.RawMessage
+}
+
+// A deployment becomes a release once; recording it again changes nothing.
+func (q *Queries) CreateRelease(ctx context.Context, arg CreateReleaseParams) (Release, error) {
+	row := q.db.QueryRow(ctx, createRelease,
+		arg.ApplicationID,
+		arg.EnvironmentID,
+		arg.DeploymentID,
+		arg.CommitSha,
+		arg.ImageRef,
+		arg.Config,
+	)
+	var i Release
+	err := row.Scan(
+		&i.ID,
+		&i.ApplicationID,
+		&i.EnvironmentID,
+		&i.DeploymentID,
+		&i.CommitSha,
+		&i.ImageRef,
+		&i.Config,
+		&i.CreatedAt,
+	)
+	return i, err
+}
 
 const getLatestRelease = `-- name: GetLatestRelease :one
 SELECT id, application_id, environment_id, deployment_id, commit_sha, image_ref, config, created_at FROM releases
@@ -32,4 +74,96 @@ func (q *Queries) GetLatestRelease(ctx context.Context, environmentID uuid.UUID)
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getRelease = `-- name: GetRelease :one
+SELECT id, application_id, environment_id, deployment_id, commit_sha, image_ref, config, created_at FROM releases WHERE id = $1
+`
+
+func (q *Queries) GetRelease(ctx context.Context, id uuid.UUID) (Release, error) {
+	row := q.db.QueryRow(ctx, getRelease, id)
+	var i Release
+	err := row.Scan(
+		&i.ID,
+		&i.ApplicationID,
+		&i.EnvironmentID,
+		&i.DeploymentID,
+		&i.CommitSha,
+		&i.ImageRef,
+		&i.Config,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getReleaseForDeployment = `-- name: GetReleaseForDeployment :one
+SELECT id FROM releases WHERE deployment_id = $1
+`
+
+func (q *Queries) GetReleaseForDeployment(ctx context.Context, deploymentID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getReleaseForDeployment, deploymentID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const listReleases = `-- name: ListReleases :many
+SELECT releases.id, releases.application_id, releases.environment_id, releases.deployment_id, releases.commit_sha, releases.image_ref, releases.config, releases.created_at,
+       releases.id = (
+           SELECT latest.id FROM releases AS latest
+           WHERE latest.environment_id = releases.environment_id
+           ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1
+       ) AS is_current
+FROM releases
+WHERE releases.environment_id = $1
+ORDER BY releases.created_at DESC, releases.id DESC
+LIMIT $3 OFFSET $2
+`
+
+type ListReleasesParams struct {
+	EnvironmentID uuid.UUID
+	PageOffset    int32
+	PageLimit     int32
+}
+
+type ListReleasesRow struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	EnvironmentID uuid.UUID
+	DeploymentID  uuid.UUID
+	CommitSha     string
+	ImageRef      string
+	Config        json.RawMessage
+	CreatedAt     time.Time
+	IsCurrent     bool
+}
+
+func (q *Queries) ListReleases(ctx context.Context, arg ListReleasesParams) ([]ListReleasesRow, error) {
+	rows, err := q.db.Query(ctx, listReleases, arg.EnvironmentID, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReleasesRow{}
+	for rows.Next() {
+		var i ListReleasesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationID,
+			&i.EnvironmentID,
+			&i.DeploymentID,
+			&i.CommitSha,
+			&i.ImageRef,
+			&i.Config,
+			&i.CreatedAt,
+			&i.IsCurrent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

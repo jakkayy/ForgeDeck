@@ -91,7 +91,7 @@ func (d *deployer) handle(ctx context.Context, job *agentproto.Job, log worker.L
 		return nil, errComposeUnavailable
 	}
 	if a.registry != nil {
-		log.Log(agentproto.StreamSystem, "Logging in to "+a.registry.Host)
+		log.Log(agentproto.StreamSystem, agentproto.StageLine(agentproto.StagePull, "Logging in to "+a.registry.Host))
 		if err := login(ctx, a.runner, *a.registry); err != nil {
 			log.Log(agentproto.StreamSystem, err.Error())
 			return nil, errRegistryLogin
@@ -102,7 +102,7 @@ func (d *deployer) handle(ctx context.Context, job *agentproto.Job, log worker.L
 	if err != nil {
 		return nil, err
 	}
-	log.Log(agentproto.StreamSystem, "Waiting for the service to become healthy")
+	log.Log(agentproto.StreamSystem, agentproto.StageLine(agentproto.StageHealthCheck, "Waiting for the service to become healthy"))
 	if err := d.waitHealthy(ctx, a.runner, containerID, config); err != nil {
 		log.Log(agentproto.StreamSystem, "Health check failed: "+err.Error())
 		return nil, a.recover(ctx, containerID, previousOf(job.Deploy, log))
@@ -145,7 +145,7 @@ func (r *attempt) apply(ctx context.Context, rel release, mustPull bool) (string
 	}
 	project := composeCommand{runner: r.runner, project: compose.ProjectName(r.environmentID), dir: envDir}
 
-	r.log.Log(agentproto.StreamSystem, "Pulling "+rel.ImageRef)
+	r.log.Log(agentproto.StreamSystem, agentproto.StageLine(agentproto.StagePull, "Pulling "+rel.ImageRef))
 	pullArgs := []string{"pull"}
 	if !mustPull {
 		pullArgs = append(pullArgs, "--ignore-pull-failures")
@@ -154,7 +154,7 @@ func (r *attempt) apply(ctx context.Context, rel release, mustPull bool) (string
 		r.log.Log(agentproto.StreamSystem, err.Error())
 		return "", errPullFailed
 	}
-	r.log.Log(agentproto.StreamSystem, "Starting the service")
+	r.log.Log(agentproto.StreamSystem, agentproto.StageLine(agentproto.StageStart, "Starting the service"))
 	if err := project.run(ctx, "up", "--detach", "--remove-orphans", "--no-build", "--pull", "never"); err != nil {
 		r.log.Log(agentproto.StreamSystem, err.Error())
 		return "", errStartFailed

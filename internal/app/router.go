@@ -69,6 +69,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 		agentapi.WithDeployContext(deployments.NewContextMinter(store.New(pool), registryService), logger))
 	deploymentHandler := deployments.NewHandler(deploymentService)
 	jobService.OnSucceeded(deploymentService.AutoDeploy(logger))
+	jobService.OnSucceeded(deploymentService.RecordRelease)
 
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.AccessLog(logger), httpx.Recover, middleware.GetHead)

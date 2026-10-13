@@ -5,6 +5,7 @@ package agentproto
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -231,6 +232,30 @@ type BuildResult struct {
 	Tag       string `json:"tag"`       // short commit SHA
 	Digest    string `json:"digest"`    // sha256:…
 	ImageRef  string `json:"image_ref"` // Image@Digest
+}
+
+// Stages of a deployment. The Agent tags the log lines of each stage
+// ("[pull] Pulling …") so the Control Plane can show progress while the job
+// runs.
+const (
+	StagePull        = "pull"
+	StageStart       = "start"
+	StageHealthCheck = "health_check"
+)
+
+// StageLine formats a system log line that belongs to a deployment stage.
+func StageLine(stage, message string) string {
+	return "[" + stage + "] " + message
+}
+
+// StageOfLine returns the stage a StageLine belongs to, or "" for other lines.
+func StageOfLine(line string) string {
+	for _, stage := range []string{StagePull, StageStart, StageHealthCheck} {
+		if strings.HasPrefix(line, "["+stage+"] ") {
+			return stage
+		}
+	}
+	return ""
 }
 
 // DeployResult is a successful deploy_image job's result.

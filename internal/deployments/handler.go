@@ -25,6 +25,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/environments/{environmentID}/deployments", httpx.Handle(h.list))
 	r.Post("/environments/{environmentID}/deployments", httpx.Handle(h.deploy))
 	r.Get("/deployments/{deploymentID}", httpx.Handle(h.get))
+	r.Get("/environments/{environmentID}/releases", httpx.Handle(h.listReleases))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
@@ -73,4 +74,20 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return httpx.WriteJSON(w, http.StatusOK, deployment)
+}
+
+func (h *Handler) listReleases(w http.ResponseWriter, r *http.Request) error {
+	environmentID, err := httpx.UUIDParam(r, "environmentID")
+	if err != nil {
+		return err
+	}
+	page, err := httpx.ParsePage(r)
+	if err != nil {
+		return err
+	}
+	items, err := h.svc.ListReleases(r.Context(), auth.UserFrom(r.Context()).ID, environmentID, page.Limit, page.Offset)
+	if err != nil {
+		return err
+	}
+	return httpx.WriteJSON(w, http.StatusOK, httpx.NewList(items, page))
 }

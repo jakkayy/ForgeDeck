@@ -120,6 +120,34 @@ func (q *Queries) GetDeployment(ctx context.Context, id uuid.UUID) (GetDeploymen
 	return i, err
 }
 
+const getDeploymentByJob = `-- name: GetDeploymentByJob :one
+SELECT id, environment_id, job_id, source_build_job_id, source_release_id, commit_sha, image_ref, config, status, stage, error_code, error_message, created_by, created_at, started_at, finished_at FROM deployments WHERE job_id = $1
+`
+
+func (q *Queries) GetDeploymentByJob(ctx context.Context, jobID *uuid.UUID) (Deployment, error) {
+	row := q.db.QueryRow(ctx, getDeploymentByJob, jobID)
+	var i Deployment
+	err := row.Scan(
+		&i.ID,
+		&i.EnvironmentID,
+		&i.JobID,
+		&i.SourceBuildJobID,
+		&i.SourceReleaseID,
+		&i.CommitSha,
+		&i.ImageRef,
+		&i.Config,
+		&i.Status,
+		&i.Stage,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
 const hasNewerDeployment = `-- name: HasNewerDeployment :one
 SELECT EXISTS (
     SELECT 1 FROM deployments
@@ -141,6 +169,21 @@ func (q *Queries) HasNewerDeployment(ctx context.Context, arg HasNewerDeployment
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const latestStageLine = `-- name: LatestStageLine :one
+SELECT content FROM job_log_chunks
+WHERE job_id = $1 AND stream = 'system' AND content LIKE '[%] %'
+ORDER BY attempt_number DESC, sequence_number DESC
+LIMIT 1
+`
+
+// The newest stage-tagged system line of a job (see agentproto.StageLine).
+func (q *Queries) LatestStageLine(ctx context.Context, jobID uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, latestStageLine, jobID)
+	var content string
+	err := row.Scan(&content)
+	return content, err
 }
 
 const listDeployments = `-- name: ListDeployments :many
@@ -212,4 +255,16 @@ func (q *Queries) ListDeployments(ctx context.Context, arg ListDeploymentsParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const markDeploymentSucceeded = `-- name: MarkDeploymentSucceeded :exec
+UPDATE deployments
+SET status = 'succeeded', stage = NULL, error_code = NULL, error_message = NULL,
+    finished_at = COALESCE(finished_at, now())
+WHERE id = $1
+`
+
+func (q *Queries) MarkDeploymentSucceeded(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markDeploymentSucceeded, id)
+	return err
 }

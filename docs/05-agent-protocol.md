@@ -170,6 +170,7 @@ When an Agent **claims** a `deploy_image` job, the claim response adds a `deploy
 
 - `registry` is the credential of the one project registry whose host matches the image (the application's own registry first), and of no other registry. It is absent when the project has none for that host; the Agent then pulls anonymously. The Agent writes it to a per-job Docker config that it deletes afterwards.
 - `previous` is the environment's current release at claim time, which the Agent restores if the new version is not healthy.
+- Log lines of a deployment stage are tagged `[pull]`, `[start]` or `[health_check]` at the start of a `system` line, so the Control Plane can show the stage while the job runs. A job that finishes with `succeeded` has passed its health check: that is what records a release.
 - If the claim cannot be prepared (the environment was deleted, registry credentials cannot be read), the Control Plane fails the attempt immediately with a code such as `environment_not_found` or `registry_credentials_unavailable` and hands the Agent the next job instead.
 
 ## 9. Lease and heartbeat

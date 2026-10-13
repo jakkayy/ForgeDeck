@@ -41,3 +41,19 @@ SELECT EXISTS (
     WHERE deployments.environment_id = @environment_id
       AND jobs.created_at > @build_created_at::timestamptz
 );
+
+-- name: GetDeploymentByJob :one
+SELECT * FROM deployments WHERE job_id = $1;
+
+-- name: MarkDeploymentSucceeded :exec
+UPDATE deployments
+SET status = 'succeeded', stage = NULL, error_code = NULL, error_message = NULL,
+    finished_at = COALESCE(finished_at, now())
+WHERE id = $1;
+
+-- name: LatestStageLine :one
+-- The newest stage-tagged system line of a job (see agentproto.StageLine).
+SELECT content FROM job_log_chunks
+WHERE job_id = $1 AND stream = 'system' AND content LIKE '[%] %'
+ORDER BY attempt_number DESC, sequence_number DESC
+LIMIT 1;

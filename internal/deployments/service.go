@@ -47,6 +47,8 @@ type Deployment struct {
 	CreatedAt        time.Time  `json:"created_at"`
 	StartedAt        *time.Time `json:"started_at"`
 	FinishedAt       *time.Time `json:"finished_at"`
+	// ReleaseID is set once the deployment became healthy.
+	ReleaseID *uuid.UUID `json:"release_id"`
 }
 
 // Error says why a deployment failed.
@@ -169,10 +171,21 @@ func (s *Service) Get(ctx context.Context, userID, deploymentID uuid.UUID) (Depl
 		}
 		return Deployment{}, err
 	}
-	return toDeployment(row.Deployment, liveJob{
+	return s.describe(ctx, row.Deployment, liveJob{
 		Status: row.JobStatus, ErrorCode: row.JobErrorCode, ErrorMessage: row.JobErrorMessage,
 		StartedAt: row.JobStartedAt, FinishedAt: row.JobFinishedAt,
 	}), nil
+}
+
+// describe builds the API view of a deployment, adding what is not stored on
+// the row: the live stage and the release it produced.
+func (s *Service) describe(ctx context.Context, row store.Deployment, job liveJob) Deployment {
+	d := toDeployment(row, job)
+	d.Stage = s.stageOf(ctx, d)
+	if releaseID, err := s.queries.GetReleaseForDeployment(ctx, d.ID); err == nil {
+		d.ReleaseID = &releaseID
+	}
+	return d
 }
 
 // List returns an environment's deployments, newest first.
@@ -188,7 +201,7 @@ func (s *Service) List(ctx context.Context, userID, environmentID uuid.UUID, lim
 	}
 	out := make([]Deployment, len(rows))
 	for i, row := range rows {
-		out[i] = toDeployment(row.Deployment, liveJob{
+		out[i] = s.describe(ctx, row.Deployment, liveJob{
 			Status: row.JobStatus, ErrorCode: row.JobErrorCode, ErrorMessage: row.JobErrorMessage,
 			StartedAt: row.JobStartedAt, FinishedAt: row.JobFinishedAt,
 		})
