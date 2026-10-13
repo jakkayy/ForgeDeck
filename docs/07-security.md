@@ -201,3 +201,21 @@ Reads are not limited. A refused request gets `429` with `Retry-After`.
 **The client address behind a proxy.** The address a limit uses is the TCP peer unless `FORGEDECK_TRUSTED_PROXIES` lists the reverse proxies in front of ForgeDeck (addresses or CIDR ranges, comma separated). Then, and only when the peer is one of them, `X-Forwarded-For` is read from the right and the first address that is not itself a trusted proxy is the client; everything left of it was supplied by the client and is ignored. A malformed hop makes ForgeDeck fall back to the peer. **Set it when you run behind a proxy.** Without it every request looks like it comes from the proxy, so a limit per address is one bucket shared by everyone, and one caller can lock the others out. Never list addresses that clients can reach directly: they could then claim to be anyone. The access log records `client_ip`.
 
 **Not covered.** A distributed attacker with many addresses is slowed, not stopped; account lockout is not implemented (it would let an attacker lock a user out). Put a WAF or a limiting reverse proxy in front for volumetric abuse.
+
+
+## Production deployment
+
+`deploy/compose` ([README](../deploy/compose/README.md)) is the supported production setup. What it enforces, and what it leaves to you:
+
+| Threat | Mitigation | Yours to do |
+|---|---|---|
+| Traffic read or altered in transit | Caddy terminates TLS (Let's Encrypt, HTTP/2), redirects HTTP, and the app sends HSTS and `__Host-` `Secure` cookies | Point real DNS at the host; keep ports 80/443 open for certificates |
+| The database or the Control Plane reached directly | Only the proxy publishes ports; the database network is `internal` (no route out) and the proxy is not on it | Firewall the host; do not add `ports:` to `postgres` or `api` |
+| A client forging its address to dodge rate limits or the audit trail | `X-Forwarded-For` is believed only from the proxy's fixed address; a spoofed header was verified to be ignored | Leave `FORGEDECK_TRUSTED_PROXIES` as the proxy's address |
+| A compromised Control Plane process | Static no-shell image, non-root, read-only filesystem, no capabilities, no new privileges | Update the image regularly |
+| A leaked database backup | Secrets in it are encrypted; the key is not in the database or the backup | Keep `FORGEDECK_SECRET_KEYS` apart from backups ([16](16-backup-restore.md)) |
+| Weak secrets in the environment | `docker compose up` refuses to start without `POSTGRES_PASSWORD`, `FORGEDECK_SECRET_KEYS` and `FORGEDECK_DOMAIN` | Generate them with `openssl rand`, as `.env.example` shows |
+
+The Compose project is `forgedeck-prod`, distinct from the development stack, so the two can never share a database volume.
+
+**Not provided.** There is no web application firewall, no volumetric DDoS protection, and no intrusion detection. The Docker host itself, and anyone with access to the Docker socket on it, is trusted. Run the Control Plane on a host that runs nothing else you cannot afford to expose.

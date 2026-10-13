@@ -52,6 +52,10 @@ make build               # web + api + agent + runner ลงใน bin/
 bin/forgedeck-api serve  # เปิด http://localhost:8080
 ```
 
+## ติดตั้งจริง (production)
+
+ใช้ [deploy/compose](deploy/compose/README.md): Control Plane + PostgreSQL + Caddy (TLS อัตโนมัติ) ในชุดเดียว มีแต่ proxy ที่เปิด port ส่วน database กับ API เข้าถึงจากภายนอกไม่ได้ ใช้โดเมนจริงที่ชี้มาที่เครื่อง และ**เก็บ `FORGEDECK_SECRET_KEYS` ไว้นอกเครื่องนี้** (ไม่อยู่ใน backup) ดู [docs/16-backup-restore.md](docs/16-backup-restore.md)
+
 ## ต่อ Agent (จัดการ Docker ของเครื่องอื่น)
 
 ใน UI ไปที่ **Servers > Add server** จะได้ token และคำสั่ง จากนั้นบนเครื่องปลายทาง:

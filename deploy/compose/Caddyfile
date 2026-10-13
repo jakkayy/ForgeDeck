@@ -1,0 +1,25 @@
+# Terminates TLS for ForgeDeck. For a public domain Caddy obtains and renews a
+# Let's Encrypt certificate by itself (ports 80 and 443 must reach this host).
+# For "localhost" it uses its own local certificate authority, for trying the
+# stack out.
+{$FORGEDECK_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy api:8080 {
+		# Live job logs are Server-Sent Events: pass them through as they come
+		# instead of buffering them.
+		flush_interval -1
+		transport http {
+			# Agents and Runners long-poll for up to 25 seconds.
+			response_header_timeout 60s
+		}
+	}
+
+	# Do not advertise the proxy. The application sets the security headers.
+	header -Server
+
+	log {
+		output stdout
+		format json
+	}
+}
