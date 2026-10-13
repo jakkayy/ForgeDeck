@@ -27,6 +27,11 @@ var (
 	errStartFailed        = &worker.JobError{Code: "start_failed", Message: "The service could not be started. See the job log."}
 )
 
+// secretMissing is a deployment whose project secret has no value in the claim.
+func secretMissing(name string) *worker.JobError {
+	return &worker.JobError{Code: "secret_not_found", Message: "The secret " + name + " was not delivered with this deployment. Create it in the project's Secrets, then deploy again."}
+}
+
 // commandRunner runs the Docker CLI. procexec.Executor implements it.
 type commandRunner interface {
 	Run(ctx context.Context, c procexec.Command) error
@@ -72,6 +77,9 @@ func (d *deployer) handle(ctx context.Context, job *agentproto.Job, log worker.L
 		return nil, &worker.JobError{Code: "invalid_payload", Message: err.Error()}
 	}
 	target := release{ImageRef: payload.ImageRef, Config: config}
+	if name, ok := firstMissingSecret(config.Secrets, secretsOf(job.Deploy)); !ok {
+		return nil, secretMissing(name)
+	}
 	if _, err := target.render(payload.EnvironmentID); err != nil {
 		return nil, &worker.JobError{Code: "invalid_payload", Message: err.Error()}
 	}
@@ -84,7 +92,7 @@ func (d *deployer) handle(ctx context.Context, job *agentproto.Job, log worker.L
 	log = redactSecrets(log, job.Deploy, config)
 	a := &attempt{
 		d: d, runner: d.newRunner(procexec.BaseEnv(scratch.home, scratch.dockerConfig), log), log: log,
-		environmentID: payload.EnvironmentID, registry: registryOf(job.Deploy),
+		environmentID: payload.EnvironmentID, registry: registryOf(job.Deploy), secrets: secretsOf(job.Deploy),
 	}
 
 	if _, err := a.runner.Output(ctx, procexec.Command{Name: "docker", Args: []string{"compose", "version"}}); err != nil {
@@ -105,7 +113,7 @@ func (d *deployer) handle(ctx context.Context, job *agentproto.Job, log worker.L
 	log.Log(agentproto.StreamSystem, agentproto.StageLine(agentproto.StageHealthCheck, "Waiting for the service to become healthy"))
 	if err := d.waitHealthy(ctx, a.runner, containerID, config); err != nil {
 		log.Log(agentproto.StreamSystem, "Health check failed: "+err.Error())
-		return nil, a.recover(ctx, containerID, previousOf(job.Deploy, log))
+		return nil, a.recover(ctx, target, containerID, previousOf(job.Deploy, log))
 	}
 	log.Log(agentproto.StreamSystem, "The service is healthy")
 	return agentproto.DeployResult{ImageRef: payload.ImageRef, ContainerID: containerID}, nil
@@ -128,6 +136,22 @@ type attempt struct {
 	log           worker.Logger
 	environmentID uuid.UUID
 	registry      *agentproto.RegistryCredentials
+	secrets       map[string]string
+}
+
+// secretEnv is the environment `docker compose` needs to resolve the secrets
+// rel lists, and nothing more: other secrets of the project stay out of it.
+func (r *attempt) secretEnv(rel release) []string {
+	env := make([]string, 0, len(rel.Config.Secrets))
+	for _, name := range rel.Config.Secrets {
+		env = append(env, name+"="+r.secrets[name])
+	}
+	return env
+}
+
+// compose returns the Compose command of rel's environment.
+func (r *attempt) compose(rel release, dir string) composeCommand {
+	return composeCommand{runner: r.runner, project: compose.ProjectName(r.environmentID), dir: dir, env: r.secretEnv(rel)}
 }
 
 // apply writes the Compose file of r and brings the service up, returning its
@@ -143,7 +167,7 @@ func (r *attempt) apply(ctx context.Context, rel release, mustPull bool) (string
 	if err != nil {
 		return "", err
 	}
-	project := composeCommand{runner: r.runner, project: compose.ProjectName(r.environmentID), dir: envDir}
+	project := r.compose(rel, envDir)
 
 	r.log.Log(agentproto.StreamSystem, agentproto.StageLine(agentproto.StagePull, "Pulling "+rel.ImageRef))
 	pullArgs := []string{"pull"}
@@ -171,11 +195,11 @@ func (r *attempt) apply(ctx context.Context, rel release, mustPull bool) (string
 // With no previous release the failed service is stopped so it does not
 // crash-loop. The returned error is always the failed health check; its
 // message says what state the environment is in.
-func (r *attempt) recover(ctx context.Context, failedContainerID string, previous *release) error {
+func (r *attempt) recover(ctx context.Context, failed release, failedContainerID string, previous *release) error {
 	r.keepLogs(ctx, failedContainerID)
 	if previous == nil {
 		r.log.Log(agentproto.StreamSystem, "No previous release to restore; stopping the failed service")
-		if err := r.stop(ctx); err != nil {
+		if err := r.stop(ctx, failed); err != nil {
 			r.log.Log(agentproto.StreamSystem, "Stopping the service failed: "+err.Error())
 		}
 		return &worker.JobError{Code: "health_check_failed", Message: "The service did not become healthy and was stopped. There was no previous release to restore."}
@@ -194,9 +218,8 @@ func (r *attempt) recover(ctx context.Context, failedContainerID string, previou
 	return &worker.JobError{Code: "health_check_failed", Message: "The service did not become healthy. The previous release was restored and is running."}
 }
 
-func (r *attempt) stop(ctx context.Context) error {
-	dir := filepath.Join(r.d.dir, r.environmentID.String())
-	return composeCommand{runner: r.runner, project: compose.ProjectName(r.environmentID), dir: dir}.run(ctx, "stop")
+func (r *attempt) stop(ctx context.Context, rel release) error {
+	return r.compose(rel, filepath.Join(r.d.dir, r.environmentID.String())).run(ctx, "stop")
 }
 
 // keepLogs copies the last lines of a container's output into the job log.
@@ -205,6 +228,23 @@ func (r *attempt) keepLogs(ctx context.Context, containerID string) {
 	if err := r.runner.Run(ctx, procexec.Command{Name: "docker", Args: []string{"logs", "--tail", "50", containerID}}); err != nil {
 		r.log.Log(agentproto.StreamSystem, "Could not read the container's output: "+err.Error())
 	}
+}
+
+func secretsOf(c *agentproto.DeployContext) map[string]string {
+	if c == nil {
+		return nil
+	}
+	return c.Secrets
+}
+
+// firstMissingSecret returns a listed secret that has no value.
+func firstMissingSecret(names []string, values map[string]string) (string, bool) {
+	for _, name := range names {
+		if _, ok := values[name]; !ok {
+			return name, false
+		}
+	}
+	return "", true
 }
 
 func registryOf(c *agentproto.DeployContext) *agentproto.RegistryCredentials {
@@ -226,6 +266,10 @@ func previousOf(c *agentproto.DeployContext, log worker.Logger) *release {
 		log.Log(agentproto.StreamSystem, "The previous release's configuration is not valid and will not be restored: "+err.Error())
 		return nil
 	}
+	if name, ok := firstMissingSecret(config.Secrets, c.Secrets); !ok {
+		log.Log(agentproto.StreamSystem, "The previous release uses the secret "+name+", which no longer exists, so it cannot be restored.")
+		return nil
+	}
 	return &release{ImageRef: c.Previous.ImageRef, Config: config}
 }
 
@@ -239,6 +283,11 @@ func redactSecrets(log worker.Logger, c *agentproto.DeployContext, config servic
 	}
 	for _, value := range config.Env {
 		secrets = append(secrets, value)
+	}
+	if c != nil {
+		for _, value := range c.Secrets {
+			secrets = append(secrets, value)
+		}
 	}
 	if c != nil && c.Previous != nil {
 		for _, value := range c.Previous.Config.Env {
@@ -311,6 +360,8 @@ type composeCommand struct {
 	runner  commandRunner
 	project string
 	dir     string
+	// env holds the values of the secrets the Compose file refers to.
+	env []string
 }
 
 func (c composeCommand) args(sub ...string) []string {
@@ -320,11 +371,11 @@ func (c composeCommand) args(sub ...string) []string {
 }
 
 func (c composeCommand) run(ctx context.Context, sub ...string) error {
-	return c.runner.Run(ctx, procexec.Command{Name: "docker", Args: c.args(sub...), Dir: c.dir})
+	return c.runner.Run(ctx, procexec.Command{Name: "docker", Args: c.args(sub...), Dir: c.dir, Env: c.env})
 }
 
 func (c composeCommand) output(ctx context.Context, sub ...string) (string, error) {
-	return c.runner.Output(ctx, procexec.Command{Name: "docker", Args: c.args(sub...), Dir: c.dir})
+	return c.runner.Output(ctx, procexec.Command{Name: "docker", Args: c.args(sub...), Dir: c.dir, Env: c.env})
 }
 
 func firstLine(s string) string {

@@ -2,6 +2,7 @@ package environments_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -160,4 +161,32 @@ func TestEnvironmentAuthorization(t *testing.T) {
 	outsider.Do(http.MethodGet, path, nil).RequireStatus(http.StatusNotFound)
 	outsider.Do(http.MethodGet, "/api/v1/applications/"+f.app.ID.String()+"/environments", nil).RequireStatus(http.StatusNotFound)
 	f.create(outsider, nil).RequireStatus(http.StatusNotFound)
+}
+
+func TestEnvironmentsOnlyListSecretsTheProjectHas(t *testing.T) {
+	f := newFixture(t)
+	withSecrets := map[string]any{"secrets": []string{"DATABASE_PASSWORD"}}
+	f.create(f.owner, map[string]any{"config": withSecrets}).RequireStatus(http.StatusUnprocessableEntity)
+
+	f.owner.Do(http.MethodPut, "/api/v1/projects/"+f.projectID.String()+"/secrets/DATABASE_PASSWORD",
+		map[string]string{"value": "a-long-enough-value"}).RequireStatus(http.StatusCreated)
+	var created environments.Environment
+	f.create(f.owner, map[string]any{"config": withSecrets}).RequireStatus(http.StatusCreated).Decode(&created)
+	if len(created.Config.Secrets) != 1 || created.Config.Secrets[0] != "DATABASE_PASSWORD" {
+		t.Fatalf("created %+v", created.Config)
+	}
+
+	// An update cannot list an unknown secret either.
+	f.owner.Do(http.MethodPatch, "/api/v1/environments/"+created.ID.String(),
+		map[string]any{"config": map[string]any{"secrets": []string{"NOT_A_SECRET"}}}).RequireStatus(http.StatusUnprocessableEntity)
+
+	// A secret an environment lists cannot be deleted until it is removed there.
+	secretPath := "/api/v1/projects/" + f.projectID.String() + "/secrets/DATABASE_PASSWORD"
+	resp := f.owner.Do(http.MethodDelete, secretPath, nil).RequireStatus(http.StatusConflict)
+	if resp.ErrorCode() != "secret_in_use" || !strings.Contains(string(resp.Body), "production") {
+		t.Fatalf("response %s", resp.Body)
+	}
+	f.owner.Do(http.MethodPatch, "/api/v1/environments/"+created.ID.String(),
+		map[string]any{"config": map[string]any{"secrets": []string{}}}).RequireStatus(http.StatusOK)
+	f.owner.Do(http.MethodDelete, secretPath, nil).RequireStatus(http.StatusNoContent)
 }

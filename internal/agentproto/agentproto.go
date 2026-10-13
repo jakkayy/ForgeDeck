@@ -124,6 +124,9 @@ type DeployContext struct {
 	// claimed. If the new version does not become healthy, the Agent
 	// restores it.
 	Previous *PreviousRelease `json:"previous,omitempty"`
+	// Secrets are the current values of the project secrets the new and the
+	// previous release list, by name. They are never stored or logged.
+	Secrets map[string]string `json:"secrets,omitempty"`
 }
 
 // PreviousRelease is a release the Agent can restore.

@@ -107,6 +107,16 @@ func TestRenderTreatsUserTextAsData(t *testing.T) {
 	}
 }
 
+func TestRenderReferencesSecretsWithoutTheirValues(t *testing.T) {
+	file := render(t, spec(servicecfg.Config{
+		Env: map[string]string{"LOG_LEVEL": "info"}, Secrets: []string{"DATABASE_PASSWORD"},
+	}))
+	env := service(file)["environment"].(map[string]any)
+	if env["DATABASE_PASSWORD"] != "${DATABASE_PASSWORD}" || env["LOG_LEVEL"] != "info" {
+		t.Fatalf("environment %v", env)
+	}
+}
+
 func TestRenderRefusesTamperedInput(t *testing.T) {
 	cases := map[string]compose.Spec{
 		"mutable tag":      {ImageRef: "ghcr.io/acme/app:latest", Config: servicecfg.Config{}},
@@ -132,6 +142,7 @@ func TestComposeAcceptsRenderedFile(t *testing.T) {
 	data, err := compose.Render(spec(servicecfg.Config{
 		ContainerPort: ptr(8080), PublishedPort: ptr(18080),
 		Env:     map[string]string{"PASSWORD": "pa$word ${X}"},
+		Secrets: []string{"API_TOKEN"},
 		Volumes: []servicecfg.Volume{{Name: "data", Path: "/var/lib/app"}},
 	}))
 	if err != nil {
@@ -141,7 +152,9 @@ func TestComposeAcceptsRenderedFile(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.CommandContext(context.Background(), "docker", "compose", "-f", path, "config", "--format", "json").CombinedOutput()
+	cmd := exec.CommandContext(context.Background(), "docker", "compose", "-f", path, "config", "--format", "json") //nolint:gosec // test
+	cmd.Env = append(os.Environ(), "API_TOKEN=tok-from-the-environment")
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("docker compose config: %v\n%s", err, out)
 	}
@@ -156,7 +169,14 @@ func TestComposeAcceptsRenderedFile(t *testing.T) {
 	// `config` prints values re-escaped so the output can be read back, so
 	// the literal "pa$word ${X}" appears as "pa$$word $${X}". Had the value
 	// been interpolated instead, "$word" and "${X}" would be empty here.
-	if got := parsed.Services[compose.ServiceName].Environment["PASSWORD"]; got != "pa$$word $${X}" {
+	environment := parsed.Services[compose.ServiceName].Environment
+	if got := environment["PASSWORD"]; got != "pa$$word $${X}" {
 		t.Fatalf("Compose resolved PASSWORD to %q", got)
+	}
+	if got := environment["API_TOKEN"]; got != "tok-from-the-environment" {
+		t.Fatalf("Compose resolved API_TOKEN to %q, want the value from the process environment", got)
+	}
+	if strings.Contains(string(data), "tok-from-the-environment") {
+		t.Fatal("the secret value is in the rendered file")
 	}
 }

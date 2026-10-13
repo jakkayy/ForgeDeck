@@ -66,10 +66,16 @@ func Render(spec Spec) ([]byte, error) {
 	if config.ContainerPort != nil && config.PublishedPort != nil {
 		service["ports"] = []string{fmt.Sprintf("%s:%d:%d", config.BindAddress, *config.PublishedPort, *config.ContainerPort)}
 	}
-	if len(config.Env) > 0 {
-		env := make(map[string]string, len(config.Env))
+	if len(config.Env) > 0 || len(config.Secrets) > 0 {
+		env := make(map[string]string, len(config.Env)+len(config.Secrets))
 		for name, value := range config.Env {
 			env[name] = escapeInterpolation(value)
+		}
+		// A secret's value is not in the file: Compose reads it from the
+		// environment of the `docker compose` process, so nothing secret is
+		// written to disk.
+		for _, name := range config.Secrets {
+			env[name] = "${" + name + "}"
 		}
 		service["environment"] = env
 	}

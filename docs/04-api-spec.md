@@ -85,7 +85,7 @@ See [15 — Deployments §4](15-deployments.md#4-project-secrets-phase-5).
 | PUT | `/projects/{projectID}/secrets/{name}` | Create (`201`) or replace (`200`, `version` + 1) with `{ "value": "…" }` (admin) |
 | DELETE | `/projects/{projectID}/secrets/{name}` | Delete (`409 secret_in_use` while an environment lists it) (admin) |
 
-`name` is `[A-Z_][A-Z0-9_]{0,63}`; the value is 6 bytes to 4 KB. A secret is used by listing its name in an environment's `config.secrets`.
+`name` is `[A-Z_][A-Z0-9_]{0,63}`; the value is 6 bytes to 4 KB. A secret is used by listing its name in an environment's `config.secrets` (the environment API rejects unknown names with `422`); the service receives it as an environment variable of that name at the next deployment.
 
 ### Environments
 

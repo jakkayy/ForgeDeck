@@ -57,7 +57,8 @@ An environment's service is described by **structured fields, not a Compose file
 | `container_port` | Optional, 1–65535. The port the application listens on inside the container. |
 | `published_port` | Optional, 1–65535, requires `container_port`. The host port. Unique per server across environments (database constraint). Ports below 1024 are rejected. |
 | `bind_address` | `127.0.0.1` (default) or `0.0.0.0`. Services are not exposed to the network unless this is set explicitly, so a reverse proxy on the host is the default front door. |
-| `env` | Map of plain environment variables: names `[A-Za-z_][A-Za-z0-9_]*`, at most 64 entries, 4 KB per value. Not for secrets; secret references arrive in Phase 5 and are never logged. |
+| `env` | Map of plain environment variables: names `[A-Za-z_][A-Za-z0-9_]*`, at most 64 entries, 4 KB per value. Not for secrets: use `secrets`. |
+| `secrets` | List of project secret names (at most 32), delivered as environment variables of the same name. A name may not also be in `env`. See [§4](#4-project-secrets-phase-5). |
 | `volumes` | List of `{name, path}`: a **named** Docker volume mounted at an absolute container path. Host paths, `docker.sock`, and bind mounts are not accepted. |
 | `restart` | `unless-stopped` (default), `always`, `on-failure`, or `no`. |
 | `memory_mb`, `cpus` | Optional limits. |
@@ -136,7 +137,7 @@ A deployment stops the old container and starts the new one, so the service is d
 
 ### Secrets and configuration
 
-Environment variables are stored in the environment's configuration and in each release's snapshot, and are visible to project members. They are not for secrets. A rollback restores the variables the old release had, which can include a value that has since been rotated. Secret references arrive in Phase 5.
+Environment variables are stored in the environment's configuration and in each release's snapshot, and are visible to project members. They are not for secrets. A rollback restores the variables the old release had, which can include a value that has since been rotated. Use project secrets (§4) for anything sensitive.
 
 ## 4. Project secrets (Phase 5)
 

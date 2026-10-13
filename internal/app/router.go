@@ -68,7 +68,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 
 	deploymentService := deployments.NewService(pool, authorizer, jobService)
 	agentHandler := agentapi.NewHandler(ctx, serverService, jobService, notifier,
-		agentapi.WithDeployContext(deployments.NewContextMinter(store.New(pool), registryService), logger))
+		agentapi.WithDeployContext(deployments.NewContextMinter(store.New(pool), registryService, secretService), logger))
 	deploymentHandler := deployments.NewHandler(deploymentService)
 	jobService.OnSucceeded(deploymentService.AutoDeploy(logger))
 	jobService.OnSucceeded(deploymentService.RecordRelease)
@@ -98,7 +98,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			registries.NewHandler(registryService).Routes(signedIn)
 			secrets.NewHandler(secretService).Routes(signedIn)
 			deploymentHandler.Routes(signedIn)
-			environments.NewHandler(environments.NewService(store.New(pool), authorizer)).Routes(signedIn)
+			environments.NewHandler(environments.NewService(store.New(pool), authorizer, secretService)).Routes(signedIn)
 			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)
 		})
 	})

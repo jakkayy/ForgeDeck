@@ -19,6 +19,7 @@ const (
 	maxEnvVars          = 64
 	maxEnvValueBytes    = 4096
 	maxVolumes          = 16
+	maxSecrets          = 32
 	maxPathLength       = 255
 	maxHealthPathLength = 255
 )
@@ -44,6 +45,10 @@ const (
 	HealthDocker = "docker"
 )
 
+// SecretName is the form of a project secret's name, which is also the name
+// of the environment variable the service receives it in.
+var SecretName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
+
 var (
 	envName    = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	volumeName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$`)
@@ -56,11 +61,14 @@ type Config struct {
 	PublishedPort *int              `json:"published_port"`
 	BindAddress   string            `json:"bind_address"`
 	Env           map[string]string `json:"env"`
-	Volumes       []Volume          `json:"volumes"`
-	Restart       string            `json:"restart"`
-	MemoryMB      *int              `json:"memory_mb"`
-	CPUs          *float64          `json:"cpus"`
-	HealthCheck   HealthCheck       `json:"health_check"`
+	// Secrets names project secrets the service receives as environment
+	// variables of the same name. The values are never part of a release.
+	Secrets     []string    `json:"secrets"`
+	Volumes     []Volume    `json:"volumes"`
+	Restart     string      `json:"restart"`
+	MemoryMB    *int        `json:"memory_mb"`
+	CPUs        *float64    `json:"cpus"`
+	HealthCheck HealthCheck `json:"health_check"`
 }
 
 // Volume mounts a named Docker volume. Host paths are not supported.
@@ -83,6 +91,7 @@ type HealthCheck struct {
 func Normalize(c Config) (Config, error) {
 	errs := validate.Errors{}
 	c.Env = cloneEnv(c.Env)
+	c.Secrets = append([]string{}, c.Secrets...)
 	c.Volumes = append([]Volume{}, c.Volumes...)
 
 	checkPorts(errs, c)
@@ -93,6 +102,7 @@ func Normalize(c Config) (Config, error) {
 		errs.Add("bind_address", "Use 127.0.0.1 (default) or 0.0.0.0.")
 	}
 	checkEnv(errs, c.Env)
+	checkSecrets(errs, c.Secrets, c.Env)
 	checkVolumes(errs, c.Volumes)
 	if c.Restart == "" {
 		c.Restart = RestartUnlessStopped
@@ -140,6 +150,25 @@ func checkEnv(errs validate.Errors, env map[string]string) {
 		case len(value) > maxEnvValueBytes || strings.ContainsRune(value, 0):
 			errs.Add("env", fmt.Sprintf("The value of %s is too long or contains a NUL byte.", name))
 		}
+	}
+}
+
+func checkSecrets(errs validate.Errors, secrets []string, env map[string]string) {
+	if len(secrets) > maxSecrets {
+		errs.Add("secrets", fmt.Sprintf("At most %d secrets.", maxSecrets))
+	}
+	seen := map[string]bool{}
+	for _, name := range secrets {
+		switch {
+		case !SecretName.MatchString(name):
+			errs.Add("secrets", fmt.Sprintf("%q is not a valid secret name.", name))
+		case seen[name]:
+			errs.Add("secrets", fmt.Sprintf("%s is listed twice.", name))
+		}
+		if _, clash := env[name]; clash {
+			errs.Add("secrets", fmt.Sprintf("%s is also an environment variable; use one or the other.", name))
+		}
+		seen[name] = true
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 	"github.com/jakkayy/ForgeDeck/internal/database"
 	"github.com/jakkayy/ForgeDeck/internal/keyring"
+	"github.com/jakkayy/ForgeDeck/internal/servicecfg"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
@@ -31,7 +31,7 @@ const (
 var (
 	errSecretNotFound = apperr.NotFound("Secret not found.")
 	// NamePattern is the form of a secret name: an environment variable name.
-	NamePattern = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
+	NamePattern = servicecfg.SecretName
 )
 
 // Secret is the API view of a secret. The value is never part of it.
