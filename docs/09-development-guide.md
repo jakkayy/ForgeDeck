@@ -20,6 +20,20 @@ Recommended local tools:
 
 Record exact supported versions in the repository once the first working setup is committed.
 
+## 2a. Quick start with make
+
+```sh
+cp .env.example .env            # set the database password and FORGEDECK_SECRET_KEYS
+make db-up                      # PostgreSQL
+make dev-api                    # Control Plane on :8080 (migrates on start)
+make create-user EMAIL=you@example.com
+make dev-web                    # dashboard with hot reload, proxying to :8080
+```
+
+For a Runner: `make create-runner NAME=build-01`, then
+`FORGEDECK_RUNNER_CREDENTIAL=fdr_… make run-runner` (optional `URL=` and `WORK_DIR=`).
+`make build` produces the single-binary build in `bin/`; `make db-down` stops PostgreSQL.
+
 ## 3. Suggested repository layout
 
 ```text
