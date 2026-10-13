@@ -25,6 +25,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/health"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
+	"github.com/jakkayy/ForgeDeck/internal/overview"
 	"github.com/jakkayy/ForgeDeck/internal/projects"
 	"github.com/jakkayy/ForgeDeck/internal/registries"
 	"github.com/jakkayy/ForgeDeck/internal/retention"
@@ -114,6 +115,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			signedIn.Use(authHandler.RequireUser, limits.userMutations, auditRecorder.Middleware)
 			projectHandler.Routes(signedIn)
 			serverHandler.Routes(signedIn)
+			overview.NewHandler(overview.NewService(store.New(pool), time.Now)).Routes(signedIn)
 			jobs.NewHandler(ctx, jobService, notifier).Routes(signedIn)
 			gitHandler.Routes(signedIn)
 			appHandler.Routes(signedIn)

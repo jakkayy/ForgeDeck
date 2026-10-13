@@ -15,6 +15,7 @@ export const Route = createFileRoute("/_app")({
 });
 
 const navItems = [
+  { to: "/", label: "Overview" },
   { to: "/servers", label: "Servers" },
   { to: "/projects", label: "Projects" },
   { to: "/jobs", label: "Jobs" },

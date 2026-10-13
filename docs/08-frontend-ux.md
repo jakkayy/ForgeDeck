@@ -63,6 +63,8 @@ Prioritize:
 
 Avoid large decorative charts. Only add a graph if it answers a real operational question.
 
+The page at `/` shows four counts (servers online, servers down, environments whose last deployment succeeded, failed deployments), a *Needs attention* list (servers that stopped reporting and environments whose newest deployment failed, each linking to the environment), the eight newest deployments, and the six newest jobs. It covers every project the user belongs to and refreshes every 20 seconds. A user with no servers or environments sees a pointer to Projects instead of zeros. "Running" means the last deployment passed its health check; the page does not claim to know that a service is up at this moment.
+
 ## 5. Application list
 
 Each row should make it easy to scan:

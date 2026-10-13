@@ -195,6 +195,22 @@ Follow it like any job (`GET /jobs/{jobID}`, `/events`). A succeeded build's `re
 
 `POST /environments/{environmentID}/deployments` (developer or higher) takes `{ "build_job_id": "<uuid>" }`: a **succeeded build of the same application**, whose result holds an image digest. The deployment uses the environment's current configuration and the image's digest, never a tag. It returns `202` with the deployment (`status: queued`) and queues a `deploy_image` job for the environment's server, in one transaction. `422` if the build is not usable (still running, failed, another application's, or without a digest). A deployment follows its job: `queued → running → succeeded | failed`, with `error.code` and `error.message` on failure. While it runs, `stage` is the newest of `pull`, `start`, `health_check` that the Agent reported (its log lines are tagged `[pull] …`); once it failed, `stage` is where, taken from the error code (`registry_login_failed`/`pull_failed` → `pull`, `start_failed` → `start`, `health_check_failed` → `health_check`). A deployment that passed its health check gets a `release_id`. `GET /deployments/{deploymentID}` and `GET /environments/{environmentID}/deployments` (paginated, newest first) read it. Environments with `auto_deploy` also get a deployment whenever a build succeeds ([15](15-deployments.md)); such a deployment has no `created_by`. `GET /environments/{environmentID}/releases` lists releases newest first (paginated); each has `commit_sha`, `image_ref`, the `config` snapshot it ran with, and `current: true` for the newest. A release is recorded in the same transaction that records the successful `deploy_image` job, so a release exists exactly when its deployment became healthy. `POST /releases/{releaseID}/rollback` (developer or higher) redeploys a release's digest and configuration snapshot as a new deployment (`202`, same shape as a deployment, with `source_release_id`). `409 port_in_use` if another environment on the server now publishes the release's port. See [15](15-deployments.md#rollback). Arbitrary shell commands are never accepted as a deployment payload.
 
+### Overview
+
+`GET /overview` summarizes every project the caller belongs to; any member (viewer and up) may read it, and nothing outside the caller's projects is counted or listed.
+
+```json
+{
+  "servers": { "total": 4, "online": 2, "unreachable": 1, "offline": 1, "pending": 0 },
+  "environments": { "total": 5, "succeeded": 3, "failed": 1, "in_progress": 1, "not_deployed": 0 },
+  "recent_deployments": [ { "id": "uuid", "environment_id": "uuid", "environment_name": "staging", "application_id": "uuid", "application_name": "API", "project_name": "Shop", "commit_sha": "0123…", "status": "failed", "error_code": "health_check_failed", "created_at": "…", "finished_at": null } ],
+  "failing_deployments": [ "…same shape…" ],
+  "generated_at": "…"
+}
+```
+
+Server counts use the same heartbeat windows as a server's `status`. Environments are grouped by how their **newest** deployment ended (`not_deployed`: none yet, or only cancelled), so `succeeded` means the last deployment passed its health check, not that the service is healthy right now. `recent_deployments` is the eight newest across projects; `failing_deployments` holds up to five environments whose newest deployment failed, so a later success removes an entry.
+
 ## 8. Webhooks
 
 - `POST /webhooks/github`

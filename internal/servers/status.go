@@ -36,3 +36,10 @@ func ConnectivityStatus(lastSeen *time.Time, now time.Time) Status {
 		return StatusOffline
 	}
 }
+
+// ConnectivityCutoffs returns the oldest last-seen time that still counts as
+// online and as unreachable at now: the same windows as ConnectivityStatus,
+// for queries that classify many servers at once.
+func ConnectivityCutoffs(now time.Time) (online, unreachable time.Time) {
+	return now.Add(-onlineWindow), now.Add(-unreachableWindow)
+}

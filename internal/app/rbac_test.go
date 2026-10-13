@@ -99,6 +99,7 @@ var notProjectScoped = map[string]string{
 	"POST /api/v1/projects":        "any signed-in user may create a project; they become its owner",
 	"GET /api/v1/servers":          "lists only servers of the caller's projects",
 	"GET /api/v1/jobs":             "lists only jobs of the caller's projects",
+	"GET /api/v1/overview":         "summarizes only the caller's projects",
 	"GET /api/v1/auth/me":          "the caller's own user",
 	"POST /api/v1/auth/login":      "public by nature; rate limited",
 	"POST /api/v1/auth/logout":     "ends the caller's own session",
