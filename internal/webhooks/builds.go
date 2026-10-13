@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jakkayy/ForgeDeck/internal/agentproto"
-	"github.com/jakkayy/ForgeDeck/internal/jobs"
+	"github.com/jakkayy/ForgeDeck/internal/builds"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
@@ -18,25 +17,9 @@ func (h *Handler) queueBuilds(ctx context.Context, apps []store.Application, pus
 	}
 	queued := 0
 	for _, app := range apps {
-		_, created, err := h.jobs.EnqueueOnce(ctx, jobs.NewJob{
-			ProjectID:     app.ProjectID,
-			ApplicationID: &app.ID,
-			Type:          agentproto.JobBuild,
-			WorkerKind:    jobs.WorkerRunner,
-			Payload: agentproto.BuildPayload{
-				ApplicationID:      app.ID,
-				GitConnectionID:    app.GitConnectionID,
-				RepositoryID:       app.RepositoryID,
-				RepositoryFullName: app.RepositoryFullName,
-				Branch:             push.Branch,
-				CommitSHA:          push.CommitSHA,
-				CommitMessage:      push.CommitMessage,
-				DockerfilePath:     app.DockerfilePath,
-				BuildContext:       app.BuildContext,
-				TestCommand:        app.TestCommand,
-			},
-			IdempotencyKey: "build:" + app.ID.String() + ":" + push.CommitSHA,
-		})
+		job := builds.NewJob(app, push.Branch, push.CommitSHA, push.CommitMessage)
+		job.IdempotencyKey = "build:" + app.ID.String() + ":" + push.CommitSHA
+		_, created, err := h.jobs.EnqueueOnce(ctx, job)
 		if err != nil {
 			return "", fmt.Errorf("queue build for %s: %w", app.Name, err)
 		}

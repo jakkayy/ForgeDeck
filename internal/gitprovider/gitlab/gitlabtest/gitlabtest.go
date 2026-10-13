@@ -31,16 +31,17 @@ type Hook struct {
 // Server fakes the parts of the GitLab API ForgeDeck uses.
 type Server struct {
 	*httptest.Server
-	mu     sync.Mutex
-	tokens map[string]Token
-	hooks  map[int64]Hook
-	nextID int64
+	mu      sync.Mutex
+	tokens  map[string]Token
+	hooks   map[int64]Hook
+	commits map[string]gitlab.Commit // "<project ID>:<ref>"
+	nextID  int64
 }
 
 // New starts a fake GitLab that is closed when the test ends.
 func New(t testing.TB) *Server {
 	t.Helper()
-	s := &Server{tokens: map[string]Token{}, hooks: map[int64]Hook{}}
+	s := &Server{tokens: map[string]Token{}, hooks: map[int64]Hook{}, commits: map[string]gitlab.Commit{}}
 	s.Server = httptest.NewServer(http.HandlerFunc(s.route))
 	t.Cleanup(s.Close)
 	return s
@@ -55,6 +56,13 @@ func (s *Server) Hooks() []Hook {
 		hooks = append(hooks, h)
 	}
 	return hooks
+}
+
+// AddCommit makes ref (a branch or SHA) resolve to commit in a project.
+func (s *Server) AddCommit(projectID int64, ref string, commit gitlab.Commit) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.commits[strconv.FormatInt(projectID, 10)+":"+ref] = commit
 }
 
 // AddToken makes value a valid token.
@@ -86,6 +94,16 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-Next-Page", strconv.Itoa(page+1))
 		}
 		writeJSON(w, token.Projects[start:end])
+	case r.Method == http.MethodGet && commitPath.MatchString(r.URL.Path):
+		match := commitPath.FindStringSubmatch(r.URL.Path)
+		s.mu.Lock()
+		commit, ok := s.commits[match[1]+":"+match[2]]
+		s.mu.Unlock()
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, commit)
 	case r.Method == http.MethodPost && hookPath.MatchString(r.URL.Path):
 		var body struct {
 			URL   string `json:"url"`
@@ -119,6 +137,7 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 var (
 	hookPath     = regexp.MustCompile(`^/api/v4/projects/(\d+)/hooks$`)
 	hookItemPath = regexp.MustCompile(`^/api/v4/projects/(\d+)/hooks/(\d+)$`)
+	commitPath   = regexp.MustCompile(`^/api/v4/projects/(\d+)/repository/commits/(.+)$`)
 )
 
 func writeJSON(w http.ResponseWriter, v any) {

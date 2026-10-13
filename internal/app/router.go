@@ -86,6 +86,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			gitHandler.Routes(signedIn)
 			appHandler.Routes(signedIn)
 			registries.NewHandler(registryService).Routes(signedIn)
+			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)
 		})
 	})
 	router.Get("/*", webui.Handler(webui.FS()).ServeHTTP)

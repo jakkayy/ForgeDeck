@@ -141,6 +141,30 @@ func (c *Client) Repositories(ctx context.Context, installationID int64) ([]Repo
 	}
 }
 
+// Commit is a commit's identity and message.
+type Commit struct {
+	SHA     string
+	Message string
+}
+
+// Commit resolves ref (a branch, tag, or SHA) in the repository fullName.
+func (c *Client) Commit(ctx context.Context, installationID int64, fullName, ref string) (Commit, error) {
+	token, err := c.InstallationToken(ctx, installationID)
+	if err != nil {
+		return Commit{}, err
+	}
+	var resp struct {
+		SHA    string `json:"sha"`
+		Commit struct {
+			Message string `json:"message"`
+		} `json:"commit"`
+	}
+	if err := c.get(ctx, "/repos/"+fullName+"/commits/"+url.PathEscape(ref), "token "+token, &resp); err != nil {
+		return Commit{}, fmt.Errorf("get commit: %w", err)
+	}
+	return Commit{SHA: resp.SHA, Message: resp.Commit.Message}, nil
+}
+
 // InstallationToken returns a token scoped to the installation, reusing a
 // cached one while it has more than five minutes left.
 func (c *Client) InstallationToken(ctx context.Context, installationID int64) (string, error) {

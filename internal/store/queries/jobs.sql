@@ -183,3 +183,14 @@ WHERE (sqlc.narg(project_id)::uuid IS NULL OR jobs.project_id = sqlc.narg(projec
        OR (jobs.created_at, jobs.id) < (sqlc.narg(before_created_at)::timestamptz, sqlc.narg(before_id)::uuid))
 ORDER BY jobs.created_at DESC, jobs.id DESC
 LIMIT @page_limit;
+
+-- name: FindActiveBuild :one
+-- A queued or running build of one commit, so a repeated manual trigger
+-- returns it instead of building the same commit twice at once.
+SELECT * FROM jobs
+WHERE application_id = @application_id
+  AND type = 'build'
+  AND status IN ('queued', 'running')
+  AND payload->>'commit_sha' = @commit_sha::text
+ORDER BY created_at DESC
+LIMIT 1;

@@ -237,6 +237,51 @@ func (q *Queries) CompleteJob(ctx context.Context, arg CompleteJobParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const findActiveBuild = `-- name: FindActiveBuild :one
+SELECT id, project_id, type, worker_kind, target_server_id, status, payload, result, error_code, error_message, attempt_count, max_attempts, lease_owner, lease_expires_at, idempotency_key, created_by, created_at, started_at, finished_at, application_id FROM jobs
+WHERE application_id = $1
+  AND type = 'build'
+  AND status IN ('queued', 'running')
+  AND payload->>'commit_sha' = $2::text
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type FindActiveBuildParams struct {
+	ApplicationID *uuid.UUID
+	CommitSha     string
+}
+
+// A queued or running build of one commit, so a repeated manual trigger
+// returns it instead of building the same commit twice at once.
+func (q *Queries) FindActiveBuild(ctx context.Context, arg FindActiveBuildParams) (Job, error) {
+	row := q.db.QueryRow(ctx, findActiveBuild, arg.ApplicationID, arg.CommitSha)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Type,
+		&i.WorkerKind,
+		&i.TargetServerID,
+		&i.Status,
+		&i.Payload,
+		&i.Result,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.LeaseOwner,
+		&i.LeaseExpiresAt,
+		&i.IdempotencyKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.ApplicationID,
+	)
+	return i, err
+}
+
 const finishJobAttempt = `-- name: FinishJobAttempt :exec
 UPDATE job_attempts
 SET status        = $1::text,

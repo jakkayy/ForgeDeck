@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -106,6 +107,19 @@ func (c *Client) DeleteProjectHook(ctx context.Context, projectID, hookID int64)
 		return nil
 	}
 	return err
+}
+
+// Commit is a commit's identity and message.
+type Commit struct {
+	ID      string `json:"id"`
+	Message string `json:"message"`
+}
+
+// Commit resolves ref (a branch, tag, or SHA) in a project.
+func (c *Client) Commit(ctx context.Context, projectID int64, ref string) (Commit, error) {
+	var commit Commit
+	_, err := c.get(ctx, "/api/v4/projects/"+strconv.FormatInt(projectID, 10)+"/repository/commits/"+url.PathEscape(ref), &commit)
+	return commit, err
 }
 
 func (c *Client) get(ctx context.Context, path string, out any) (http.Header, error) {

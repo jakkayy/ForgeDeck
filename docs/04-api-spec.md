@@ -150,6 +150,14 @@ Never accept a client-supplied Docker socket, host address, or Docker API path.
 | GET | `/environments/{environmentID}/releases` | List releases |
 | POST | `/releases/{releaseID}/rollback` | Roll back to a previous release |
 
+`POST /applications/{applicationID}/builds` (developer or higher) takes an optional body `{ "commit_sha": "<40-char sha>" }`; without it, the head of the application's branch is built. The commit is resolved through the Git provider (`404` if it does not exist), the application must have a registry and image (`409 no_image_destination`), and if the same commit is already queued or building that job is returned instead of a new one. Response `202`:
+
+```json
+{ "job_id": "uuid", "status": "queued", "commit_sha": "0123…" }
+```
+
+Follow it like any job (`GET /jobs/{jobID}`, `/events`). A succeeded build's `result` holds `image`, `tag`, `digest`, and `image_ref` ([14](14-runner.md)).
+
 A deployment request should specify a validated commit or previously built image, target environment, and optional safe configuration overrides. Do not accept arbitrary shell commands as a deployment payload.
 
 ## 8. Webhooks

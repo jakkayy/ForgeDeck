@@ -2,6 +2,7 @@ package gitconn
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apperr"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
+	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
@@ -143,4 +145,54 @@ func (s *Service) CloneCredentials(ctx context.Context, connectionID uuid.UUID, 
 	default:
 		return agentproto.GitCredentials{}, fmt.Errorf("unknown provider %q", row.Provider)
 	}
+}
+
+// Commit identifies a commit in a repository.
+type Commit struct {
+	SHA     string
+	Message string
+}
+
+// ErrCommitNotFound means the branch or commit does not exist in the repository.
+var ErrCommitNotFound = apperr.NotFound("The branch or commit was not found in the repository.")
+
+// ResolveCommit looks up ref (a branch or commit SHA) through the provider.
+// It does no user authorization; callers authorize access to the
+// application that uses the connection.
+func (s *Service) ResolveCommit(ctx context.Context, connectionID uuid.UUID, repositoryID, fullName, ref string) (Commit, error) {
+	row, err := s.queries.GetGitConnection(ctx, connectionID)
+	if err != nil {
+		return Commit{}, fmt.Errorf("get git connection: %w", err)
+	}
+	var commit Commit
+	switch row.Provider {
+	case "github":
+		if s.github == nil {
+			return Commit{}, errGitHubNotConfigured
+		}
+		var found github.Commit
+		found, err = s.github.Commit(ctx, *row.InstallationID, fullName, ref)
+		commit = Commit{SHA: found.SHA, Message: found.Message}
+	case "gitlab":
+		client, clientErr := s.gitLabClient(row)
+		if clientErr != nil {
+			return Commit{}, clientErr
+		}
+		projectID, parseErr := strconv.ParseInt(repositoryID, 10, 64)
+		if parseErr != nil {
+			return Commit{}, fmt.Errorf("gitlab project id %q: %w", repositoryID, parseErr)
+		}
+		var found gitlab.Commit
+		found, err = client.Commit(ctx, projectID, ref)
+		commit = Commit{SHA: found.ID, Message: found.Message}
+	default:
+		return Commit{}, fmt.Errorf("unknown provider %q", row.Provider)
+	}
+	switch {
+	case errors.Is(err, github.ErrNotFound) || errors.Is(err, gitlab.ErrNotFound):
+		return Commit{}, ErrCommitNotFound
+	case err != nil:
+		return Commit{}, fmt.Errorf("%w (%w)", errProviderUnavailable, err)
+	}
+	return commit, nil
 }

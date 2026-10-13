@@ -37,6 +37,7 @@ type Server struct {
 	codes         map[string][]int64            // OAuth code -> installations the user can access
 	tokensIssued  int
 	tokens        map[string]issuedToken
+	commits       map[string]github.Commit // "<full name>@<ref>"
 }
 
 type issuedToken struct {
@@ -57,6 +58,7 @@ func New(t testing.TB) *Server {
 		repositories:  map[int64][]github.Repository{},
 		codes:         map[string][]int64{},
 		tokens:        map[string]issuedToken{},
+		commits:       map[string]github.Commit{},
 	}
 	s.Server = httptest.NewServer(http.HandlerFunc(s.route))
 	t.Cleanup(s.Close)
@@ -89,6 +91,13 @@ func (s *Server) AddOAuthCode(code string, installations ...int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.codes[code] = installations
+}
+
+// AddCommit makes ref (a branch or SHA) resolve to commit in fullName.
+func (s *Server) AddCommit(fullName, ref string, commit github.Commit) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.commits[fullName+"@"+ref] = commit
 }
 
 // TokenScope is what an installation token was restricted to when minted.
@@ -137,6 +146,8 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 		})
 	case r.Method == http.MethodGet && path == "/installation/repositories":
 		s.installationRepos(w, r)
+	case r.Method == http.MethodGet && strings.HasPrefix(path, "/repos/") && strings.Contains(path, "/commits/"):
+		s.commit(w, r)
 	default:
 		http.NotFound(w, r)
 	}
@@ -218,6 +229,20 @@ func (s *Server) installationRepos(w http.ResponseWriter, r *http.Request) {
 	start := min((page-1)*perPage, len(repos))
 	end := min(start+perPage, len(repos))
 	writeJSON(w, map[string]any{"repositories": repos[start:end]})
+}
+
+func (s *Server) commit(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.tokens[strings.TrimPrefix(r.Header.Get("Authorization"), "token ")]; !ok {
+		http.Error(w, `{"message":"Bad credentials"}`, http.StatusUnauthorized)
+		return
+	}
+	fullName, ref, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/repos/"), "/commits/")
+	commit, ok := s.commits[fullName+"@"+ref]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	writeJSON(w, map[string]any{"sha": commit.SHA, "commit": map[string]string{"message": commit.Message}})
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
