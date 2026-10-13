@@ -10,6 +10,7 @@ import {
 } from "../../../api/environments";
 import { serversQuery } from "../../../api/servers";
 import { DeploymentStages } from "../../../components/environment/DeploymentStages";
+import { ReleaseHistory } from "../../../components/environment/ReleaseHistory";
 import { JobStatusChip } from "../../../components/JobStatusChip";
 import { QueryError } from "../../../components/QueryError";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
@@ -26,6 +27,10 @@ export const Route = createFileRoute("/_app/environments/$environmentId")({
 function EnvironmentPage() {
   const { environmentId } = Route.useParams();
   const environment = useQuery(environmentQuery(environmentId));
+  const app = useQuery({
+    ...applicationQuery(environment.data?.application_id ?? ""),
+    enabled: !!environment.data,
+  });
 
   if (environment.isPending) {
     return <Spinner aria-label="Loading environment" />;
@@ -33,11 +38,13 @@ function EnvironmentPage() {
   if (environment.isError) {
     return <QueryError error={environment.error} onRetry={() => environment.refetch()} />;
   }
+  const projectId = app.data?.project_id;
   return (
     <div className="flex flex-col gap-6">
       <EnvironmentHeader environmentId={environmentId} />
       <CurrentRelease environmentId={environmentId} />
       <Deployments environmentId={environmentId} />
+      {projectId && <ReleaseHistory environmentId={environmentId} projectId={projectId} />}
     </div>
   );
 }
