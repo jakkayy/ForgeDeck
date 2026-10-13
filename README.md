@@ -113,4 +113,5 @@ FORGEDECK_RUNNER_CREDENTIAL=fdr_... make run-runner URL=http://localhost:8080
 | [08 Frontend](docs/08-frontend-ux.md) · [09 Development](docs/09-development-guide.md) | UI และคู่มือพัฒนา |
 | [10 Roadmap](docs/10-roadmap.md) · [11 Plan](docs/11-implementation-plan.md) | แผนงาน |
 | [12 Measurements](docs/12-measurements.md) · [13 Git Providers](docs/13-git-providers.md) | ผลวัดและการตั้งค่า provider |
+| [15 Deployments](docs/15-deployments.md) | environment, deployment, release, rollback |
 | [AGENTS.md](AGENTS.md) | กฎสำหรับ AI coding agents |

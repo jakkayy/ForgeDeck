@@ -37,3 +37,48 @@ Deployment status: `queued → running → succeeded | failed | cancelled`. Whil
 ### Failure and automatic rollback
 
 If the new service does not pass its health check, the Agent captures the new container's last log lines into the job log, then **restores the previous release's image and configuration** (when there is one) and checks that it is healthy. The deployment is `failed` with `health_check_failed`; the environment keeps running its previous release. With no previous release, the failed service is left stopped for inspection. Other failures (pull, start) leave the previous service untouched where possible. Cancelling a running deployment is not supported in the MVP.
+
+## 2. Service configuration (4.2)
+
+An environment's service is described by **structured fields, not a Compose file**. A user-supplied Compose file can mount the host, run privileged containers, or join the host network, which would give a project member control of the server. The Control Plane validates the fields and the Agent renders the Compose file itself, so unsafe options cannot be expressed.
+
+### Fields
+
+| Field | Rules |
+|---|---|
+| `container_port` | Optional, 1–65535. The port the application listens on inside the container. |
+| `published_port` | Optional, 1–65535, requires `container_port`. The host port. Unique per server across environments (database constraint). Ports below 1024 are rejected. |
+| `bind_address` | `127.0.0.1` (default) or `0.0.0.0`. Services are not exposed to the network unless this is set explicitly, so a reverse proxy on the host is the default front door. |
+| `env` | Map of plain environment variables: names `[A-Za-z_][A-Za-z0-9_]*`, at most 64 entries, 4 KB per value. Not for secrets; secret references arrive in Phase 5 and are never logged. |
+| `volumes` | List of `{name, path}`: a **named** Docker volume mounted at an absolute container path. Host paths, `docker.sock`, and bind mounts are not accepted. |
+| `restart` | `unless-stopped` (default), `always`, `on-failure`, or `no`. |
+| `memory_mb`, `cpus` | Optional limits. |
+| `health_check` | See below. |
+
+Not configurable, by design: `privileged`, `network_mode: host`, capabilities, devices, `pid`/`ipc` modes, extra mounts, `command`/`entrypoint` overrides. The application is one service per environment in the MVP.
+
+### Health check
+
+| `type` | Passes when |
+|---|---|
+| `http` | `GET http://127.0.0.1:<published_port><path>` returns 2xx/3xx. Requires `published_port`. |
+| `tcp` | A TCP connection to `<published_port>` succeeds. Requires `published_port`. |
+| `docker` | The image's own `HEALTHCHECK` reports `healthy`. |
+
+Plus `timeout_seconds` (default 60, max 600) and `interval_seconds` (default 2). The check runs from the Agent on the server, polls until it passes or the timeout is reached, and requires the container to stay running. A container that is merely running is not healthy. The default is `docker` when no published port is set and `tcp` otherwise.
+
+### Rendering and applying
+
+For each environment the Agent keeps `compose.yml` under its state directory, with Compose project `forgedeck-<environment id>` and a single service `app`. It carries ForgeDeck labels (`forgedeck.environment`, `forgedeck.release`) and the standard Compose labels, so the dashboard's container list shows it.
+
+Applying a deployment is idempotent: pull the digest, render, `docker compose up -d --remove-orphans`, then run the health check. Re-running the same deployment converges to the same state. The Agent needs the Docker Compose plugin on the host (documented as a requirement; the Agent reports it missing as `compose_unavailable`).
+
+### Persistent volumes and downtime
+
+- **Downtime:** the service is recreated, so there is a short gap while the old container stops and the new one starts. Blue/green and canary are out of scope for the MVP.
+- **Volumes:** named volumes survive recreation. The Agent never runs `down -v` or removes volumes; deleting an environment leaves its volumes on the server and says so.
+- **Rollback and data:** rolling back restores the old image and configuration, not the data. A new version that migrated a volume or database schema may not run on the old image. This risk is documented in 4.18 and shown before a rollback is confirmed.
+
+### Registry access for pulls
+
+The Agent pulls with credentials the Control Plane includes in the claimed `deploy_image` job for that one registry (4.7). They are scoped to the job, never stored in the payload or logs, and written to a per-job Docker config that is deleted afterwards.
