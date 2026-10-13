@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppJobsIndexRouteImport } from './routes/_app/jobs/index'
+import { Route as AppJobsJobIdRouteImport } from './routes/_app/jobs/$jobId'
 import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
 import { Route as AppProjectsProjectIdRouteImport } from './routes/_app/projects/$projectId'
 import { Route as AppServersIndexRouteImport } from './routes/_app/servers/index'
@@ -29,6 +31,16 @@ const LoginRoute = LoginRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppJobsIndexRoute = AppJobsIndexRouteImport.update({
+  id: '/jobs/',
+  path: '/jobs/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppJobsJobIdRoute = AppJobsJobIdRouteImport.update({
+  id: '/jobs/$jobId',
+  path: '/jobs/$jobId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProjectsIndexRoute = AppProjectsIndexRouteImport.update({
@@ -55,16 +67,20 @@ const AppServersServerIdRoute = AppServersServerIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
+  '/jobs/$jobId': typeof AppJobsJobIdRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/servers/$serverId': typeof AppServersServerIdRoute
+  '/jobs/': typeof AppJobsIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/servers/': typeof AppServersIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/': typeof AppIndexRoute
+  '/jobs/$jobId': typeof AppJobsJobIdRoute
   '/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/servers/$serverId': typeof AppServersServerIdRoute
+  '/jobs': typeof AppJobsIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/servers': typeof AppServersIndexRoute
 }
@@ -73,8 +89,10 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/jobs/$jobId': typeof AppJobsJobIdRoute
   '/_app/projects/$projectId': typeof AppProjectsProjectIdRoute
   '/_app/servers/$serverId': typeof AppServersServerIdRoute
+  '/_app/jobs/': typeof AppJobsIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/servers/': typeof AppServersIndexRoute
 }
@@ -83,16 +101,20 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/jobs/$jobId'
     | '/projects/$projectId'
     | '/servers/$serverId'
+    | '/jobs/'
     | '/projects/'
     | '/servers/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
     | '/'
+    | '/jobs/$jobId'
     | '/projects/$projectId'
     | '/servers/$serverId'
+    | '/jobs'
     | '/projects'
     | '/servers'
   id:
@@ -100,8 +122,10 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/_app/'
+    | '/_app/jobs/$jobId'
     | '/_app/projects/$projectId'
     | '/_app/servers/$serverId'
+    | '/_app/jobs/'
     | '/_app/projects/'
     | '/_app/servers/'
   fileRoutesById: FileRoutesById
@@ -132,6 +156,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/jobs/': {
+      id: '/_app/jobs/'
+      path: '/jobs'
+      fullPath: '/jobs/'
+      preLoaderRoute: typeof AppJobsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/jobs/$jobId': {
+      id: '/_app/jobs/$jobId'
+      path: '/jobs/$jobId'
+      fullPath: '/jobs/$jobId'
+      preLoaderRoute: typeof AppJobsJobIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/projects/': {
@@ -167,16 +205,20 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
+  AppJobsJobIdRoute: typeof AppJobsJobIdRoute
   AppProjectsProjectIdRoute: typeof AppProjectsProjectIdRoute
   AppServersServerIdRoute: typeof AppServersServerIdRoute
+  AppJobsIndexRoute: typeof AppJobsIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppServersIndexRoute: typeof AppServersIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
+  AppJobsJobIdRoute: AppJobsJobIdRoute,
   AppProjectsProjectIdRoute: AppProjectsProjectIdRoute,
   AppServersServerIdRoute: AppServersServerIdRoute,
+  AppJobsIndexRoute: AppJobsIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppServersIndexRoute: AppServersIndexRoute,
 }

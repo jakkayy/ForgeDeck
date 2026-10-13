@@ -4,16 +4,9 @@ import { useState } from "react";
 import { getAllJobLogs, waitForJob } from "../api/jobs";
 import { requestContainerLogs } from "../api/servers";
 import type { Container, LogLine } from "../api/types";
+import { LogView } from "./LogView";
 
 const tailOptions = [100, 500, 2000];
-
-// stderr is marked in the gutter rather than colored: many programs log
-// ordinary output there, and an all-red log reads as an outage.
-const streamStyle: Record<LogLine["stream"], string> = {
-  stdout: "border-transparent",
-  stderr: "border-[var(--warning)]",
-  system: "border-transparent text-[var(--muted)]",
-};
 
 type FetchedLogs = { lines: LogLine[]; truncated: boolean; fetchedAt: Date };
 
@@ -108,18 +101,7 @@ export function ContainerLogs({ serverId, container, isDisabled = false }: Props
   );
 }
 
-/** Splits Docker's "2026-10-12T20:08:09.43Z message" prefix into a short time. */
-function splitTimestamp(message: string): { time: string | null; text: string } {
-  const match = /^(\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2})[.\d]*Z) (.*)$/s.exec(message);
-  return match ? { time: match[2] ?? null, text: match[3] ?? "" } : { time: null, text: message };
-}
-
 function LogOutput({ logs }: { logs: FetchedLogs }) {
-  // Start at the newest lines, which is what someone debugging looks for first.
-  const scrollToEnd = (element: HTMLPreElement | null) => {
-    element?.scrollTo({ top: element.scrollHeight });
-  };
-
   if (logs.lines.length === 0) {
     return (
       <p className="text-sm text-[var(--muted)]">This container has not written any output.</p>
@@ -132,23 +114,7 @@ function LogOutput({ logs }: { logs: FetchedLogs }) {
         {logs.truncated &&
           " Output was truncated at 1 MB; fetch fewer lines to see the newest ones."}
       </p>
-      <pre
-        ref={scrollToEnd}
-        className="min-h-0 flex-1 overflow-auto rounded-lg bg-[var(--surface-secondary)] py-3 font-mono text-xs leading-5"
-      >
-        {logs.lines.map((line) => {
-          const { time, text } = splitTimestamp(line.message);
-          return (
-            <div
-              key={`${line.attempt}.${line.sequence}`}
-              className={`flex gap-3 border-s-2 px-3 ${streamStyle[line.stream]}`}
-            >
-              {time && <span className="shrink-0 select-none text-[var(--muted)]">{time}</span>}
-              <span className="whitespace-pre-wrap break-all">{text}</span>
-            </div>
-          );
-        })}
-      </pre>
+      <LogView lines={logs.lines} />
     </>
   );
 }

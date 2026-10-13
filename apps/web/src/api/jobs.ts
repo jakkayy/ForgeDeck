@@ -44,3 +44,20 @@ export async function getAllJobLogs(jobId: string, signal?: AbortSignal): Promis
     after = page.next_cursor;
   }
 }
+
+export type JobPage = List<Job>;
+
+export function listJobs(params: { status?: string; cursor?: string }, signal?: AbortSignal) {
+  const query = new URLSearchParams({ limit: "30" });
+  if (params.status) {
+    query.set("status", params.status);
+  }
+  if (params.cursor) {
+    query.set("cursor", params.cursor);
+  }
+  return api<JobPage>(`/jobs?${query}`, { signal });
+}
+
+export function cancelJob(jobId: string) {
+  return api<Job>(`/jobs/${jobId}/cancel`, { method: "POST" });
+}
