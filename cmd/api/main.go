@@ -5,6 +5,8 @@
 //	forgedeck-api [serve]             run the server (applies pending migrations first)
 //	forgedeck-api migrate up|down|status
 //	forgedeck-api create-user --email <address>   (password from terminal or stdin)
+//	forgedeck-api create-runner --name <name>     (prints the Runner credential once)
+//	forgedeck-api delete-runner --name <name>
 package main
 
 import (
@@ -54,7 +56,11 @@ func dispatch(ctx context.Context, command string, args []string, cfg config.Con
 		return migrate(ctx, args, cfg, logger)
 	case "create-user":
 		return createUser(ctx, args, cfg, logger)
+	case "create-runner":
+		return createRunner(ctx, args, cfg, logger)
+	case "delete-runner":
+		return deleteRunner(ctx, args, cfg, logger)
 	default:
-		return fmt.Errorf("unknown command %q (want serve, migrate or create-user)", command)
+		return fmt.Errorf("unknown command %q (want serve, migrate, create-user, create-runner or delete-runner)", command)
 	}
 }

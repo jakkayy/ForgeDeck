@@ -236,7 +236,7 @@ Added during Phase 2:
 | # | งาน | Commit |
 |---|---|---|
 | 3.1 | 🚧 กำหนด Runner protocol (เสนอ: ใช้ protocol เดียวกับ Agent, `worker_kind = runner`) | `docs: define runner protocol` |
-| 3.2 | Migration `runners` + enrollment | `feat(api): add runner enrollment` |
+| 3.2 | Migration `runners` + คำสั่ง `create-runner`/`delete-runner` (ไม่มี enrollment ผ่านเว็บ ดู 14) | `feat(api): add runner registration` |
 | 3.3 | เปิด claim/lease/events/complete ให้ Runner | `feat(api): add runner job endpoints` |
 | 3.4 | Migration และ endpoint ของ registry connection | `feat(api): add registry connections` |
 | 3.5 | Runner binary + claim loop | `feat(runner): add job claim loop` |

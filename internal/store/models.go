@@ -123,6 +123,15 @@ type ProjectMember struct {
 	CreatedAt time.Time
 }
 
+type Runner struct {
+	ID             uuid.UUID
+	Name           string
+	CredentialHash []byte
+	Version        *string
+	LastSeenAt     *time.Time
+	CreatedAt      time.Time
+}
+
 type Server struct {
 	ID                   uuid.UUID
 	ProjectID            uuid.UUID
