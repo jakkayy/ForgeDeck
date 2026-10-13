@@ -11,6 +11,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/gitconn"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
+	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
 // maxPayloadBytes matches GitHub's 25 MB cap with room to spare for GitLab.
@@ -26,11 +27,12 @@ type SecretSource interface {
 type Handler struct {
 	gitHubSecret string // empty when the GitHub App is not configured
 	gitLab       SecretSource
+	queries      *store.Queries
 }
 
 // NewHandler returns webhook endpoints.
-func NewHandler(gitHubSecret string, gitLab SecretSource) *Handler {
-	return &Handler{gitHubSecret: gitHubSecret, gitLab: gitLab}
+func NewHandler(gitHubSecret string, gitLab SecretSource, queries *store.Queries) *Handler {
+	return &Handler{gitHubSecret: gitHubSecret, gitLab: gitLab, queries: queries}
 }
 
 // Routes mounts the webhook endpoints on r.
@@ -63,13 +65,26 @@ func (h *Handler) gitlab(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if r.Header.Get("X-Gitlab-Event") != "Push Hook" {
+	event := r.Header.Get("X-Gitlab-Event")
+	if event != "Push Hook" {
 		return httpx.WriteJSON(w, http.StatusOK, map[string]string{"result": "ignored: event not used"})
 	}
-	if _, _, err := parseGitLabPush(body); err != nil {
+	push, ok, err := parseGitLabPush(body)
+	if err != nil {
 		return httpx.BadRequest("invalid_payload", err.Error())
 	}
-	return httpx.WriteJSON(w, http.StatusAccepted, map[string]string{"result": "accepted"})
+	d := delivery{provider: "gitlab", id: r.Header.Get("X-Gitlab-Event-UUID"), eventType: event, connectionID: &connectionID}
+	return h.handleOnce(w, r, d, func(context.Context) (string, error) {
+		return pushResult(push, ok), nil
+	})
+}
+
+// pushResult describes a push that has been accepted but not yet acted on.
+func pushResult(push Push, buildable bool) string {
+	if !buildable {
+		return "ignored: not a branch push"
+	}
+	return "accepted push to " + push.Branch
 }
 
 func (h *Handler) github(w http.ResponseWriter, r *http.Request) error {
@@ -84,14 +99,18 @@ func (h *Handler) github(w http.ResponseWriter, r *http.Request) error {
 		return httpx.Unauthorized("Webhook signature is invalid.")
 	}
 
-	switch r.Header.Get("X-GitHub-Event") {
+	switch event := r.Header.Get("X-GitHub-Event"); event {
 	case "ping":
 		return httpx.WriteJSON(w, http.StatusOK, map[string]string{"result": "pong"})
 	case "push":
-		if _, _, _, err := parseGitHubPush(body); err != nil {
+		push, _, ok, err := parseGitHubPush(body)
+		if err != nil {
 			return httpx.BadRequest("invalid_payload", err.Error())
 		}
-		return httpx.WriteJSON(w, http.StatusAccepted, map[string]string{"result": "accepted"})
+		d := delivery{provider: "github", id: r.Header.Get("X-GitHub-Delivery"), eventType: event}
+		return h.handleOnce(w, r, d, func(context.Context) (string, error) {
+			return pushResult(push, ok), nil
+		})
 	default:
 		return httpx.WriteJSON(w, http.StatusOK, map[string]string{"result": "ignored: event not used"})
 	}

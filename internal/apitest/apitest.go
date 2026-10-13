@@ -128,13 +128,24 @@ type Response struct {
 // Do sends a request with body encoded as JSON (nil for no body).
 func (c *Client) Do(method, path string, body any) *Response {
 	c.t.Helper()
-	var reader io.Reader
+	var raw []byte
 	if body != nil {
 		encoded, err := json.Marshal(body)
 		if err != nil {
 			c.t.Fatalf("apitest: encode body: %v", err)
 		}
-		reader = bytes.NewReader(encoded)
+		raw = encoded
+	}
+	return c.DoRaw(method, path, raw, nil)
+}
+
+// DoRaw sends body bytes as-is with extra headers, for webhook-style requests
+// whose signature covers the exact bytes.
+func (c *Client) DoRaw(method, path string, body []byte, headers map[string]string) *Response {
+	c.t.Helper()
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
 	}
 	req, err := http.NewRequestWithContext(context.Background(), method, c.base+path, reader)
 	if err != nil {
@@ -142,6 +153,9 @@ func (c *Client) Do(method, path string, body any) *Response {
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 	if c.bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+c.bearer)
