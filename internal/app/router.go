@@ -127,6 +127,10 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)
 		})
 	})
-	router.Get("/*", webui.Handler(webui.FS()).ServeHTTP)
+	// The dashboard is compressed here, not only by a proxy: running the binary
+	// directly is a supported way to use it. API responses and event streams
+	// are left alone.
+	router.With(middleware.Compress(5, "text/html", "text/css", "text/javascript", "image/svg+xml", "application/manifest+json")).
+		Get("/*", webui.Handler(webui.FS()).ServeHTTP)
 	return router
 }
