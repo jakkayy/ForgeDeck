@@ -1,6 +1,7 @@
 import { createRouter } from "@tanstack/react-router";
 import { meQuery } from "./api/auth";
 import { queryClient, setUnauthorizedHandler } from "./api/queryClient";
+import { NotFoundPage, RouteErrorPage } from "./components/RouteFallbacks";
 import { routeTree } from "./routeTree.gen";
 
 export const router = createRouter({
@@ -8,6 +9,8 @@ export const router = createRouter({
   context: { queryClient },
   defaultPreload: "intent",
   scrollRestoration: true,
+  defaultNotFoundComponent: NotFoundPage,
+  defaultErrorComponent: RouteErrorPage,
 });
 
 // A session can end while a page is open (logout elsewhere, expiry).

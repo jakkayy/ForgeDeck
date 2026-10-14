@@ -6,27 +6,32 @@ import {
   Input,
   Label,
   Modal,
-  Spinner,
   TextField,
 } from "@heroui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 import { isApiError } from "../../../api/client";
-import { createProject, projectsQuery } from "../../../api/projects";
+import { loadedItems } from "../../../api/paged";
+import { createProject, projectListQuery, projectsQuery } from "../../../api/projects";
 import { ApiForm } from "../../../components/ApiForm";
 import { EmptyState } from "../../../components/EmptyState";
+import { LoadMore } from "../../../components/LoadMore";
 import { PageHeader } from "../../../components/PageHeader";
-import { QueryError } from "../../../components/QueryError";
+import { QueryBoundary } from "../../../components/QueryBoundary";
 import { RoleChip } from "../../../components/RoleChip";
+import { SearchBox } from "../../../components/SearchBox";
+import { useDebouncedValue } from "../../../lib/useDebouncedValue";
 
 export const Route = createFileRoute("/_app/projects/")({
-  loader: ({ context }) => context.queryClient.prefetchQuery(projectsQuery),
+  loader: ({ context }) => context.queryClient.prefetchInfiniteQuery(projectListQuery()),
   component: ProjectsPage,
 });
 
 function ProjectsPage() {
-  const projects = useQuery(projectsQuery);
+  const [search, setSearch] = useState("");
+  const q = useDebouncedValue(search.trim()) || undefined;
+  const projects = useInfiniteQuery(projectListQuery(q));
 
   return (
     <>
@@ -35,35 +40,52 @@ function ProjectsPage() {
         description="Projects group servers, applications and the people who can manage them."
         actions={<NewProjectDialog />}
       />
-      {projects.isPending && <Spinner aria-label="Loading projects" />}
-      {projects.isError && <QueryError error={projects.error} onRetry={() => projects.refetch()} />}
-      {projects.isSuccess && projects.data.items.length === 0 && (
-        <EmptyState
-          title="No projects yet"
-          description="Create a project first. Servers and applications always belong to a project."
+      <div className="mb-4">
+        <SearchBox
+          label="Search projects"
+          placeholder="Search by name"
+          value={search}
+          onChange={setSearch}
         />
-      )}
-      {projects.isSuccess && projects.data.items.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {projects.data.items.map((project) => (
-              <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="min-w-0">
-                  <Link
-                    to="/projects/$projectId"
-                    params={{ projectId: project.id }}
-                    className="block truncate font-medium hover:underline"
-                  >
-                    {project.name}
-                  </Link>
-                  <p className="truncate font-mono text-xs text-[var(--muted)]">{project.slug}</p>
-                </div>
-                <RoleChip role={project.role} />
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      </div>
+      <QueryBoundary
+        query={projects}
+        label="projects"
+        isEmpty={(data) => loadedItems(data).length === 0}
+        empty={
+          q ? (
+            <EmptyState title="No projects match" description="Try a different name." />
+          ) : (
+            <EmptyState
+              title="No projects yet"
+              description="Create a project first. Servers and applications always belong to a project."
+            />
+          )
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {loadedItems(data).map((project) => (
+                <li key={project.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="min-w-0">
+                    <Link
+                      to="/projects/$projectId"
+                      params={{ projectId: project.id }}
+                      className="block truncate font-medium hover:underline"
+                    >
+                      {project.name}
+                    </Link>
+                    <p className="truncate font-mono text-xs text-[var(--muted)]">{project.slug}</p>
+                  </div>
+                  <RoleChip role={project.role} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
+      <LoadMore query={projects} />
     </>
   );
 }

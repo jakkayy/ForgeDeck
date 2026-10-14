@@ -2,6 +2,7 @@ package servers_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,4 +109,42 @@ func TestDeleteServerRevokesAgent(t *testing.T) {
 
 	// The name is free again, so the same host can be re-enrolled.
 	env.EnrollAgent(owner, projectID, "prod-01")
+}
+
+func TestServerListFiltersByNameAndConnectivity(t *testing.T) {
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	projectID := owner.CreateProject("Infra")
+	seen := map[string]time.Duration{"web-fresh": time.Second, "web-stale": 3 * time.Minute, "db-gone": time.Hour}
+	for name, age := range seen {
+		agent := env.EnrollAgent(owner, projectID, name)
+		if _, err := env.Pool.Exec(t.Context(), `UPDATE servers SET last_seen_at = $2 WHERE id = $1`, agent.ServerID, time.Now().Add(-age)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env.EnrollAgent(owner, projectID, "web-new") // never reported: pending
+
+	names := func(query string) string {
+		var list httpx.List[servers.Server]
+		owner.Do(http.MethodGet, "/api/v1/servers?"+query, nil).RequireStatus(http.StatusOK).Decode(&list)
+		out := make([]string, len(list.Items))
+		for i, s := range list.Items {
+			out[i] = s.Name
+		}
+		return strings.Join(out, ",")
+	}
+	for query, want := range map[string]string{
+		"q=web":                      "web-fresh,web-new,web-stale",
+		"status=online":              "web-fresh",
+		"status=unreachable":         "web-stale",
+		"status=offline":             "db-gone",
+		"status=pending":             "web-new",
+		"q=web&status=offline":       "",
+		"q=WEB-S&status=unreachable": "web-stale",
+	} {
+		if got := names(query); got != want {
+			t.Errorf("%s: got %q, want %q", query, got, want)
+		}
+	}
+	owner.Do(http.MethodGet, "/api/v1/servers?status=sleeping", nil).RequireStatus(http.StatusBadRequest)
 }

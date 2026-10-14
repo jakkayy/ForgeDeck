@@ -149,14 +149,27 @@ FROM servers
 JOIN projects ON projects.id = servers.project_id
 JOIN project_members ON project_members.project_id = servers.project_id
 WHERE project_members.user_id = $1
+  AND ($2::text IS NULL OR servers.name ILIKE '%' || $2::text || '%')
+  -- Connectivity is derived from the heartbeat age (servers.ConnectivityStatus);
+  -- the caller passes the cutoffs so the windows live in one place.
+  AND ($3::text IS NULL
+       OR ($3::text = 'pending' AND servers.last_seen_at IS NULL)
+       OR ($3::text = 'online' AND servers.last_seen_at >= $4::timestamptz)
+       OR ($3::text = 'unreachable' AND servers.last_seen_at < $4::timestamptz
+                                                   AND servers.last_seen_at >= $5::timestamptz)
+       OR ($3::text = 'offline' AND servers.last_seen_at < $5::timestamptz))
 ORDER BY projects.name, servers.name, servers.id
-LIMIT $3 OFFSET $2
+LIMIT $7 OFFSET $6
 `
 
 type ListServersForUserParams struct {
-	UserID     uuid.UUID
-	PageOffset int32
-	PageLimit  int32
+	UserID           uuid.UUID
+	Search           *string
+	Status           *string
+	OnlineAfter      time.Time
+	UnreachableAfter time.Time
+	PageOffset       int32
+	PageLimit        int32
 }
 
 type ListServersForUserRow struct {
@@ -165,7 +178,15 @@ type ListServersForUserRow struct {
 }
 
 func (q *Queries) ListServersForUser(ctx context.Context, arg ListServersForUserParams) ([]ListServersForUserRow, error) {
-	rows, err := q.db.Query(ctx, listServersForUser, arg.UserID, arg.PageOffset, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listServersForUser,
+		arg.UserID,
+		arg.Search,
+		arg.Status,
+		arg.OnlineAfter,
+		arg.UnreachableAfter,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

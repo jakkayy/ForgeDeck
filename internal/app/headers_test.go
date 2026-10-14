@@ -6,6 +6,7 @@ import (
 
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/config"
+	"github.com/jakkayy/ForgeDeck/internal/webui"
 )
 
 func TestEveryResponseCarriesSecurityHeaders(t *testing.T) {
@@ -39,5 +40,23 @@ func TestHSTSFollowsTheSecureCookieSetting(t *testing.T) {
 	resp := env.Anonymous().Do(http.MethodGet, "/healthz", nil)
 	if resp.Header.Get("Strict-Transport-Security") == "" {
 		t.Fatal("no HSTS on an HTTPS deployment")
+	}
+}
+
+func TestDashboardAssetsAreCompressedAndAPIResponsesAreNot(t *testing.T) {
+	if !webui.Built() {
+		t.Skip("the dashboard is not built into this binary (run `make web`)")
+	}
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	gzip := map[string]string{"Accept-Encoding": "gzip"}
+
+	if got := owner.DoRaw(http.MethodGet, "/", nil, gzip).Header.Get("Content-Encoding"); got != "gzip" {
+		t.Errorf("the dashboard page has Content-Encoding %q, want gzip", got)
+	}
+	for _, path := range []string{"/healthz", "/api/v1/projects"} {
+		if got := owner.DoRaw(http.MethodGet, path, nil, gzip).Header.Get("Content-Encoding"); got != "" {
+			t.Errorf("GET %s was compressed (%q)", path, got)
+		}
 	}
 }

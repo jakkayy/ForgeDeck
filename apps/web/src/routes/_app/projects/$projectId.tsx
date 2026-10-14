@@ -1,4 +1,4 @@
-import { Spinner, Tabs, toast } from "@heroui/react";
+import { Tabs, toast } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -10,7 +10,7 @@ import { MembersSection } from "../../../components/project/MembersSection";
 import { RegistriesSection } from "../../../components/project/RegistriesSection";
 import { SecretsSection } from "../../../components/project/SecretsSection";
 import { SetupGuide } from "../../../components/project/SetupGuide";
-import { QueryError } from "../../../components/QueryError";
+import { StaleNotice, waitingFor } from "../../../components/QueryBoundary";
 import { RoleChip } from "../../../components/RoleChip";
 import { useHasRole } from "../../../lib/useHasRole";
 
@@ -61,14 +61,12 @@ function ProjectPage() {
     navigate({ search: { tab: "git" }, replace: true });
   }, [search.git, search.git_error, navigate]);
 
-  if (project.isPending) {
-    return <Spinner aria-label="Loading project" />;
-  }
-  if (project.isError) {
-    return <QueryError error={project.error} onRetry={() => project.refetch()} />;
+  if (project.data === undefined) {
+    return waitingFor(project, "project");
   }
   return (
     <div className="flex flex-col gap-6">
+      <StaleNotice query={project} label="project" />
       <div>
         <Link to="/projects" className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
           ← Projects
@@ -85,7 +83,8 @@ function ProjectPage() {
         selectedKey={tab}
         onSelectionChange={(key) => navigate({ search: { tab: key as Tab }, replace: true })}
       >
-        <Tabs.ListContainer>
+        {/* The six tabs are wider than a phone: scroll them instead of the page. */}
+        <Tabs.ListContainer className="max-w-full overflow-x-auto">
           <Tabs.List aria-label="Project sections">
             <Tabs.Tab id="applications">
               Applications

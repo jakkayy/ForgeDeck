@@ -1,10 +1,10 @@
-import { Button, Card, ListBox, Select, Spinner } from "@heroui/react";
+import { Button, Card, ListBox, Select } from "@heroui/react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { listAudit } from "../../api/audit";
 import { auditActions, describeAudit } from "../../lib/describeAudit";
 import { timeAgo } from "../../lib/time";
-import { QueryError } from "../QueryError";
+import { QueryBoundary } from "../QueryBoundary";
 
 /** Who did what in this project, newest first. Admins only; the API enforces it. */
 export function AuditSection({ projectId }: { projectId: string }) {
@@ -48,37 +48,41 @@ export function AuditSection({ projectId }: { projectId: string }) {
           </Select.Popover>
         </Select>
       </div>
-      {events.isPending && <Spinner aria-label="Loading audit log" />}
-      {events.isError && <QueryError error={events.error} onRetry={() => events.refetch()} />}
-      {events.isSuccess && entries.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          {action ? "Nothing matches this filter." : "Nothing has been recorded yet."}
-        </Card>
-      )}
-      {entries.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {entries.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex flex-col gap-0.5 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-4"
-              >
-                <p className="min-w-0 flex-1 text-sm">
-                  <span className="font-medium">{entry.actor}</span> {describeAudit(entry)}
-                </p>
-                <p className="font-mono text-xs text-[var(--muted)]">{entry.action}</p>
-                <time
-                  dateTime={entry.created_at}
-                  title={new Date(entry.created_at).toLocaleString()}
-                  className="w-28 text-sm text-[var(--muted)] sm:text-end"
+      <QueryBoundary
+        query={events}
+        label="audit log"
+        isEmpty={() => entries.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            {action ? "Nothing matches this filter." : "Nothing has been recorded yet."}
+          </Card>
+        }
+      >
+        {() => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {entries.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="flex flex-col gap-0.5 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-4"
                 >
-                  {timeAgo(entry.created_at)}
-                </time>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+                  <p className="min-w-0 flex-1 text-sm">
+                    <span className="font-medium">{entry.actor}</span> {describeAudit(entry)}
+                  </p>
+                  <p className="font-mono text-xs text-[var(--muted)]">{entry.action}</p>
+                  <time
+                    dateTime={entry.created_at}
+                    title={new Date(entry.created_at).toLocaleString()}
+                    className="w-28 text-sm text-[var(--muted)] sm:text-end"
+                  >
+                    {timeAgo(entry.created_at)}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
       {events.hasNextPage && (
         <div className="flex justify-center">
           <Button

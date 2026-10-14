@@ -1,11 +1,15 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
+import { pagedQuery } from "./paged";
 import type { List, Member, Project, Role } from "./types";
 
 export const projectsQuery = queryOptions({
   queryKey: ["projects"],
   queryFn: ({ signal }) => api<List<Project>>("/projects?limit=100", { signal }),
 });
+
+export const projectListQuery = (q?: string) =>
+  pagedQuery<Project>({ key: ["projects"], path: "/projects", params: { q } });
 
 export function createProject(input: { name: string; slug?: string }) {
   return api<Project>("/projects", { method: "POST", body: input });

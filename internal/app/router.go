@@ -25,6 +25,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/health"
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 	"github.com/jakkayy/ForgeDeck/internal/jobs"
+	"github.com/jakkayy/ForgeDeck/internal/overview"
 	"github.com/jakkayy/ForgeDeck/internal/projects"
 	"github.com/jakkayy/ForgeDeck/internal/registries"
 	"github.com/jakkayy/ForgeDeck/internal/retention"
@@ -114,6 +115,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			signedIn.Use(authHandler.RequireUser, limits.userMutations, auditRecorder.Middleware)
 			projectHandler.Routes(signedIn)
 			serverHandler.Routes(signedIn)
+			overview.NewHandler(overview.NewService(store.New(pool), time.Now)).Routes(signedIn)
 			jobs.NewHandler(ctx, jobService, notifier).Routes(signedIn)
 			gitHandler.Routes(signedIn)
 			appHandler.Routes(signedIn)
@@ -125,6 +127,10 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)
 		})
 	})
-	router.Get("/*", webui.Handler(webui.FS()).ServeHTTP)
+	// The dashboard is compressed here, not only by a proxy: running the binary
+	// directly is a supported way to use it. API responses and event streams
+	// are left alone.
+	router.With(middleware.Compress(5, "text/html", "text/css", "text/javascript", "image/svg+xml", "application/manifest+json")).
+		Get("/*", webui.Handler(webui.FS()).ServeHTTP)
 	return router
 }

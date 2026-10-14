@@ -38,7 +38,11 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	apps, err := h.svc.List(r.Context(), auth.UserFrom(r.Context()).ID, projectID, page.Limit, page.Offset)
+	search, err := httpx.ParseSearch(r)
+	if err != nil {
+		return err
+	}
+	apps, err := h.svc.List(r.Context(), auth.UserFrom(r.Context()).ID, projectID, search, page.Limit, page.Offset)
 	if err != nil {
 		return err
 	}

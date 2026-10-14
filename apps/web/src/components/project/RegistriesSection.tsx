@@ -8,7 +8,6 @@ import {
   Input,
   Label,
   Modal,
-  Spinner,
   TextField,
   toast,
 } from "@heroui/react";
@@ -24,7 +23,7 @@ import {
 } from "../../api/registries";
 import { useHasRole } from "../../lib/useHasRole";
 import { ApiForm } from "../ApiForm";
-import { QueryError } from "../QueryError";
+import { QueryBoundary } from "../QueryBoundary";
 
 /** Container registries the project's builds push images to. */
 export function RegistriesSection({ projectId }: { projectId: string }) {
@@ -38,36 +37,38 @@ export function RegistriesSection({ projectId }: { projectId: string }) {
           <AddRegistryDialog projectId={projectId} />
         </div>
       )}
-      {registries.isPending && <Spinner aria-label="Loading registries" />}
-      {registries.isError && (
-        <QueryError error={registries.error} onRetry={() => registries.refetch()} />
-      )}
-      {registries.isSuccess && registries.data.length === 0 && (
-        <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-          No registries yet. Add the registry your images are pushed to, such as ghcr.io or Docker
-          Hub, then choose it for each application.
-        </Card>
-      )}
-      {registries.isSuccess && registries.data.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {registries.data.map((registry) => (
-              <li
-                key={registry.id}
-                className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3"
-              >
-                <div className="min-w-48 flex-1">
-                  <p className="font-medium">{registry.name}</p>
-                  <p className="font-mono text-xs text-[var(--muted)]">
-                    {registry.username} @ {registry.host}
-                  </p>
-                </div>
-                {canManage && <RemoveRegistry projectId={projectId} registry={registry} />}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      <QueryBoundary
+        query={registries}
+        label="registries"
+        isEmpty={(data) => data.length === 0}
+        empty={
+          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
+            No registries yet. Add the registry your images are pushed to, such as ghcr.io or Docker
+            Hub, then choose it for each application.
+          </Card>
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {data.map((registry) => (
+                <li
+                  key={registry.id}
+                  className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3"
+                >
+                  <div className="min-w-48 flex-1">
+                    <p className="font-medium">{registry.name}</p>
+                    <p className="font-mono text-xs text-[var(--muted)]">
+                      {registry.username} @ {registry.host}
+                    </p>
+                  </div>
+                  {canManage && <RemoveRegistry projectId={projectId} registry={registry} />}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
     </section>
   );
 }

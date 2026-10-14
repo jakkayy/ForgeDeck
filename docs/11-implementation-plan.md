@@ -345,6 +345,18 @@ Added during Phase 5 (each shipped inside the commit of the item it supports, ex
 | 6.2 | Loading/empty/error/stale state ครบทุกหน้า | `feat(web): complete page state handling` |
 | 6.3 | Pagination และ filter ทุก list | `feat(web): add pagination and filters to lists` |
 | 6.4 | Virtualize log ยาว | `feat(web): virtualize long logs` |
-| 6.5 | ปิด SSE เมื่อออกจากหน้า | `fix(web): close SSE streams on navigation` |
+| 6.5 | ปิด SSE เมื่อออกจากหน้า | `fix(web): stop job streams in hidden tabs` |
 | 6.6 | Accessibility และ responsive | `feat(web): improve accessibility and responsive layout` |
 | 6.7 | Benchmark ตาม test profile และบันทึกผล | `docs: add performance benchmark results` |
+
+Added during Phase 6 (each shipped inside the commit of the item it supports, except where a commit is named):
+
+| # | งาน | อยู่ใน commit ของ |
+|---|---|---|
+| 6.1b | `GET /overview` (`internal/overview`) และ `servers.ConnectivityCutoffs` (หน้าต่างเวลา online/unreachable ที่ใช้ร่วมกับ query) | 6.1 |
+| 6.2b | `QueryBoundary` / `StaleNotice` (loading, error, empty, stale ที่เดียว: refetch ล้มเหลวแล้วข้อมูลเดิมยังอยู่), หน้า not found และหน้า error | 6.2 |
+| 6.3b | `?q=` (`httpx.ParseSearch`) และ `?status=` ฝั่ง server, แก้ `useHasRole` ที่เคยหา role จาก list 100 รายการแรก | 6.3 |
+| 6.4b | รวม log ที่มาถึงพร้อมกันเป็น render เดียว (`useJobStream`), ปุ่ม Copy all, Jump to latest | 6.4 |
+| 6.5b | ตรวจแล้วว่าออกจากหน้าปิด stream อยู่แล้ว สิ่งที่แก้คือ tab ที่ซ่อนนานเกิน 1 นาที (resume ด้วย `?after=`) | 6.5 |
+| 6.6b | Skip link, title และ focus ตามหน้า, token สีที่ผ่าน contrast, งบ CSS 20 → 22 KB | 6.6 |
+| 6.7b | `scripts/bench` (seed + ตัวยิงโหลด), query ของ `/jobs` และ `/overview` ที่เคยอ่านทั้งตาราง, บีบอัด dashboard ใน Control Plane | `perf(api): speed up job history and overview queries and compress the dashboard` |

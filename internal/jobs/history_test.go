@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 	"github.com/jakkayy/ForgeDeck/internal/authz"
@@ -73,4 +75,53 @@ func TestJobHistoryPagesFiltersAndScopes(t *testing.T) {
 
 	owner.Do(http.MethodGet, "/api/v1/jobs?status=exploded", nil).RequireStatus(http.StatusBadRequest)
 	owner.Do(http.MethodGet, "/api/v1/jobs?cursor=%21%21", nil).RequireStatus(http.StatusBadRequest)
+}
+
+// A person in several projects sees one history, newest first, even though
+// each project is read separately: no job is skipped or repeated across pages.
+func TestJobHistoryMergesProjectsAcrossPages(t *testing.T) {
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	svc := jobs.NewService(env.Pool, authz.New(store.New(env.Pool)), time.Now)
+	var agents []apitest.Agent
+	var projectIDs []uuid.UUID
+	for _, name := range []string{"Alpha", "Beta", "Gamma"} {
+		id := owner.CreateProject(name)
+		projectIDs = append(projectIDs, id)
+		agents = append(agents, env.EnrollAgent(owner, id, "srv-"+name))
+	}
+	want := map[uuid.UUID]bool{}
+	for i := range 14 { // interleaved: 0,1,2,0,1,2…, so every page mixes projects
+		p := i % 3
+		job, err := svc.Enqueue(t.Context(), jobs.NewJob{ProjectID: projectIDs[p], Type: agentproto.JobFetchLogs,
+			WorkerKind: jobs.WorkerAgent, TargetServerID: &agents[p].ServerID, Payload: map[string]int{"n": i}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want[job.ID] = true
+	}
+
+	var seen []jobs.Job
+	cursor := ""
+	for {
+		var page httpx.List[jobs.Job]
+		owner.Do(http.MethodGet, "/api/v1/jobs?limit=4&cursor="+cursor, nil).RequireStatus(http.StatusOK).Decode(&page)
+		seen = append(seen, page.Items...)
+		if page.NextCursor == nil {
+			break
+		}
+		cursor = *page.NextCursor
+	}
+	if len(seen) != len(want) {
+		t.Fatalf("saw %d jobs, want %d", len(seen), len(want))
+	}
+	for i, job := range seen {
+		if !want[job.ID] {
+			t.Fatalf("job %s listed twice or unknown", job.ID)
+		}
+		delete(want, job.ID)
+		if i > 0 && job.CreatedAt.After(seen[i-1].CreatedAt) {
+			t.Fatalf("job %d is newer than the one before it", i)
+		}
+	}
 }

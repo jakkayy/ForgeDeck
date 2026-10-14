@@ -1,22 +1,33 @@
-import { Card, Spinner } from "@heroui/react";
-import { useQuery } from "@tanstack/react-query";
+import { Card, ListBox, Select } from "@heroui/react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { serversQuery } from "../../../api/servers";
-import type { Server } from "../../../api/types";
+import { useState } from "react";
+import { loadedItems } from "../../../api/paged";
+import { serverListQuery } from "../../../api/servers";
+import type { Server, ServerStatus } from "../../../api/types";
 import { AddServerDialog } from "../../../components/AddServerDialog";
 import { EmptyState } from "../../../components/EmptyState";
+import { LoadMore } from "../../../components/LoadMore";
 import { PageHeader } from "../../../components/PageHeader";
-import { QueryError } from "../../../components/QueryError";
+import { QueryBoundary } from "../../../components/QueryBoundary";
+import { SearchBox } from "../../../components/SearchBox";
 import { ServerStatusChip } from "../../../components/ServerStatusChip";
 import { timeAgo } from "../../../lib/time";
+import { useDebouncedValue } from "../../../lib/useDebouncedValue";
 
 export const Route = createFileRoute("/_app/servers/")({
-  loader: ({ context }) => context.queryClient.prefetchQuery(serversQuery),
+  loader: ({ context }) => context.queryClient.prefetchInfiniteQuery(serverListQuery({})),
   component: ServersPage,
 });
 
+const statuses: (ServerStatus | "all")[] = ["all", "online", "unreachable", "offline", "pending"];
+
 function ServersPage() {
-  const servers = useQuery(serversQuery);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<ServerStatus | undefined>();
+  const q = useDebouncedValue(search.trim()) || undefined;
+  const servers = useInfiniteQuery(serverListQuery({ q, status }));
+  const filtered = Boolean(q || status);
 
   return (
     <>
@@ -25,23 +36,61 @@ function ServersPage() {
         description="Docker hosts running the ForgeDeck Agent."
         actions={<AddServerDialog />}
       />
-      {servers.isPending && <Spinner aria-label="Loading servers" />}
-      {servers.isError && <QueryError error={servers.error} onRetry={() => servers.refetch()} />}
-      {servers.isSuccess && servers.data.items.length === 0 && (
-        <EmptyState
-          title="No servers yet"
-          description="Register your first Docker server: install the Agent and it connects to ForgeDeck over HTTPS, with no inbound ports."
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <SearchBox
+          label="Search servers"
+          placeholder="Search by name"
+          value={search}
+          onChange={setSearch}
         />
-      )}
-      {servers.isSuccess && servers.data.items.length > 0 && (
-        <Card className="p-0">
-          <ul className="divide-y divide-[var(--separator)]">
-            {servers.data.items.map((server) => (
-              <ServerRow key={server.id} server={server} />
-            ))}
-          </ul>
-        </Card>
-      )}
+        <Select
+          aria-label="Filter by status"
+          className="w-44"
+          selectedKey={status ?? "all"}
+          onSelectionChange={(key) => setStatus(key === "all" ? undefined : (key as ServerStatus))}
+        >
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {statuses.map((value) => (
+                <ListBox.Item key={value} id={value} textValue={value}>
+                  {value === "all" ? "All statuses" : value}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
+      </div>
+      <QueryBoundary
+        query={servers}
+        label="servers"
+        isEmpty={(data) => loadedItems(data).length === 0}
+        empty={
+          filtered ? (
+            <EmptyState title="No servers match" description="Try a different name or status." />
+          ) : (
+            <EmptyState
+              title="No servers yet"
+              description="Register your first Docker server: install the Agent and it connects to ForgeDeck over HTTPS, with no inbound ports."
+            />
+          )
+        }
+      >
+        {(data) => (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--separator)]">
+              {loadedItems(data).map((server) => (
+                <ServerRow key={server.id} server={server} />
+              ))}
+            </ul>
+          </Card>
+        )}
+      </QueryBoundary>
+      <LoadMore query={servers} />
     </>
   );
 }

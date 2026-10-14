@@ -39,7 +39,11 @@ func (h *Handler) listForUser(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	servers, err := h.svc.ListForUser(r.Context(), auth.UserFrom(r.Context()).ID, page.Limit, page.Offset)
+	filter, err := parseListFilter(r)
+	if err != nil {
+		return err
+	}
+	servers, err := h.svc.ListForUser(r.Context(), auth.UserFrom(r.Context()).ID, filter, page.Limit, page.Offset)
 	if err != nil {
 		return err
 	}
@@ -175,4 +179,21 @@ func (h *Handler) createEnrollmentToken(w http.ResponseWriter, r *http.Request) 
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	return httpx.WriteJSON(w, http.StatusCreated, token)
+}
+
+func parseListFilter(r *http.Request) (ListFilter, error) {
+	search, err := httpx.ParseSearch(r)
+	if err != nil {
+		return ListFilter{}, err
+	}
+	filter := ListFilter{Search: search}
+	if status := r.URL.Query().Get("status"); status != "" {
+		switch Status(status) {
+		case StatusPending, StatusOnline, StatusUnreachable, StatusOffline:
+			filter.Status = &status
+		default:
+			return ListFilter{}, httpx.BadRequest("invalid_status", "status must be pending, online, unreachable or offline.")
+		}
+	}
+	return filter, nil
 }

@@ -2,6 +2,7 @@ import { Button } from "@heroui/react";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { logout, meQuery } from "../api/auth";
+import { usePageAnnouncer } from "../lib/usePageAnnouncer";
 
 /** Layout for every signed-in page; redirects to /login without a session. */
 export const Route = createFileRoute("/_app")({
@@ -15,14 +16,22 @@ export const Route = createFileRoute("/_app")({
 });
 
 const navItems = [
+  { to: "/", label: "Overview" },
   { to: "/servers", label: "Servers" },
   { to: "/projects", label: "Projects" },
   { to: "/jobs", label: "Jobs" },
 ] as const;
 
 function AppShell() {
+  usePageAnnouncer("main");
   return (
     <div className="min-h-dvh">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:start-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-[var(--surface)] focus:px-3 focus:py-2 focus:text-sm focus:shadow"
+      >
+        Skip to content
+      </a>
       <header className="border-b border-[var(--separator)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link to="/" className="font-semibold tracking-tight">
@@ -45,7 +54,7 @@ function AppShell() {
           <UserMenu />
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 outline-none">
         <Outlet />
       </main>
     </div>

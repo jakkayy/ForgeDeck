@@ -63,6 +63,8 @@ Prioritize:
 
 Avoid large decorative charts. Only add a graph if it answers a real operational question.
 
+The page at `/` shows four counts (servers online, servers down, environments whose last deployment succeeded, failed deployments), a *Needs attention* list (servers that stopped reporting and environments whose newest deployment failed, each linking to the environment), the eight newest deployments, and the six newest jobs. It covers every project the user belongs to and refreshes every 20 seconds. A user with no servers or environments sees a pointer to Projects instead of zeros. "Running" means the last deployment passed its health check; the page does not claim to know that a service is up at this moment.
+
 ## 5. Application list
 
 Each row should make it easy to scan:
@@ -74,6 +76,8 @@ Each row should make it easy to scan:
 - Clear actions such as View, Deploy, Logs, Settings.
 
 Use pagination or filtering for large lists.
+
+Every list that can grow loads 25 rows at a time with **Load more**: projects, servers, applications, builds, deployments, releases, jobs, and the audit log. Searchable lists (projects, servers, applications) have a search field that asks the API after 300 ms without typing, so the filter applies to everything, not only the rows already loaded; servers also filter by status, and jobs by status and type. The previous rows stay on screen while a new filter loads, and an empty result says that nothing *matches* rather than that nothing exists. Pickers inside dialogs (a project or a server to choose) show the first 100 entries.
 
 ## 6. Application detail
 
@@ -117,6 +121,10 @@ Avoid querying expensive Docker stats continuously. Make metric freshness visibl
 - Escape log content; do not render it as HTML.
 - Redact secrets before they reach the browser.
 
+The live stream (SSE) is closed when the page is left and after a tab has been hidden for a minute, and resumes after the last received line when the tab is shown again, so background tabs do not keep a connection and a server wakeup open.
+
+How the log view does it: only the rows in view (plus a margin) are in the DOM, measured individually so wrapped lines keep their height. A job with 200,000 lines (measured with Chrome against the development server) keeps about 60 rows in the DOM, and fully replaying it over SSE takes about 6 seconds. Lines that arrive within 100 ms are added in one render. The view follows new output while it is at the bottom; scrolling up pauses that, and *Jump to latest* resumes it. The browser can only select the rows that exist, so selecting across a long log is replaced by **Copy all**, which copies every line (with its timestamp) as plain text.
+
 ## 10. Design system
 
 Use HeroUI components consistently for:
@@ -148,6 +156,14 @@ Every data-driven page should support:
 
 Empty states should explain the next action, e.g. “No servers yet — register your first Docker server.”
 
+How the dashboard implements them:
+
+- **One component for lists and sections.** `QueryBoundary` (and `waitingFor` / `StaleNotice` for pages that return early) renders loading, failed, empty and stale in the same way everywhere, so a page cannot forget one.
+- **Loading** is a spinner labelled for screen readers ("Loading servers"). **Failed** with nothing to show is an error with the server's message and *Try again*.
+- **Stale:** when a refresh fails, or the browser is offline, the last data stays on screen under a notice saying how old it is ("Could not refresh servers. Showing what was loaded 2 minutes ago."). A network blip never replaces a list with an error screen. Pages refresh by polling (servers, containers, deployments, releases, jobs), so this is the state a user meets most.
+- **Permission denied:** a project you do not belong to is shown as *not found* (the API does the same, so IDs cannot be probed); actions above your role are hidden or disabled rather than failing.
+- **A URL that matches no page** shows *Page not found*, and a page that fails while rendering shows the error with *Try again*, instead of a blank screen.
+
 ## 12. Interaction principles
 
 - One obvious primary action per page.
@@ -161,8 +177,9 @@ Empty states should explain the next action, e.g. “No servers yet — register
 ## 13. Performance
 
 - Split code per route so a page only loads what it uses.
-- Enforce a bundle size budget in CI (`bun run size`: initial JS ≤ 130 KB, CSS ≤ 20 KB, each route chunk ≤ 60 KB, all gzip). The CSS budget was raised from 15 KB in Phase 2: all component CSS ships in one global file and grows about 1–2 KB per HeroUI component used. Splitting component CSS per route is the next step if it keeps growing (Phase 6) and review it when adding dependencies. HeroUI and its animation dependency are the largest expected contributors; import components individually and measure.
+- Enforce a bundle size budget in CI (`bun run size`: initial JS ≤ 130 KB, CSS ≤ 22 KB, each route chunk ≤ 60 KB, all gzip). The CSS budget was raised from 15 KB in Phase 2 and from 20 KB in Phase 6 (the search field, scrollable tabs, and the skip link): all component CSS ships in one global file and grows about 1–2 KB per HeroUI component used. Splitting component CSS per route is the next step if it keeps growing (Phase 6) and review it when adding dependencies. HeroUI and its animation dependency are the largest expected contributors; import components individually and measure.
 - Serve hashed assets with long-lived cache headers and `index.html` with no-cache.
+- Compress the dashboard (gzip, in the Control Plane, so running the binary without a proxy is not slower; Caddy does the same in the production stack). The budgets above are gzip sizes, and measuring showed the bare binary had been sending them uncompressed.
 - Fetch only the data needed for the current page.
 - Use pagination and server-side filtering.
 - Avoid aggressive global polling.
@@ -178,11 +195,25 @@ Suggested initial targets to validate:
 - Common read API p95 ≤ 200 ms in a controlled test environment.
 - Live state changes visible within 1–3 seconds when the connection is healthy.
 
-These are targets, not guarantees.
+These are targets, not guarantees. Results against them, with the test profile, are in [12](12-measurements.md#phase-6--benchmark-profile-and-results): the API and interaction targets are met; LCP on a deliberately harsh mobile profile is not on 5 of 8 pages.
 
 ## 14. Responsive behavior
 
 Prioritize desktop for server administration, while keeping core flows usable on tablet and mobile. On small screens, simplify tables and move secondary actions into a menu instead of forcing horizontal overflow.
+
+## 14a. Accessibility
+
+The target is WCAG 2.2 AA. What is in place, and how it was checked:
+
+- **Navigation:** a *Skip to content* link is the first tab stop. Because nothing reloads when the page changes, the document title follows the page's `<h1>` ("Servers · ForgeDeck") and keyboard focus moves to the start of the new page's content; neither happens on first load or for changes inside a page (tabs, filters).
+- **Landmarks and headings:** one `<main>`, a labelled main navigation, one `<h1>` per page (the sign-in page included).
+- **Contrast:** HeroUI's default muted text, white-on-accent and white-on-danger fills, and soft success chip fall short of 4.5:1, so `index.css` overrides them (`--muted`, `--accent`, `--danger`, `--success-soft-foreground`). Accent *text* uses `--link`, which is lighter in dark mode. The ratios were computed, not guessed; re-check them when changing a token. Status is never color alone: chips and the deployment tracker carry text ("failed", "Health check (failed)" for screen readers).
+- **Keyboard:** everything is reachable and operable by keyboard; dialogs trap focus, close on Escape, and return focus to the button that opened them. The scrollable log is focusable so its keys scroll it.
+- **Links in running text** are underlined, not distinguished by color.
+- **Motion:** with `prefers-reduced-motion`, animations and transitions are effectively off.
+- **Responsive:** no page scrolls sideways from 320 px up (long digests and image references wrap; the six project tabs scroll inside their own row).
+
+Checked with axe-core (WCAG 2.0/2.1/2.2 A and AA plus best-practice rules) in Chrome on every page and the main dialogs, in light and dark mode at 1280, 768, 375 and 320 px wide, with no violations left. One known exception: while react-aria announces a change to screen readers it briefly inserts hidden `role="img"` nodes with no text, which axe reports as `role-img-alt`; they are the library's own live-region mechanism and are removed again. Automated rules find roughly a third of accessibility problems: a manual pass with a screen reader is still owed before calling this done.
 
 ## 15. Open decisions
 

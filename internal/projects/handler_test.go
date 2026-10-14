@@ -2,6 +2,8 @@ package projects_test
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
@@ -142,4 +144,38 @@ func TestDeleteProjectRequiresOwnerAndConfirmation(t *testing.T) {
 	owner.Do(http.MethodDelete, path, map[string]string{"confirm": "wrong"}).RequireStatus(http.StatusUnprocessableEntity)
 	owner.Do(http.MethodDelete, path, map[string]string{"confirm": "doomed"}).RequireStatus(http.StatusNoContent)
 	owner.Do(http.MethodGet, path, nil).RequireStatus(http.StatusNotFound)
+}
+
+func TestListProjectsFiltersByNameOrSlug(t *testing.T) {
+	env := apitest.New(t)
+	dev, _ := env.NewUser("dev@example.com")
+	createProject(t, dev, "Shop Backend", "shop")
+	createProject(t, dev, "Billing", "money")
+	createProject(t, dev, "100% Done", "done")
+
+	names := func(query string) []string {
+		var list httpx.List[projects.Project]
+		dev.Do(http.MethodGet, "/api/v1/projects?q="+url.QueryEscape(query), nil).RequireStatus(http.StatusOK).Decode(&list)
+		out := make([]string, len(list.Items))
+		for i, p := range list.Items {
+			out[i] = p.Name
+		}
+		return out
+	}
+	for query, want := range map[string]string{
+		"shop":  "Shop Backend", // name, any case
+		"MONEY": "Billing",      // slug
+		"100%":  "100% Done",    // a wildcard is plain text
+	} {
+		if got := names(query); len(got) != 1 || got[0] != want {
+			t.Errorf("q=%q: got %v, want [%s]", query, got, want)
+		}
+	}
+	if got := names("%"); len(got) != 1 {
+		t.Errorf("q=%%: a lone wildcard matched %v", got)
+	}
+	if got := names("nothing like this"); len(got) != 0 {
+		t.Errorf("no match returned %v", got)
+	}
+	dev.Do(http.MethodGet, "/api/v1/projects?q="+strings.Repeat("a", 101), nil).RequireStatus(http.StatusBadRequest)
 }

@@ -587,20 +587,30 @@ func (q *Queries) ListJobLogs(ctx context.Context, arg ListJobLogsParams) ([]Lis
 
 const listJobsForUser = `-- name: ListJobsForUser :many
 SELECT jobs.id, jobs.project_id, jobs.type, jobs.worker_kind, jobs.target_server_id, jobs.status, jobs.payload, jobs.result, jobs.error_code, jobs.error_message, jobs.attempt_count, jobs.max_attempts, jobs.lease_owner, jobs.lease_expires_at, jobs.idempotency_key, jobs.created_by, jobs.created_at, jobs.started_at, jobs.finished_at, jobs.application_id, jobs.logs_expired_at FROM jobs
-JOIN project_members ON project_members.project_id = jobs.project_id AND project_members.user_id = $1
-WHERE ($2::uuid IS NULL OR jobs.project_id = $2::uuid)
-  AND ($3::uuid IS NULL OR jobs.application_id = $3::uuid)
-  AND ($4::uuid IS NULL OR jobs.target_server_id = $4::uuid)
-  AND ($5::text IS NULL OR jobs.status = $5::text)
-  AND ($6::text IS NULL OR jobs.type = $6::text)
-  AND ($7::timestamptz IS NULL
-       OR (jobs.created_at, jobs.id) < ($7::timestamptz, $8::uuid))
+WHERE jobs.id IN (
+    SELECT offered.id
+    FROM project_members
+    CROSS JOIN LATERAL (
+        SELECT candidate.id, candidate.created_at FROM jobs candidate
+        WHERE candidate.project_id = project_members.project_id
+          AND ($1::uuid IS NULL OR candidate.project_id = $1::uuid)
+          AND ($2::uuid IS NULL OR candidate.application_id = $2::uuid)
+          AND ($3::uuid IS NULL OR candidate.target_server_id = $3::uuid)
+          AND ($4::text IS NULL OR candidate.status = $4::text)
+          AND ($5::text IS NULL OR candidate.type = $5::text)
+          AND ($6::timestamptz IS NULL
+               OR (candidate.created_at, candidate.id) < ($6::timestamptz, $7::uuid))
+        ORDER BY candidate.created_at DESC, candidate.id DESC
+        LIMIT $8
+    ) offered
+    WHERE project_members.user_id = $9
+    ORDER BY offered.created_at DESC, offered.id DESC
+    LIMIT $8
+)
 ORDER BY jobs.created_at DESC, jobs.id DESC
-LIMIT $9
 `
 
 type ListJobsForUserParams struct {
-	UserID          uuid.UUID
 	ProjectID       *uuid.UUID
 	ApplicationID   *uuid.UUID
 	ServerID        *uuid.UUID
@@ -609,13 +619,16 @@ type ListJobsForUserParams struct {
 	BeforeCreatedAt *time.Time
 	BeforeID        *uuid.UUID
 	PageLimit       int32
+	UserID          uuid.UUID
 }
 
 // Newest first, only in projects the user belongs to. The cursor is the
-// (created_at, id) of the last job on the previous page.
+// (created_at, id) of the last job on the previous page. Each project offers
+// its newest page_limit matching jobs from jobs_project_history_idx, and the
+// newest of those are the page: the cost follows the page size, not the number
+// of jobs there are.
 func (q *Queries) ListJobsForUser(ctx context.Context, arg ListJobsForUserParams) ([]Job, error) {
 	rows, err := q.db.Query(ctx, listJobsForUser,
-		arg.UserID,
 		arg.ProjectID,
 		arg.ApplicationID,
 		arg.ServerID,
@@ -624,6 +637,7 @@ func (q *Queries) ListJobsForUser(ctx context.Context, arg ListJobsForUserParams
 		arg.BeforeCreatedAt,
 		arg.BeforeID,
 		arg.PageLimit,
+		arg.UserID,
 	)
 	if err != nil {
 		return nil, err

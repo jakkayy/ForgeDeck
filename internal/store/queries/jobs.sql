@@ -171,18 +171,32 @@ SELECT status FROM target;
 
 -- name: ListJobsForUser :many
 -- Newest first, only in projects the user belongs to. The cursor is the
--- (created_at, id) of the last job on the previous page.
+-- (created_at, id) of the last job on the previous page. Each project offers
+-- its newest page_limit matching jobs from jobs_project_history_idx, and the
+-- newest of those are the page: the cost follows the page size, not the number
+-- of jobs there are.
 SELECT jobs.* FROM jobs
-JOIN project_members ON project_members.project_id = jobs.project_id AND project_members.user_id = @user_id
-WHERE (sqlc.narg(project_id)::uuid IS NULL OR jobs.project_id = sqlc.narg(project_id)::uuid)
-  AND (sqlc.narg(application_id)::uuid IS NULL OR jobs.application_id = sqlc.narg(application_id)::uuid)
-  AND (sqlc.narg(server_id)::uuid IS NULL OR jobs.target_server_id = sqlc.narg(server_id)::uuid)
-  AND (sqlc.narg(status)::text IS NULL OR jobs.status = sqlc.narg(status)::text)
-  AND (sqlc.narg(type)::text IS NULL OR jobs.type = sqlc.narg(type)::text)
-  AND (sqlc.narg(before_created_at)::timestamptz IS NULL
-       OR (jobs.created_at, jobs.id) < (sqlc.narg(before_created_at)::timestamptz, sqlc.narg(before_id)::uuid))
-ORDER BY jobs.created_at DESC, jobs.id DESC
-LIMIT @page_limit;
+WHERE jobs.id IN (
+    SELECT offered.id
+    FROM project_members
+    CROSS JOIN LATERAL (
+        SELECT candidate.id, candidate.created_at FROM jobs candidate
+        WHERE candidate.project_id = project_members.project_id
+          AND (sqlc.narg(project_id)::uuid IS NULL OR candidate.project_id = sqlc.narg(project_id)::uuid)
+          AND (sqlc.narg(application_id)::uuid IS NULL OR candidate.application_id = sqlc.narg(application_id)::uuid)
+          AND (sqlc.narg(server_id)::uuid IS NULL OR candidate.target_server_id = sqlc.narg(server_id)::uuid)
+          AND (sqlc.narg(status)::text IS NULL OR candidate.status = sqlc.narg(status)::text)
+          AND (sqlc.narg(type)::text IS NULL OR candidate.type = sqlc.narg(type)::text)
+          AND (sqlc.narg(before_created_at)::timestamptz IS NULL
+               OR (candidate.created_at, candidate.id) < (sqlc.narg(before_created_at)::timestamptz, sqlc.narg(before_id)::uuid))
+        ORDER BY candidate.created_at DESC, candidate.id DESC
+        LIMIT @page_limit
+    ) offered
+    WHERE project_members.user_id = @user_id
+    ORDER BY offered.created_at DESC, offered.id DESC
+    LIMIT @page_limit
+)
+ORDER BY jobs.created_at DESC, jobs.id DESC;
 
 -- name: FindActiveBuild :one
 -- A queued or running build of one commit, so a repeated manual trigger
