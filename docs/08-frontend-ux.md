@@ -179,6 +179,7 @@ How the dashboard implements them:
 - Split code per route so a page only loads what it uses.
 - Enforce a bundle size budget in CI (`bun run size`: initial JS ≤ 130 KB, CSS ≤ 22 KB, each route chunk ≤ 60 KB, all gzip). The CSS budget was raised from 15 KB in Phase 2 and from 20 KB in Phase 6 (the search field, scrollable tabs, and the skip link): all component CSS ships in one global file and grows about 1–2 KB per HeroUI component used. Splitting component CSS per route is the next step if it keeps growing (Phase 6) and review it when adding dependencies. HeroUI and its animation dependency are the largest expected contributors; import components individually and measure.
 - Serve hashed assets with long-lived cache headers and `index.html` with no-cache.
+- Compress the dashboard (gzip, in the Control Plane, so running the binary without a proxy is not slower; Caddy does the same in the production stack). The budgets above are gzip sizes, and measuring showed the bare binary had been sending them uncompressed.
 - Fetch only the data needed for the current page.
 - Use pagination and server-side filtering.
 - Avoid aggressive global polling.
@@ -194,7 +195,7 @@ Suggested initial targets to validate:
 - Common read API p95 ≤ 200 ms in a controlled test environment.
 - Live state changes visible within 1–3 seconds when the connection is healthy.
 
-These are targets, not guarantees.
+These are targets, not guarantees. Results against them, with the test profile, are in [12](12-measurements.md#phase-6--benchmark-profile-and-results): the API and interaction targets are met; LCP on a deliberately harsh mobile profile is not on 5 of 8 pages.
 
 ## 14. Responsive behavior
 
