@@ -7,8 +7,7 @@ import (
 	"strconv"
 )
 
-// verifyGitLabToken compares X-Gitlab-Token with the connection's secret in
-// constant time. GitLab sends the secret itself rather than a signature.
+// verifyGitLabToken compares X-Gitlab-Token with the connection's secret in constant time
 func verifyGitLabToken(secret, header string) error {
 	if header == "" || subtle.ConstantTimeCompare([]byte(secret), []byte(header)) != 1 {
 		return errBadSignature

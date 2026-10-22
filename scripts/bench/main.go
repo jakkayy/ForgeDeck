@@ -1,9 +1,4 @@
-// Command bench drives a running Control Plane with the benchmark profile in
-// docs/12-measurements.md: concurrent dashboard users reading the pages a
-// person opens, plus simulated Agents that heartbeat and long-poll for jobs.
-// It reads through the public API only. Seed the data first with seed.sql.
-//
-//	go run ./scripts/bench -url http://127.0.0.1:18090
+// Command bench drives a running Control Plane with the benchmark profile in docs/12-measurements.md
 package main
 
 import (
@@ -183,9 +178,7 @@ func mustGet(c *http.Client, base, path string, into any) {
 	}
 }
 
-// drive runs users concurrent requesters on one signed-in client (one session:
-// login is rate limited, and the per-request cost is the same), each requesting
-// paths in turn as fast as the server answers, for d.
+// drive runs users concurrent requesters on one signed-in client (login is rate limited) for d
 func drive(c *http.Client, base string, users int, d time.Duration, paths []string) result {
 	var mu sync.Mutex
 	var res result
@@ -228,8 +221,7 @@ func report(name string, r result) {
 		float64(len(r.latencies))/r.elapsed.Seconds(), r.errors, pct(0.50), pct(0.95), pct(0.99), pct(1))
 }
 
-// runAgent behaves like a real Agent: a heartbeat every 20 seconds and a
-// 25-second long-poll for jobs, with the credential in the Authorization header.
+// runAgent behaves like a real Agent: 20s heartbeats and 25s long-polls for jobs
 func runAgent(ctx context.Context, base, credential string, heartbeats, claims, errs *atomic.Int64) {
 	c := &http.Client{Timeout: 40 * time.Second}
 	post := func(path string, body any) (int, error) {

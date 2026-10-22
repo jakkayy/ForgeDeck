@@ -74,7 +74,6 @@ export type Job = {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
-  /** The output was removed by the retention job. */
   logs_expired: boolean;
 };
 

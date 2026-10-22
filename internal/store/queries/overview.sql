@@ -1,6 +1,5 @@
 -- name: CountServersByConnectivity :one
--- Mirrors servers.ConnectivityStatus: the caller passes the heartbeat
--- thresholds, so the windows are defined in one place.
+-- Mirrors servers.ConnectivityStatus; the caller passes the heartbeat thresholds.
 SELECT
     count(*)                                                        AS total,
     count(*) FILTER (WHERE servers.last_seen_at IS NULL)            AS pending,
@@ -13,10 +12,7 @@ JOIN project_members ON project_members.project_id = servers.project_id
 WHERE project_members.user_id = @user_id;
 
 -- name: CountEnvironmentsByLastDeployment :one
--- Groups the user's environments by how their newest deployment ended. The
--- job is the live source of status while it exists (see ListDeployments). The
--- newest deployment of each environment is one index lookup, not a sort of
--- every deployment there is.
+-- Environments grouped by how their newest deployment ended (the job is the live status).
 WITH latest AS (
     SELECT COALESCE(newest.job_status, newest.status) AS status
     FROM environments
@@ -41,10 +37,7 @@ SELECT
 FROM latest;
 
 -- name: ListRecentDeploymentsForUser :many
--- Newest deployments across the user's projects: each environment offers its
--- newest few (an index range), and the newest of those are kept. When
--- only_failed is set, each offers only its single newest deployment and only a
--- failed one counts: what still needs attention, not history.
+-- Newest deployments across the user's projects; only_failed keeps each environment's newest failure.
 SELECT d.id,
        environments.id                                   AS environment_id,
        environments.name                                 AS environment_name,

@@ -46,7 +46,6 @@ function ProjectPage() {
   const tab =
     search.tab === "audit" && !canSeeAudit ? "applications" : (search.tab ?? "applications");
 
-  // Report the outcome of a GitHub install redirect once, then tidy the URL.
   useEffect(() => {
     if (!search.git && !search.git_error) {
       return;
@@ -83,7 +82,6 @@ function ProjectPage() {
         selectedKey={tab}
         onSelectionChange={(key) => navigate({ search: { tab: key as Tab }, replace: true })}
       >
-        {/* The six tabs are wider than a phone: scroll them instead of the page. */}
         <Tabs.ListContainer className="max-w-full overflow-x-auto">
           <Tabs.List aria-label="Project sections">
             <Tabs.Tab id="applications">

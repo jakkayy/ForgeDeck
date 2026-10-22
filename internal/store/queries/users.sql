@@ -13,9 +13,7 @@ SELECT * FROM users WHERE id = $1;
 SELECT EXISTS (SELECT 1 FROM users);
 
 -- name: CreateFirstUser :one
--- Creates the user only if there is none and nobody else is registering at the
--- same moment. One statement: a concurrent caller blocks on the claim row until
--- this one commits, then finds it taken and inserts nothing (no rows returned).
+-- Creates the user only if none exists and nobody else is registering; a race inserts nothing.
 WITH claim AS (
     INSERT INTO setup_claim DEFAULT VALUES ON CONFLICT DO NOTHING RETURNING singleton
 )

@@ -36,7 +36,6 @@ func newGitHubFixture(t *testing.T) githubFixture {
 	return githubFixture{env: env, fake: fake, owner: owner, projectID: owner.CreateProject("Shop")}
 }
 
-// startInstall returns the state ForgeDeck put in the GitHub install URL.
 func (f githubFixture) startInstall(t *testing.T) string {
 	t.Helper()
 	var resp struct {
@@ -51,7 +50,6 @@ func (f githubFixture) startInstall(t *testing.T) string {
 	return u.Query().Get("state")
 }
 
-// callback simulates GitHub redirecting the browser back, without cookies.
 func (f githubFixture) callback(t *testing.T, state, installationID, code string) string {
 	t.Helper()
 	q := url.Values{"state": {state}, "installation_id": {installationID}, "code": {code}, "setup_action": {"install"}}
@@ -82,7 +80,6 @@ func TestGitHubInstallCreatesConnection(t *testing.T) {
 		t.Fatalf("connections %+v", conns)
 	}
 
-	// Installing again (for example after changing repo access) does not duplicate it.
 	f.callback(t, f.startInstall(t), "11", "acme-admin-code")
 	if n := len(f.connections(t)); n != 1 {
 		t.Fatalf("%d connections after reinstall", n)

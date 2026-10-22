@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 type Props = { title: string; description?: string; actions?: ReactNode };
 
-/** Page title row with an optional primary action on the right. */
 export function PageHeader({ title, description, actions }: Props) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">

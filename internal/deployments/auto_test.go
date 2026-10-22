@@ -55,7 +55,6 @@ func (f autoFixture) environment(t *testing.T, name string, port int, autoDeploy
 	return env
 }
 
-// queueBuild adds a build job; the runner claims builds in creation order.
 func (f autoFixture) queueBuild(t *testing.T, trigger string) uuid.UUID {
 	t.Helper()
 	job, err := f.jobs.Enqueue(t.Context(), jobs.NewJob{ProjectID: f.projectID, ApplicationID: &f.appID,
@@ -106,7 +105,6 @@ func TestSucceededBuildDeploysToAutoDeployEnvironmentsOnly(t *testing.T) {
 	if got := f.deploymentsOf(t, production.ID); len(got) != 0 {
 		t.Fatalf("production deployed without auto_deploy: %+v", got)
 	}
-	// The deployment job is waiting for the server's Agent.
 	wait := 0
 	var claimed agentproto.Job
 	f.server.Do(http.MethodPost, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).RequireStatus(http.StatusOK).Decode(&claimed)
@@ -168,11 +166,10 @@ func TestOneBrokenEnvironmentDoesNotFailTheBuildOrOthers(t *testing.T) {
 
 func TestClaimedDeploymentCarriesScopedRegistryCredentialsAndPreviousRelease(t *testing.T) {
 	f := newAutoFixture(t)
-	// A second registry of the project must never be sent for this image.
+	// a second registry of the project must never be sent for this image.
 	f.owner.Do(http.MethodPost, "/api/v1/projects/"+f.projectID.String()+"/registries",
 		map[string]string{"name": "Other", "host": "registry.other.example", "username": "other", "password": "other-secret"}).
 		RequireStatus(http.StatusCreated)
-	// The environment already runs a release.
 	releaseID := f.recordRelease(t, f.staging.ID, "ghcr.io/acme/shop-api@sha256:"+"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1")
 
 	build := f.build(t, f.appID, "succeeded", goodResult())
@@ -188,10 +185,9 @@ func TestClaimedDeploymentCarriesScopedRegistryCredentialsAndPreviousRelease(t *
 		t.Fatalf("previous release %+v", claimed.Deploy.Previous)
 	}
 
-	// Secrets travel only in the claim response, not in the stored job.
+	// secrets travel only in the claim response, not in the stored job.
 	var stored jobs.Job
 	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&stored)
-	// (The registry password in this fixture is "secret".)
 	if strings.Contains(string(stored.Payload), `"password"`) || strings.Contains(string(stored.Payload), `":"secret"`) {
 		t.Fatalf("payload %s", stored.Payload)
 	}
@@ -237,8 +233,6 @@ func (f autoFixture) claimDeploy(t *testing.T) agentproto.Job {
 	return job
 }
 
-// recordRelease inserts a release row for the environment, as a healthy
-// deployment will once release recording exists.
 func (f autoFixture) recordRelease(t *testing.T, environmentID uuid.UUID, ref string) uuid.UUID {
 	t.Helper()
 	config := `{"container_port":80,"published_port":18080,"bind_address":"127.0.0.1","env":{},"volumes":[],"restart":"unless-stopped","health_check":{"type":"tcp","timeout_seconds":60,"interval_seconds":2}}`
@@ -279,14 +273,14 @@ func TestClaimedDeploymentCarriesCurrentSecretValuesOnly(t *testing.T) {
 	build := f.build(t, f.appID, "succeeded", goodResult())
 	var d deployments.Deployment
 	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted).Decode(&d)
-	// The secret is rotated after the deployment was queued: the claim has the new value.
+	// the secret rotated after queueing: the claim has the new value.
 	f.setSecretReplace(t, "DATABASE_PASSWORD", "rotated-database-value")
 
 	claimed := f.claimDeploy(t)
 	if got := claimed.Deploy.Secrets; len(got) != 1 || got["DATABASE_PASSWORD"] != "rotated-database-value" {
 		t.Fatalf("secrets %v", got)
 	}
-	// Values are never stored: not in the job, the deployment, or a later release's snapshot.
+	// values are never stored: not in the job, deployment or release snapshot.
 	var stored jobs.Job
 	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&stored)
 	f.agentComplete(t, claimed, agentproto.CompleteRequest{Outcome: agentproto.OutcomeSucceeded})
@@ -331,7 +325,7 @@ func TestDeploymentFailsAtClaimWhenAListedSecretIsGone(t *testing.T) {
 	build := f.build(t, f.appID, "succeeded", goodResult())
 	var d deployments.Deployment
 	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted).Decode(&d)
-	// Deleting it is refused while listed, so remove it behind the API's back.
+	// deleting is refused while listed, so remove it behind the API's back.
 	if _, err := f.env.Pool.Exec(context.Background(), `DELETE FROM project_secrets`); err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +339,6 @@ func TestDeploymentFailsAtClaimWhenAListedSecretIsGone(t *testing.T) {
 	}
 }
 
-// auditEvents returns the project's audit entries of one action, newest first.
 func (f fixture) auditEvents(t *testing.T, action string) []audit.Entry {
 	t.Helper()
 	var page httpx.List[audit.Entry]
@@ -358,7 +351,6 @@ func TestDeploymentsAreAudited(t *testing.T) {
 	f := newAutoFixture(t)
 	f.setAutoDeploy(t, f.staging.ID, true)
 
-	// An automatic deployment is the system's, tied to the build that caused it.
 	f.queueBuild(t, agentproto.TriggerPush)
 	f.succeed(t, f.claim(t), imageRef)
 	auto := f.auditEvents(t, "deployment.start")
@@ -371,7 +363,6 @@ func TestDeploymentsAreAudited(t *testing.T) {
 		t.Fatalf("metadata %v", metadata)
 	}
 
-	// A manual deployment and a rollback are the user's.
 	build := f.build(t, f.appID, "succeeded", goodResult())
 	f.deploy(f.owner, f.staging.ID, build).RequireStatus(http.StatusAccepted)
 	manual := f.auditEvents(t, "deployment.start")

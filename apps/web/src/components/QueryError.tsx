@@ -2,7 +2,6 @@ import { Alert, Button } from "@heroui/react";
 
 type Props = { error: Error; onRetry?: () => void };
 
-/** Shows why data failed to load, with a retry when it makes sense. */
 export function QueryError({ error, onRetry }: Props) {
   return (
     <Alert status="danger">

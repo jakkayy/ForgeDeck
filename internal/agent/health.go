@@ -15,20 +15,19 @@ import (
 )
 
 const (
-	// healthyProbes is how many probes in a row must pass. One pass can be
-	// luck: a crash-looping container may answer once between restarts.
+	// healthyProbes is how many probes in a row must pass
 	healthyProbes = 2
 	probeTimeout  = 5 * time.Second
 )
 
-// probeFuncs are the checks that talk to the service from the host.
+// probeFuncs are the checks that talk to the service from the host
 type probeFuncs struct {
 	http func(ctx context.Context, port int, path string) error
 	tcp  func(ctx context.Context, port int) error
 }
 
 func hostProbes() probeFuncs {
-	// A redirect is a response from a live service, so it counts as healthy.
+	// A redirect is a response from a live service, so it counts as healthy
 	client := &http.Client{Timeout: probeTimeout, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
@@ -60,9 +59,7 @@ func hostProbes() probeFuncs {
 	}
 }
 
-// waitHealthy polls the service until it has passed healthyProbes probes in a
-// row, or fails when the container stops running or the timeout passes. A
-// running container is not enough: the configured check must pass.
+// waitHealthy polls until healthyProbes probes pass in a row, or fails on exit or timeout
 func (d *deployer) waitHealthy(ctx context.Context, runner commandRunner, containerID string, config servicecfg.Config) error {
 	check := config.HealthCheck
 	deadline := d.now().Add(time.Duration(check.TimeoutSeconds) * time.Second)
@@ -117,7 +114,7 @@ func (d *deployer) probe(ctx context.Context, check servicecfg.HealthCheck, conf
 	}
 }
 
-// containerState is what a health check needs from `docker inspect`.
+// containerState is what a health check needs from `docker inspect`
 type containerState struct {
 	Status     string
 	Restarting bool

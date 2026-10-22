@@ -2,7 +2,6 @@ import type { Job } from "../api/types";
 
 const short = (id: unknown, n: number) => (typeof id === "string" ? id.slice(0, n) : "");
 
-/** A one-line, human description of what a job does. */
 export function describeJob(job: Job): string {
   const p = (job.payload ?? {}) as Record<string, unknown>;
   switch (job.type) {
@@ -26,7 +25,6 @@ export function describeJob(job: Job): string {
   }
 }
 
-/** "1m 12s" between two timestamps, or since start while still running. */
 export function duration(start: string | null, end: string | null, now = Date.now()): string {
   if (!start) {
     return "";

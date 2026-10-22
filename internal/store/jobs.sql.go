@@ -254,8 +254,7 @@ type FindActiveBuildParams struct {
 	CommitSha     string
 }
 
-// A queued or running build of one commit, so a repeated manual trigger
-// returns it instead of building the same commit twice at once.
+// A queued or running build of one commit, so a repeated trigger does not build it twice.
 func (q *Queries) FindActiveBuild(ctx context.Context, arg FindActiveBuildParams) (Job, error) {
 	row := q.db.QueryRow(ctx, findActiveBuild, arg.ApplicationID, arg.CommitSha)
 	var i Job
@@ -622,11 +621,7 @@ type ListJobsForUserParams struct {
 	UserID          uuid.UUID
 }
 
-// Newest first, only in projects the user belongs to. The cursor is the
-// (created_at, id) of the last job on the previous page. Each project offers
-// its newest page_limit matching jobs from jobs_project_history_idx, and the
-// newest of those are the page: the cost follows the page size, not the number
-// of jobs there are.
+// Newest first within the user's projects; cursor is (created_at, id) of the last row.
 func (q *Queries) ListJobsForUser(ctx context.Context, arg ListJobsForUserParams) ([]Job, error) {
 	rows, err := q.db.Query(ctx, listJobsForUser,
 		arg.ProjectID,
@@ -725,8 +720,7 @@ type RecoverExpiredLeasesRow struct {
 	TargetServerID *uuid.UUID
 }
 
-// Requeues running jobs whose worker stopped renewing the lease, or fails
-// them when no attempts are left, and marks the abandoned attempt as lost.
+// Requeues running jobs whose lease lapsed, or fails them when out of attempts.
 func (q *Queries) RecoverExpiredLeases(ctx context.Context, now time.Time) ([]RecoverExpiredLeasesRow, error) {
 	rows, err := q.db.Query(ctx, recoverExpiredLeases, now)
 	if err != nil {

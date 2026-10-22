@@ -1,5 +1,4 @@
-// Package githubtest is an in-memory GitHub API for tests. It checks App
-// JWT signatures with the App's public key, so tests exercise real signing.
+// Package githubtest is an in-memory GitHub API for tests that checks real App JWT signatures.
 package githubtest
 
 import (
@@ -23,7 +22,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/github"
 )
 
-// Server fakes the parts of github.com and api.github.com ForgeDeck uses.
+// Server fakes the parts of GitHub ForgeDeck uses
 type Server struct {
 	*httptest.Server
 	AppID        int64
@@ -45,7 +44,6 @@ type issuedToken struct {
 	scope        TokenScope
 }
 
-// New starts a fake GitHub that is closed when the test ends.
 func New(t testing.TB) *Server {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -65,7 +63,6 @@ func New(t testing.TB) *Server {
 	return s
 }
 
-// Config returns a client config pointing at this fake.
 func (s *Server) Config() github.Config {
 	return github.Config{
 		AppID: s.AppID, Slug: "forgedeck-test", ClientID: s.ClientID, ClientSecret: s.ClientSecret,
@@ -73,12 +70,10 @@ func (s *Server) Config() github.Config {
 	}
 }
 
-// PrivateKeyPEM returns the App key as PKCS#1 PEM, as GitHub hands it out.
 func (s *Server) PrivateKeyPEM() []byte {
 	return pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(s.Key)})
 }
 
-// AddInstallation registers an installation on account with repos.
 func (s *Server) AddInstallation(id int64, account string, repos ...github.Repository) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -86,28 +81,24 @@ func (s *Server) AddInstallation(id int64, account string, repos ...github.Repos
 	s.repositories[id] = repos
 }
 
-// AddOAuthCode makes code exchangeable for a user who can access installations.
 func (s *Server) AddOAuthCode(code string, installations ...int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.codes[code] = installations
 }
 
-// AddCommit makes ref (a branch or SHA) resolve to commit in fullName.
 func (s *Server) AddCommit(fullName, ref string, commit github.Commit) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.commits[fullName+"@"+ref] = commit
 }
 
-// TokenScope is what an installation token was restricted to when minted.
-// Zero values mean the token covers the whole installation.
+// TokenScope is what an installation token was restricted to; zero values mean the whole installation
 type TokenScope struct {
 	RepositoryIDs []int64           `json:"repository_ids"`
 	Permissions   map[string]string `json:"permissions"`
 }
 
-// TokenScope returns how token was scoped, and whether the fake issued it.
 func (s *Server) TokenScope(token string) (TokenScope, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -115,7 +106,6 @@ func (s *Server) TokenScope(token string) (TokenScope, bool) {
 	return issued.scope, ok
 }
 
-// TokensIssued counts installation tokens minted so far.
 func (s *Server) TokensIssued() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()

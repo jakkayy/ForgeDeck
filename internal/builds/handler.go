@@ -9,17 +9,17 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
-// Handler serves the build endpoints behind auth.RequireUser.
+// Handler serves the build endpoints behind auth.RequireUser
 type Handler struct {
 	svc *Service
 }
 
-// NewHandler returns build endpoints.
+// NewHandler returns build endpoints
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// Routes mounts the build endpoints on r.
+// Routes mounts the build endpoints on r
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/applications/{applicationID}/builds", httpx.Handle(h.trigger))
 }

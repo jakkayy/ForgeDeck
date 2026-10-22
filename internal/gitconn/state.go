@@ -20,9 +20,7 @@ var (
 	errExpiredInstall = errors.New("install state has expired")
 )
 
-// installState rides through GitHub's install redirect. It is sealed with the
-// keyring, so it is both secret and tamper-proof, and it binds the callback
-// to the user and project that started the install.
+// installState is sealed with the keyring and binds the callback to the user and project
 type installState struct {
 	ProjectID uuid.UUID `json:"p"`
 	UserID    uuid.UUID `json:"u"`

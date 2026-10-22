@@ -14,8 +14,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// Run starts the heartbeat, snapshot, and job loops for an enrolled Agent
-// and blocks until ctx ends or the credential is revoked.
+// Run starts the heartbeat, snapshot, and job loops and blocks until ctx ends or access is revoked
 func Run(ctx context.Context, identity Identity, state *State, version string, handlers map[string]worker.Handler, engine *docker.Engine, logger *slog.Logger) error {
 	client := worker.NewClient(identity.ControlPlaneURL, worker.AgentAPI, identity.Credential)
 	sampler := host.NewSampler("/")

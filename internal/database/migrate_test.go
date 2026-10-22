@@ -12,8 +12,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
 )
 
-// TestMigrationsRoundTrip applies every migration, rolls all of them back,
-// and applies them again, proving each Down reverses its Up.
+// TestMigrationsRoundTrip proves each Down reverses its Up.
 func TestMigrationsRoundTrip(t *testing.T) {
 	dbURL := testdb.Create(t)
 	migrator, err := database.NewMigrator(dbURL, slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -34,9 +33,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	}
 }
 
-// TestDataSurvivesUpgradingFromAnOlderSchema is the promise of the upgrade
-// guide: an installation on an older version keeps everything it has when the
-// new version applies its migrations on start.
+// TestDataSurvivesUpgradingFromAnOlderSchema keeps data when a new version migrates on start.
 func TestDataSurvivesUpgradingFromAnOlderSchema(t *testing.T) {
 	dbURL := testdb.Create(t)
 	migrator, err := database.NewMigrator(dbURL, slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -46,8 +43,7 @@ func TestDataSurvivesUpgradingFromAnOlderSchema(t *testing.T) {
 	t.Cleanup(func() { _ = migrator.Close() })
 	ctx := context.Background()
 
-	// The schema as it was after the Runner tables (version 14), before
-	// registries, environments, deployments, secrets, audit and rotation.
+	// schema at version 14, before registries, environments, deployments and secrets.
 	const olderVersion = 14
 	if err := migrator.UpTo(ctx, olderVersion); err != nil {
 		t.Fatalf("UpTo(%d): %v", olderVersion, err)
@@ -75,7 +71,6 @@ func TestDataSurvivesUpgradingFromAnOlderSchema(t *testing.T) {
 		}
 	}
 
-	// The new version starts and applies everything it has not applied yet.
 	if err := migrator.Up(ctx); err != nil {
 		t.Fatalf("Up from version %d: %v", olderVersion, err)
 	}
@@ -93,7 +88,6 @@ func TestDataSurvivesUpgradingFromAnOlderSchema(t *testing.T) {
 			t.Errorf("%s: %d rows after the upgrade, want %d", table, got, want)
 		}
 	}
-	// Rows that existed before get safe values for what the new version added.
 	if got := count(`SELECT count(*) FROM agents WHERE credential_rotated_at IS NOT NULL AND rotation_requested_at IS NULL AND previous_credential_hash IS NULL`); got != 1 {
 		t.Errorf("the existing Agent did not get usable rotation defaults")
 	}
@@ -103,7 +97,6 @@ func TestDataSurvivesUpgradingFromAnOlderSchema(t *testing.T) {
 	if got := count(`SELECT count(*) FROM applications WHERE registry_connection_id IS NULL AND image_repository IS NULL`); got != 1 {
 		t.Errorf("an existing application did not keep working without an image destination")
 	}
-	// The new tables exist and are empty.
 	for _, table := range []string{"registry_connections", "environments", "deployments", "releases", "project_secrets", "audit_logs"} {
 		if got := count("SELECT count(*) FROM " + table); got != 0 {
 			t.Errorf("%s has %d rows right after the upgrade", table, got)

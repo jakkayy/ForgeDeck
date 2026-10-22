@@ -17,7 +17,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
 )
 
-// emptyAuthAPI is an installation with no accounts yet.
 func emptyAuthAPI(t *testing.T, options ...auth.Option) authAPI {
 	t.Helper()
 	svc := auth.NewService(store.New(testdb.New(t)), time.Now)

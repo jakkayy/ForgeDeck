@@ -19,9 +19,7 @@ import (
 
 const testImage = "alpine:3.20"
 
-// TestEngineAgainstDockerDaemon exercises every allowlisted operation on a
-// throwaway container. It needs a Docker daemon and is opt-in:
-// FORGEDECK_TEST_DOCKER=1 go test ./internal/agent/docker/
+// TestEngineAgainstDockerDaemon exercises every allowlisted operation (FORGEDECK_TEST_DOCKER=1).
 func TestEngineAgainstDockerDaemon(t *testing.T) {
 	if os.Getenv("FORGEDECK_TEST_DOCKER") != "1" {
 		t.Skip("set FORGEDECK_TEST_DOCKER=1 to run against a Docker daemon")
@@ -97,7 +95,7 @@ func createTestContainer(ctx context.Context, t *testing.T, cli *client.Client) 
 		Config: &container.Config{
 			Image:  testImage,
 			Labels: map[string]string{"forgedeck.test": "1", "vendor.secret": "hunter2"},
-			// Exit promptly on SIGTERM so stop/restart do not wait for the kill timeout.
+			// exit promptly on SIGTERM so stop/restart do not wait for the kill timeout.
 			Cmd: []string{"sh", "-c", `trap 'exit 0' TERM; echo to-stdout; echo to-stderr >&2; while :; do sleep 1; done`},
 		},
 	})

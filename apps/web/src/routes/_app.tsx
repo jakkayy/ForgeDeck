@@ -4,7 +4,6 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate } from "@tanstack/
 import { logout, meQuery } from "../api/auth";
 import { usePageAnnouncer } from "../lib/usePageAnnouncer";
 
-/** Layout for every signed-in page; redirects to /login without a session. */
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ context, location }) => {
     const user = await context.queryClient.ensureQueryData(meQuery).catch(() => undefined);

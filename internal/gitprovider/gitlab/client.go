@@ -1,5 +1,4 @@
-// Package gitlab talks to GitLab (gitlab.com or self-hosted) with a project
-// or group access token.
+// Package gitlab talks to GitLab with a project or group access token.
 package gitlab
 
 import (
@@ -22,32 +21,27 @@ var (
 	ErrNotFound = errors.New("not found on GitLab")
 )
 
-// Client calls the GitLab REST API v4 with one token.
 type Client struct {
 	baseURL string
 	token   string
 	http    *http.Client
 }
 
-// NewClient returns a client for baseURL (e.g. https://gitlab.com). httpClient
-// should come from safehttp, since baseURL is user supplied.
+// NewClient returns a client for baseURL; httpClient should come from safehttp (user-supplied URL)
 func NewClient(httpClient *http.Client, baseURL, token string) *Client {
 	return &Client{baseURL: strings.TrimRight(baseURL, "/"), token: token, http: httpClient}
 }
 
-// TokenInfo describes the access token in use.
 type TokenInfo struct {
 	Name   string   `json:"name"`
 	Scopes []string `json:"scopes"`
 	Active bool     `json:"active"`
 }
 
-// User is the account behind the token (a bot user for project tokens).
 type User struct {
 	Username string `json:"username"`
 }
 
-// Project is a repository the token can access.
 type Project struct {
 	ID                int64  `json:"id"`
 	PathWithNamespace string `json:"path_with_namespace"`
@@ -55,21 +49,18 @@ type Project struct {
 	Visibility        string `json:"visibility"`
 }
 
-// Token returns details of the token itself.
 func (c *Client) Token(ctx context.Context) (TokenInfo, error) {
 	var info TokenInfo
 	_, err := c.get(ctx, "/api/v4/personal_access_tokens/self", &info)
 	return info, err
 }
 
-// CurrentUser returns the user the token acts as.
 func (c *Client) CurrentUser(ctx context.Context) (User, error) {
 	var user User
 	_, err := c.get(ctx, "/api/v4/user", &user)
 	return user, err
 }
 
-// Projects lists projects where the token has at least Developer access.
 func (c *Client) Projects(ctx context.Context) ([]Project, error) {
 	var all []Project
 	for page := "1"; page != ""; {
@@ -84,7 +75,6 @@ func (c *Client) Projects(ctx context.Context) ([]Project, error) {
 	return all, nil
 }
 
-// CreateProjectHook registers a push webhook on a project and returns its ID.
 func (c *Client) CreateProjectHook(ctx context.Context, projectID int64, hookURL, token string) (int64, error) {
 	body, _ := json.Marshal(map[string]any{
 		"url": hookURL, "token": token, "push_events": true, "enable_ssl_verification": true,
@@ -99,7 +89,7 @@ func (c *Client) CreateProjectHook(ctx context.Context, projectID int64, hookURL
 	return hook.ID, nil
 }
 
-// DeleteProjectHook removes a webhook; a hook that is already gone is fine.
+// DeleteProjectHook removes a webhook; an already-gone hook is fine
 func (c *Client) DeleteProjectHook(ctx context.Context, projectID, hookID int64) error {
 	path := "/api/v4/projects/" + strconv.FormatInt(projectID, 10) + "/hooks/" + strconv.FormatInt(hookID, 10)
 	_, err := c.send(ctx, http.MethodDelete, path, nil, nil)
@@ -109,13 +99,11 @@ func (c *Client) DeleteProjectHook(ctx context.Context, projectID, hookID int64)
 	return err
 }
 
-// Commit is a commit's identity and message.
 type Commit struct {
 	ID      string `json:"id"`
 	Message string `json:"message"`
 }
 
-// Commit resolves ref (a branch, tag, or SHA) in a project.
 func (c *Client) Commit(ctx context.Context, projectID int64, ref string) (Commit, error) {
 	var commit Commit
 	_, err := c.get(ctx, "/api/v4/projects/"+strconv.FormatInt(projectID, 10)+"/repository/commits/"+url.PathEscape(ref), &commit)

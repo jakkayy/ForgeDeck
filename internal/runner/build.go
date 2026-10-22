@@ -14,12 +14,10 @@ import (
 
 // BuildConfig configures build jobs on this Runner.
 type BuildConfig struct {
-	// WorkDir holds one temporary workspace per running build.
 	WorkDir string
 	// GitProtocols is GIT_ALLOW_PROTOCOL for checkouts, e.g. "https".
 	GitProtocols string
-	// TestLimits bound the test container.
-	TestLimits TestLimits
+	TestLimits   TestLimits
 	// Timeout stops a build that runs longer, whatever step it is in.
 	Timeout time.Duration
 }
@@ -38,9 +36,7 @@ var (
 	errPush         = &worker.JobError{Code: "image_push_failed", Message: "The image could not be pushed to the registry. Check the registry credentials and the build log."}
 )
 
-// BuildHandler runs build jobs in a fresh workspace. The workspace and the
-// images the build created are removed when the job ends, whatever the
-// outcome, so a build host does not fill up.
+// BuildHandler runs build jobs in a fresh workspace, removed with its images when the job ends
 func BuildHandler(cfg BuildConfig) worker.Handler {
 	return func(ctx context.Context, job *agentproto.Job, log worker.Logger) (any, error) {
 		var payload agentproto.BuildPayload
@@ -75,7 +71,6 @@ func BuildHandler(cfg BuildConfig) worker.Handler {
 	}
 }
 
-// build is one build attempt.
 type build struct {
 	cfg         BuildConfig
 	ws          *workspace
@@ -118,8 +113,7 @@ func (b *build) run(ctx context.Context) (any, error) {
 	return agentproto.BuildResult{CommitSHA: b.payload.CommitSHA, Image: image, Tag: tag, Digest: digest, ImageRef: image + "@" + digest}, nil
 }
 
-// removeImages deletes the build's tags from the build host. The pushed
-// image stays in the registry; layers shared with other images stay cached.
+// removeImages deletes the build's tags from the build host; the registry copy stays
 func (b *build) removeImages(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeImagesTimeout)
 	defer cancel()
@@ -127,17 +121,15 @@ func (b *build) removeImages(ctx context.Context) {
 	if b.credentials.Image != "" {
 		tags = append(tags, b.credentials.Image+":"+b.payload.CommitSHA[:12])
 	}
-	// Tags that were never created make docker exit non-zero; that is fine.
+	// tags that were never created make docker exit non-zero; ignored
 	_, _ = b.exec.Output(ctx, procexec.Command{Name: "docker", Args: append([]string{"image", "rm", "--force"}, tags...)})
 }
 
-// testContainer names the test container of this build.
 func (b *build) testContainer() string {
 	return "forgedeck-test-" + filepath.Base(b.ws.root)
 }
 
-// localTag names the image on the build host until it is pushed. It is
-// unique per workspace, so concurrent builds never share a tag.
+// localTag names the image on the build host; unique per workspace so builds never share a tag
 func (b *build) localTag() string {
 	return "forgedeck-build:" + filepath.Base(b.ws.root)
 }

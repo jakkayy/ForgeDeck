@@ -1,7 +1,4 @@
-// Package agent_test runs deploy/agent/install.sh in a Debian container against
-// a real Control Plane, with a stand-in for systemctl and docker (a container
-// has no systemd and the test needs no Docker daemon inside). It runs only when
-// FORGEDECK_TEST_DOCKER=1.
+// Package agent_test runs install.sh in a Debian container; opt-in via FORGEDECK_TEST_DOCKER=1.
 package agent_test
 
 import (
@@ -17,7 +14,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 )
 
-// stubs stand in for the two tools the installer calls that a container lacks.
 const stubs = `
 mkdir -p /stub
 cat > /stub/systemctl <<'SH'
@@ -35,9 +31,6 @@ groupadd docker
 export PATH=/stub:$PATH
 `
 
-// run executes a shell script as root in a Debian container on the host
-// network (so it reaches the test server), with the repository's installer
-// and the Agent binary mounted read-only.
 func run(t *testing.T, env []string, script string, binary string) (string, error) {
 	t.Helper()
 	repo, err := filepath.Abs("../..")
@@ -113,13 +106,11 @@ echo ALL-OK
 		t.Errorf("the Agent user is not in the docker group:\n%s", out)
 	}
 
-	// The Control Plane enrolled exactly one server, named by the token.
 	var list struct{ Items []servers.Server }
 	owner.Do(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/servers", nil).RequireStatus(http.StatusOK).Decode(&list)
 	if len(list.Items) != 1 || list.Items[0].Name != "prod-01" {
 		t.Fatalf("servers after two installs: %+v", list.Items)
 	}
-	// Nothing printed the token.
 	if strings.Contains(out, token) {
 		t.Errorf("the enrollment token appears in the installer's output")
 	}
@@ -171,7 +162,6 @@ func TestUnitIsValidAndHardened(t *testing.T) {
 			t.Errorf("the unit lacks %q", want)
 		}
 	}
-	// The installer puts the binary and state where the unit expects them.
 	script, err := os.ReadFile("install.sh")
 	if err != nil {
 		t.Fatal(err)
@@ -182,9 +172,7 @@ func TestUnitIsValidAndHardened(t *testing.T) {
 		}
 	}
 	if _, err := exec.LookPath("systemd-analyze"); err == nil {
-		// Verification complains that the binary does not exist on this machine; nothing else may be reported.
-		// It also reads the host's own units and reports their problems (a newer systemd warns about
-		// options an older vendor unit still uses): those are not ours, so only lines about this unit count.
+		// ignore verify noise: the binary is absent here and the host's own units may warn.
 		out, _ := exec.CommandContext(t.Context(), "systemd-analyze", "verify", "forgedeck-agent.service").CombinedOutput() //nolint:gosec // test
 		for _, line := range strings.Split(string(out), "\n") {
 			if line != "" && strings.Contains(line, "forgedeck-agent.service") &&

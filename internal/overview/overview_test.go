@@ -20,7 +20,6 @@ import (
 
 const commit = "1111111111111111111111111111111111111111"
 
-// digestOf expands a two-digit seed into a full sha256 digest.
 func digestOf(seed string) string { return "sha256:" + strings.Repeat(seed, 32) }
 
 type fixture struct {
@@ -55,8 +54,6 @@ func (f fixture) environment(t *testing.T, name string, port int) uuid.UUID {
 	return created.ID
 }
 
-// deploy queues a deployment to the environment, has the Agent claim it, and
-// finishes it with the given outcome.
 func (f fixture) deploy(t *testing.T, environmentID uuid.UUID, seed, outcome string) {
 	t.Helper()
 	job, err := f.jobs.Enqueue(t.Context(), jobs.NewJob{ProjectID: f.projectID, ApplicationID: &f.appID,
@@ -92,13 +89,13 @@ func get(t *testing.T, client *apitest.Client) overview.Overview {
 
 func TestOverviewSummarizesServersAndDeployments(t *testing.T) {
 	f := newFixture(t)
-	f.env.EnrollAgent(f.owner, f.projectID, "prod-02") // never reports in: pending
+	f.env.EnrollAgent(f.owner, f.projectID, "prod-02")
 	f.server.Do(http.MethodPost, "/api/v1/agent/heartbeat", agentproto.HeartbeatRequest{
 		AgentVersion: "0.2.0", ProtocolVersion: agentproto.ProtocolVersion, Docker: agentproto.Docker{Available: true},
 	}).RequireStatus(http.StatusOK)
 	staging := f.environment(t, "staging", 18080)
 	production := f.environment(t, "production", 18081)
-	f.environment(t, "preview", 18082) // never deployed
+	f.environment(t, "preview", 18082)
 
 	f.deploy(t, production, "aa", agentproto.OutcomeSucceeded)
 	f.deploy(t, staging, "bb", agentproto.OutcomeFailed)
@@ -118,7 +115,6 @@ func TestOverviewSummarizesServersAndDeployments(t *testing.T) {
 		t.Fatalf("failures %+v", o.Failures)
 	}
 
-	// A later success clears the failure: only what still needs action is listed.
 	f.deploy(t, staging, "cc", agentproto.OutcomeSucceeded)
 	o = get(t, f.owner)
 	if len(o.Failures) != 0 || o.Environments.Failed != 0 || o.Environments.Succeeded != 2 || len(o.Recent) != 3 {

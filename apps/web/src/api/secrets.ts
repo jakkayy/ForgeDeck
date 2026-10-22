@@ -15,7 +15,7 @@ export const secretsQuery = (projectId: string) =>
       api<{ items: Secret[] }>(`/projects/${projectId}/secrets`, { signal }).then((r) => r.items),
   });
 
-/** Creates the secret or replaces its value. The value is never read back. */
+/** Creates the secret or replaces its value; the value is never read back. */
 export function setSecret(projectId: string, name: string, value: string) {
   return api<Secret>(`/projects/${projectId}/secrets/${encodeURIComponent(name)}`, {
     method: "PUT",

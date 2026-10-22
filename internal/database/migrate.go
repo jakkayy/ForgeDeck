@@ -1,4 +1,4 @@
-// Package database owns PostgreSQL connectivity and schema migrations.
+// Package database owns PostgreSQL connectivity and schema migrations
 package database
 
 import (
@@ -15,15 +15,14 @@ import (
 	"github.com/jakkayy/ForgeDeck/migrations"
 )
 
-// Migrator applies the embedded migrations. A PostgreSQL advisory lock keeps
-// concurrently starting Control Plane processes from migrating at once.
+// Migrator applies the embedded migrations
 type Migrator struct {
 	db       *sql.DB
 	provider *goose.Provider
 	logger   *slog.Logger
 }
 
-// NewMigrator opens a dedicated connection for migrations.
+// NewMigrator opens a dedicated connection for migrations
 func NewMigrator(databaseURL string, logger *slog.Logger) (*Migrator, error) {
 	db, err := sql.Open("pgx", databaseURL)
 	if err != nil {
@@ -45,10 +44,10 @@ func NewMigrator(databaseURL string, logger *slog.Logger) (*Migrator, error) {
 	return &Migrator{db: db, provider: provider, logger: logger}, nil
 }
 
-// Close releases the migration connection.
+// Close releases the migration connection
 func (m *Migrator) Close() error { return m.db.Close() }
 
-// Up applies all pending migrations.
+// Up applies all pending migrations
 func (m *Migrator) Up(ctx context.Context) error {
 	results, err := m.provider.Up(ctx)
 	if err != nil {
@@ -60,7 +59,7 @@ func (m *Migrator) Up(ctx context.Context) error {
 	return nil
 }
 
-// Down rolls back the most recent migration.
+// Down rolls back the most recent migration
 func (m *Migrator) Down(ctx context.Context) error {
 	r, err := m.provider.Down(ctx)
 	if err != nil {
@@ -70,7 +69,7 @@ func (m *Migrator) Down(ctx context.Context) error {
 	return nil
 }
 
-// PrintStatus writes one line per migration with its applied state.
+// PrintStatus writes one line per migration with its applied state
 func (m *Migrator) PrintStatus(ctx context.Context, w io.Writer) error {
 	statuses, err := m.provider.Status(ctx)
 	if err != nil {

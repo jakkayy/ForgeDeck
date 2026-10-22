@@ -27,11 +27,7 @@ async function fetchLogs(
 
 type Props = { serverId: string; container: Container; isDisabled?: boolean };
 
-/**
- * Past output of one container, fetched on demand through the Agent. Lines
- * are rendered as text (never HTML) and redaction happens before they reach
- * the browser.
- */
+/** Past output of one container, rendered as text (never HTML); redaction happens server-side. */
 export function ContainerLogs({ serverId, container, isDisabled = false }: Props) {
   const [tail, setTail] = useState(500);
   const logs = useMutation({

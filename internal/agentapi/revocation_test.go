@@ -9,9 +9,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 )
 
-// TestRevokedAgentIsLockedOutEverywhere removes a server while its Agent has
-// a job in progress and a long-poll pending, then checks every Agent endpoint
-// rejects the old credential.
+// TestRevokedAgentIsLockedOutEverywhere checks every Agent endpoint rejects a revoked credential.
 func TestRevokedAgentIsLockedOutEverywhere(t *testing.T) {
 	f := newClaimFixture(t)
 	f.enqueue(t, f.agent.ServerID)

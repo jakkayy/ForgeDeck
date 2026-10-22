@@ -46,17 +46,14 @@ func TestRotatedCredentialWorksAndTheOldOneOnlyBrieflyAndAsksToRotateAgain(t *te
 	}
 	fresh := withCredential(env, rotated.Credential)
 
-	// The new credential is the current one: nothing more to do.
 	if status, hb := beat(t, fresh); status != http.StatusOK || hb.RotateCredential {
 		t.Fatalf("new credential: %d, rotate=%v", status, hb.RotateCredential)
 	}
-	// The old one still works during the grace period, and says "rotate again":
-	// an Agent that never saved the new one converges instead of being locked out.
+	// the old credential works during grace and says "rotate again", so a lost response converges.
 	if status, hb := beat(t, agent.Client); status != http.StatusOK || !hb.RotateCredential {
 		t.Fatalf("old credential in grace: %d, rotate=%v", status, hb.RotateCredential)
 	}
 
-	// Once the grace period is over the old credential is dead.
 	if _, err := env.Pool.Exec(context.Background(), `UPDATE agents SET previous_expires_at = now() - interval '1 minute'`); err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +72,6 @@ func TestAnAgentThatLostTheNewCredentialCanRotateAgain(t *testing.T) {
 
 	var first, second agentproto.RotateResponse
 	rotate(agent.Client).RequireStatus(http.StatusOK).Decode(&first)
-	// The response was lost: the Agent still holds the original and rotates with it.
 	rotate(agent.Client).RequireStatus(http.StatusOK).Decode(&second)
 	if first.Credential == second.Credential {
 		t.Fatal("two rotations returned the same credential")
@@ -83,8 +79,7 @@ func TestAnAgentThatLostTheNewCredentialCanRotateAgain(t *testing.T) {
 	if status, _ := beat(t, withCredential(env, second.Credential)); status != http.StatusOK {
 		t.Fatalf("the latest credential: %d", status)
 	}
-	// The credential issued by the abandoned first rotation no longer works:
-	// only the latest and the one presented last are valid.
+	// the abandoned rotation's credential is dead; only the latest and last presented work.
 	if status, _ := beat(t, withCredential(env, first.Credential)); status != http.StatusUnauthorized {
 		t.Fatalf("a superseded credential: %d, want 401", status)
 	}
@@ -101,7 +96,6 @@ func TestAdminsCanRequestRotationAndTheAgentIsToldOnce(t *testing.T) {
 	if _, hb := beat(t, agent.Client); !hb.RotateCredential {
 		t.Fatal("the Agent was not asked to rotate after an admin requested it")
 	}
-	// Still asked until it does it.
 	if _, hb := beat(t, agent.Client); !hb.RotateCredential {
 		t.Fatal("the request was forgotten before the Agent acted")
 	}

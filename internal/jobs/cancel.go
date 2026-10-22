@@ -13,9 +13,7 @@ import (
 
 var errJobFinished = apperr.Conflict("job_finished", "This job has already finished.")
 
-// Cancel stops a queued job, or marks a running one cancelled so its worker
-// is refused at its next lease renewal and abandons the attempt. Work the
-// worker already did (a container already restarted) is not undone.
+// Cancel stops a queued job or marks a running one so its worker abandons it; done work is not undone
 func (s *Service) Cancel(ctx context.Context, userID, jobID uuid.UUID) (Job, error) {
 	job, err := s.authorizeJob(ctx, userID, jobID)
 	if err != nil {

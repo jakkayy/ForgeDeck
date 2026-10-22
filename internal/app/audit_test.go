@@ -13,9 +13,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
 )
 
-// TestEveryMutatingRouteIsAuditedOrExemptWithAReason walks the real router.
-// Adding an endpoint that changes data without deciding whether it is audited
-// fails here, so an audit event cannot be forgotten.
+// A new data-changing route must be audited or exempt with a reason, or this test fails.
 func TestEveryMutatingRouteIsAuditedOrExemptWithAReason(t *testing.T) {
 	handler := app.NewRouter(t.Context(), config.Config{}, testdb.New(t), slog.New(slog.DiscardHandler))
 	routes, ok := handler.(chi.Routes)
@@ -46,7 +44,6 @@ func TestEveryMutatingRouteIsAuditedOrExemptWithAReason(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Rules and exemptions for routes that no longer exist are dead weight.
 	for key := range audit.Rules {
 		if !seen[key] {
 			t.Errorf("audit.Rules has %s, which is not a route", key)

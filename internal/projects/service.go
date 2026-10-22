@@ -32,7 +32,6 @@ var (
 	nonSlugRuns = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
-// Project is a project as seen by one member, including their role.
 type Project struct {
 	ID        uuid.UUID  `json:"id"`
 	Name      string     `json:"name"`
@@ -41,29 +40,24 @@ type Project struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
-// errSlugTaken is reported on the slug field when the unique index rejects it.
 var errSlugTaken = validate.Errors{"slug": "Another project already uses this slug."}
 
-// Service implements project operations.
 type Service struct {
 	pool    *pgxpool.Pool
 	queries *store.Queries
 	authz   *authz.Authorizer
 }
 
-// NewService returns a project Service.
 func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer) *Service {
 	return &Service{pool: pool, queries: store.New(pool), authz: authorizer}
 }
 
-// CreateInput is the data needed to create a project. Slug is optional and
-// derived from Name when empty.
+// CreateInput creates a project; Slug is derived from Name when empty
 type CreateInput struct {
 	Name string
 	Slug string
 }
 
-// Create stores a new project with userID as its owner.
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, in CreateInput) (Project, error) {
 	name, slug, err := normalizeCreateInput(in)
 	if err != nil {
@@ -92,7 +86,6 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, in CreateInput) 
 	return toProject(created, authz.RoleOwner), nil
 }
 
-// Get returns a project the user is a member of.
 func (s *Service) Get(ctx context.Context, userID, projectID uuid.UUID) (Project, error) {
 	role, err := s.authz.Require(ctx, userID, projectID, authz.ViewProject)
 	if err != nil {
@@ -105,13 +98,11 @@ func (s *Service) Get(ctx context.Context, userID, projectID uuid.UUID) (Project
 	return toProject(p, role), nil
 }
 
-// UpdateInput changes the fields that are non-nil.
 type UpdateInput struct {
 	Name *string
 	Slug *string
 }
 
-// Update renames a project or changes its slug.
 func (s *Service) Update(ctx context.Context, userID, projectID uuid.UUID, in UpdateInput) (Project, error) {
 	role, err := s.authz.Require(ctx, userID, projectID, authz.UpdateProject)
 	if err != nil {
@@ -143,8 +134,7 @@ func (s *Service) Update(ctx context.Context, userID, projectID uuid.UUID, in Up
 	return toProject(p, role), nil
 }
 
-// Delete removes a project. confirmSlug must equal the project's slug so a
-// project is never deleted by a stray request.
+// Delete removes a project; confirmSlug must match its slug
 func (s *Service) Delete(ctx context.Context, userID, projectID uuid.UUID, confirmSlug string) error {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.DeleteProject); err != nil {
 		return err
@@ -166,7 +156,6 @@ func (s *Service) Delete(ctx context.Context, userID, projectID uuid.UUID, confi
 	return nil
 }
 
-// List returns the projects userID belongs to, ordered by name.
 func (s *Service) List(ctx context.Context, userID uuid.UUID, search *string, limit, offset int32) ([]Project, error) {
 	rows, err := s.queries.ListProjectsForUser(ctx, store.ListProjectsForUserParams{
 		UserID: userID, Search: search, PageLimit: limit, PageOffset: offset,
@@ -211,8 +200,7 @@ func validateSlug(errs validate.Errors, slug string) {
 	}
 }
 
-// slugify derives a URL-safe slug. Names without Latin letters or digits
-// (for example Thai names) get a random slug instead.
+// slugify derives a URL-safe slug; names without Latin letters or digits get a random one
 func slugify(name string) string {
 	slug := strings.Trim(nonSlugRuns.ReplaceAllString(strings.ToLower(name), "-"), "-")
 	if len(slug) > maxSlugLength {

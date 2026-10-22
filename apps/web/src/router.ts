@@ -13,7 +13,6 @@ export const router = createRouter({
   defaultErrorComponent: RouteErrorPage,
 });
 
-// A session can end while a page is open (logout elsewhere, expiry).
 setUnauthorizedHandler(() => {
   queryClient.removeQueries({ queryKey: meQuery.queryKey });
   if (router.state.location.pathname !== "/login") {

@@ -19,7 +19,6 @@ type sseEvent struct {
 	name, id, data string
 }
 
-// readEvents parses SSE events from resp until "end" or the stream closes.
 func readEvents(t *testing.T, resp *http.Response, events chan<- sseEvent) {
 	t.Helper()
 	defer close(events)
@@ -119,7 +118,6 @@ func TestJobEventStream(t *testing.T) {
 		t.Fatalf("want end, got %+v", e)
 	}
 
-	// Reconnecting with Last-Event-ID resumes after the last line seen.
 	resumed := make(chan sseEvent, 8)
 	go readEvents(t, owner.Stream(path, map[string]string{"Last-Event-ID": "1.1"}), resumed) //nolint:bodyclose // closed by readEvents
 	if e := next(t, resumed); e.id != "1.2" {

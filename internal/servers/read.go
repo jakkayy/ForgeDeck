@@ -14,8 +14,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// errServerNotFound is also returned for servers in projects the user does
-// not belong to, so server IDs cannot be probed.
+// errServerNotFound also covers servers of other projects, so IDs cannot be probed
 var errServerNotFound = apperr.NotFound("Server not found.")
 
 // Server is the dashboard view of a server.
@@ -54,8 +53,7 @@ func (s *Service) Get(ctx context.Context, userID, serverID uuid.UUID) (Server, 
 	return s.toServer(row.Server, row.ProjectName), nil
 }
 
-// ListFilter narrows a server list. Search is a LIKE-escaped substring of the
-// name; Status is one of the connectivity statuses.
+// ListFilter narrows a server list; Search is a LIKE-escaped name substring
 type ListFilter struct {
 	Search *string
 	Status *string
@@ -96,8 +94,7 @@ func (s *Service) ListForProject(ctx context.Context, userID, projectID uuid.UUI
 	return servers, nil
 }
 
-// authorizeServer loads a server and checks the user's permission in its
-// project. Unknown servers and non-members both get errServerNotFound.
+// authorizeServer loads a server and checks the user's permission in its project
 func (s *Service) authorizeServer(ctx context.Context, userID, serverID uuid.UUID, p authz.Permission) (store.GetServerRow, error) {
 	row, err := s.queries.GetServer(ctx, serverID)
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -19,7 +19,6 @@ export function logout() {
   return api<void>("/auth/logout", { method: "POST" });
 }
 
-/** Whether no account exists yet, so the sign-in page offers creating the first one. */
 export const setupQuery = queryOptions({
   queryKey: ["auth", "setup"],
   queryFn: ({ signal }) =>
@@ -28,7 +27,6 @@ export const setupQuery = queryOptions({
   retry: false,
 });
 
-/** Creates the first account and signs it in. Refused once any account exists. */
 export function registerFirstUser(email: string, password: string) {
   return api<{ user: User }>("/auth/setup", { method: "POST", body: { email, password } }).then(
     (r) => r.user,

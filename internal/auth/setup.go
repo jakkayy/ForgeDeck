@@ -10,11 +10,10 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// ErrSetupDone is returned when the first account was already created.
+// ErrSetupDone is returned when the first account was already created
 var ErrSetupDone = errors.New("setup already completed")
 
-// SetupRequired reports whether no account exists yet, which is the only time
-// the first one may be registered from the web.
+// SetupRequired reports whether no account exists yet, the only time web registration is allowed
 func (s *Service) SetupRequired(ctx context.Context) (bool, error) {
 	has, err := s.queries.HasUsers(ctx)
 	if err != nil {
@@ -23,9 +22,7 @@ func (s *Service) SetupRequired(ctx context.Context) (bool, error) {
 	return !has, nil
 }
 
-// RegisterFirstUser creates the first account and signs it in. It succeeds at
-// most once, however many requests arrive together: every later call, and any
-// call once an account exists (however it was created), gets ErrSetupDone.
+// RegisterFirstUser creates the first account and signs it in
 func (s *Service) RegisterFirstUser(ctx context.Context, email, password string) (User, NewSession, error) {
 	email, hash, err := newCredentials(email, password)
 	if err != nil {

@@ -13,7 +13,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// Filter narrows job history; nil fields match everything.
 type Filter struct {
 	ProjectID     *uuid.UUID
 	ApplicationID *uuid.UUID
@@ -22,19 +21,16 @@ type Filter struct {
 	Type          *string
 }
 
-// HistoryCursor is the position after the last job of a page.
 type HistoryCursor struct {
 	CreatedAt time.Time
 	ID        uuid.UUID
 }
 
-// Encode returns the opaque string clients pass back as ?cursor=.
 func (c HistoryCursor) Encode() string {
 	raw := strconv.FormatInt(c.CreatedAt.UnixMicro(), 10) + "_" + c.ID.String()
 	return base64.RawURLEncoding.EncodeToString([]byte(raw))
 }
 
-// DecodeHistoryCursor parses a cursor from Encode; "" means the first page.
 func DecodeHistoryCursor(s string) (*HistoryCursor, bool) {
 	if s == "" {
 		return nil, true
@@ -52,8 +48,7 @@ func DecodeHistoryCursor(s string) (*HistoryCursor, bool) {
 	return &HistoryCursor{CreatedAt: time.UnixMicro(us), ID: parsedID}, true
 }
 
-// History lists jobs newest first across the user's projects. It returns the
-// cursor for the next page, or nil on the last page.
+// History lists jobs newest first across the user's projects, with the next cursor
 func (s *Service) History(ctx context.Context, userID uuid.UUID, f Filter, after *HistoryCursor, limit int32) ([]Job, *HistoryCursor, error) {
 	params := store.ListJobsForUserParams{
 		UserID: userID, ProjectID: f.ProjectID, ApplicationID: f.ApplicationID,

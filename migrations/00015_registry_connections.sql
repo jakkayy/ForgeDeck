@@ -1,6 +1,5 @@
 -- +goose Up
--- Container registries a project's Runners push images to. The password
--- (or token) is AES-GCM ciphertext; password_key_id names the sealing key.
+-- Registries a project's Runners push to; the password is AES-GCM ciphertext.
 CREATE TABLE registry_connections (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          uuid NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
@@ -14,7 +13,6 @@ CREATE TABLE registry_connections (
     UNIQUE (project_id, name)
 );
 
--- Where an application's images are pushed: <registry host>/<image_repository>.
 -- RESTRICT: a registry cannot be removed while applications push to it.
 ALTER TABLE applications
     ADD COLUMN registry_connection_id uuid REFERENCES registry_connections (id) ON DELETE RESTRICT,

@@ -27,7 +27,6 @@ import { QueryBoundary } from "../QueryBoundary";
 
 const providerLabel = { github: "GitHub", gitlab: "GitLab" } as const;
 
-/** Git provider connections: GitHub App installs and GitLab tokens. */
 export function GitSection({ projectId }: { projectId: string }) {
   const connections = useQuery(gitConnectionsQuery(projectId));
   const canManage = useHasRole(projectId, "admin");

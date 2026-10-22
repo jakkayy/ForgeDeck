@@ -9,17 +9,14 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
-// Handler serves the overview behind auth.RequireUser.
 type Handler struct {
 	svc *Service
 }
 
-// NewHandler returns the overview endpoint.
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// Routes mounts the overview endpoint on r.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/overview", httpx.Handle(h.get))
 }

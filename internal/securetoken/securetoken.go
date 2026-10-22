@@ -1,5 +1,4 @@
-// Package securetoken generates high-entropy bearer tokens and the hashes
-// stored in place of them (sessions, enrollment tokens, Agent credentials).
+// Package securetoken generates high-entropy bearer tokens and the hashes stored in their place
 package securetoken
 
 import (
@@ -18,8 +17,7 @@ func New(prefix string) (token string, hash []byte) {
 	return token, Hash(token)
 }
 
-// Hash returns the SHA-256 hash used to look a token up. Tokens carry 256 bits
-// of entropy, so a fast hash is sufficient; passwords use argon2id instead.
+// Hash returns the SHA-256 token lookup hash; 256-bit tokens make a fast hash sufficient
 func Hash(token string) []byte {
 	sum := sha256.Sum256([]byte(token))
 	return sum[:]

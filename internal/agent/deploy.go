@@ -18,8 +18,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// Deployment failures. The code tells the Control Plane (and the user) which
-// step failed.
+// Deployment failures
 var (
 	errComposeUnavailable = &worker.JobError{Code: "compose_unavailable", Message: "Docker Compose is not available on this server. Install the Docker Compose plugin."}
 	errRegistryLogin      = &worker.JobError{Code: "registry_login_failed", Message: "The registry rejected the credentials. Check the registry in the project."}
@@ -27,36 +26,27 @@ var (
 	errStartFailed        = &worker.JobError{Code: "start_failed", Message: "The service could not be started. See the job log."}
 )
 
-// secretMissing is a deployment whose project secret has no value in the claim.
+// secretMissing is a deployment whose project secret has no value in the claim
 func secretMissing(name string) *worker.JobError {
 	return &worker.JobError{Code: "secret_not_found", Message: "The secret " + name + " was not delivered with this deployment. Create it in the project's Secrets, then deploy again."}
 }
 
-// commandRunner runs the Docker CLI. procexec.Executor implements it.
+// commandRunner runs the Docker CLI
 type commandRunner interface {
 	Run(ctx context.Context, c procexec.Command) error
 	Output(ctx context.Context, c procexec.Command) (string, error)
 }
 
-// deployer applies deployments on this server with Docker Compose.
+// deployer applies deployments on this server with Docker Compose
 type deployer struct {
-	// dir holds one subdirectory per environment with its compose.yml, and
-	// short-lived scratch directories for jobs.
-	dir string
-	// newRunner builds the command runner of one job. env is its base
-	// environment; log receives the command output.
+	dir       string
 	newRunner func(env []string, log worker.Logger) commandRunner
-	// probes check a service from the host; tests replace them.
-	probes probeFuncs
-	// sleep waits between health probes; tests replace it.
-	sleep func(ctx context.Context, d time.Duration) error
-	now   func() time.Time
+	probes    probeFuncs
+	sleep     func(ctx context.Context, d time.Duration) error
+	now       func() time.Time
 }
 
-// DeployImageHandler applies a deploy_image job: it renders the Compose file
-// from the validated configuration, pulls the image by digest, and brings
-// the service up. Applying is idempotent: running the same deployment again
-// converges to the same state. dir is the Agent's deployment directory.
+// DeployImageHandler applies a deploy_image job
 func DeployImageHandler(dir string) worker.Handler {
 	d := &deployer{dir: dir, newRunner: func(env []string, log worker.Logger) commandRunner {
 		return procexec.New(env, log)
@@ -69,9 +59,7 @@ func (d *deployer) handle(ctx context.Context, job *agentproto.Job, log worker.L
 	if err := json.Unmarshal(job.Payload, &payload); err != nil {
 		return nil, errInvalidPayload
 	}
-	// The configuration is validated here, on the server, and its defaults
-	// are filled in once, so every step below uses the same values. An
-	// invalid payload fails before anything runs.
+	// an invalid payload fails before anything runs
 	config, err := servicecfg.Normalize(payload.Config)
 	if err != nil {
 		return nil, &worker.JobError{Code: "invalid_payload", Message: err.Error()}
@@ -119,7 +107,7 @@ func (d *deployer) handle(ctx context.Context, job *agentproto.Job, log worker.L
 	return agentproto.DeployResult{ImageRef: payload.ImageRef, ContainerID: containerID}, nil
 }
 
-// release is an image and the configuration to run it with.
+// release is an image and the configuration to run it with
 type release struct {
 	ImageRef string
 	Config   servicecfg.Config
@@ -129,7 +117,7 @@ func (r release) render(environmentID uuid.UUID) ([]byte, error) {
 	return compose.Render(compose.Spec{EnvironmentID: environmentID, ImageRef: r.ImageRef, Config: r.Config})
 }
 
-// attempt is one job's deployment of an environment.
+// attempt is one job's deployment of an environment
 type attempt struct {
 	d             *deployer
 	runner        commandRunner
@@ -139,8 +127,7 @@ type attempt struct {
 	secrets       map[string]string
 }
 
-// secretEnv is the environment `docker compose` needs to resolve the secrets
-// rel lists, and nothing more: other secrets of the project stay out of it.
+// secretEnv is the minimal environment `docker compose` needs to resolve the listed secrets
 func (r *attempt) secretEnv(rel release) []string {
 	env := make([]string, 0, len(rel.Config.Secrets))
 	for _, name := range rel.Config.Secrets {
@@ -149,15 +136,12 @@ func (r *attempt) secretEnv(rel release) []string {
 	return env
 }
 
-// compose returns the Compose command of rel's environment.
+// compose returns the Compose command of rel's environment
 func (r *attempt) compose(rel release, dir string) composeCommand {
 	return composeCommand{runner: r.runner, project: compose.ProjectName(r.environmentID), dir: dir, env: r.secretEnv(rel)}
 }
 
-// apply writes the Compose file of r and brings the service up, returning its
-// container ID. With mustPull the image is pulled first and a failed pull
-// fails the step; otherwise a failed pull is tolerated because the image may
-// already be on the host (restoring a previous release).
+// apply writes the Compose file of r and brings the service up, returning its container ID
 func (r *attempt) apply(ctx context.Context, rel release, mustPull bool) (string, error) {
 	file, err := rel.render(r.environmentID)
 	if err != nil {
@@ -190,11 +174,7 @@ func (r *attempt) apply(ctx context.Context, rel release, mustPull bool) (string
 	return firstLine(containerID), nil
 }
 
-// recover handles a service that did not become healthy: it keeps the
-// container's last output for diagnosis, then restores the previous release.
-// With no previous release the failed service is stopped so it does not
-// crash-loop. The returned error is always the failed health check; its
-// message says what state the environment is in.
+// recover handles a service that did not become healthy
 func (r *attempt) recover(ctx context.Context, failed release, failedContainerID string, previous *release) error {
 	r.keepLogs(ctx, failedContainerID)
 	if previous == nil {
@@ -222,7 +202,7 @@ func (r *attempt) stop(ctx context.Context, rel release) error {
 	return r.compose(rel, filepath.Join(r.d.dir, r.environmentID.String())).run(ctx, "stop")
 }
 
-// keepLogs copies the last lines of a container's output into the job log.
+// keepLogs copies the last lines of a container's output into the job log
 func (r *attempt) keepLogs(ctx context.Context, containerID string) {
 	r.log.Log(agentproto.StreamSystem, "Last output of the failed service:")
 	if err := r.runner.Run(ctx, procexec.Command{Name: "docker", Args: []string{"logs", "--tail", "50", containerID}}); err != nil {
@@ -237,7 +217,7 @@ func secretsOf(c *agentproto.DeployContext) map[string]string {
 	return c.Secrets
 }
 
-// firstMissingSecret returns a listed secret that has no value.
+// firstMissingSecret returns a listed secret that has no value
 func firstMissingSecret(names []string, values map[string]string) (string, bool) {
 	for _, name := range names {
 		if _, ok := values[name]; !ok {
@@ -254,9 +234,7 @@ func registryOf(c *agentproto.DeployContext) *agentproto.RegistryCredentials {
 	return c.Registry
 }
 
-// previousOf returns the release to restore, validated like the new one. A
-// previous release that no longer validates is not restored: running an
-// unchecked configuration is worse than leaving the service stopped.
+// previousOf returns the release to restore, validated like the new one
 func previousOf(c *agentproto.DeployContext, log worker.Logger) *release {
 	if c == nil || c.Previous == nil {
 		return nil
@@ -273,9 +251,7 @@ func previousOf(c *agentproto.DeployContext, log worker.Logger) *release {
 	return &release{ImageRef: c.Previous.ImageRef, Config: config}
 }
 
-// redactSecrets masks the registry password and the environment values of
-// the configuration in everything the job logs, including a failed
-// service's own output.
+// redactSecrets masks the registry password and environment values in all job logs
 func redactSecrets(log worker.Logger, c *agentproto.DeployContext, config servicecfg.Config) worker.Logger {
 	var secrets []string
 	if c != nil && c.Registry != nil {
@@ -297,9 +273,7 @@ func redactSecrets(log worker.Logger, c *agentproto.DeployContext, config servic
 	return worker.NewRedactingLog(log, secrets)
 }
 
-// scratch is a job's private directory tree. HOME and DOCKER_CONFIG point
-// into it so a registry login never touches the Agent's own files and
-// disappears with the job.
+// scratch is a job's private directory tree
 type scratch struct{ root, home, dockerConfig string }
 
 func (d *deployer) newScratch() (scratch, error) {
@@ -320,8 +294,7 @@ func (d *deployer) newScratch() (scratch, error) {
 	return s, nil
 }
 
-// writeComposeFile stores the environment's Compose file, replacing the
-// previous one atomically, and returns the environment's directory.
+// writeComposeFile atomically replaces the environment's Compose file and returns its directory
 func (d *deployer) writeComposeFile(environmentID string, content []byte) (string, error) {
 	envDir := filepath.Join(d.dir, environmentID)
 	if err := os.MkdirAll(envDir, 0o700); err != nil {
@@ -355,13 +328,12 @@ func login(ctx context.Context, runner commandRunner, registry agentproto.Regist
 	})
 }
 
-// composeCommand runs `docker compose` for one environment's project.
+// composeCommand runs `docker compose` for one environment's project
 type composeCommand struct {
 	runner  commandRunner
 	project string
 	dir     string
-	// env holds the values of the secrets the Compose file refers to.
-	env []string
+	env     []string
 }
 
 func (c composeCommand) args(sub ...string) []string {

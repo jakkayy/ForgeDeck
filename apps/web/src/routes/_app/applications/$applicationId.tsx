@@ -203,7 +203,6 @@ function BuildHistory({ app }: { app: Application }) {
       listJobs({ application_id: app.id, type: "build", cursor: pageParam }, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
-    // Refresh only while a build is still in progress.
     refetchInterval: (query) =>
       query.state.data?.pages.some((page) => page.items.some(isActive)) ? ACTIVE_POLL_MS : false,
   });

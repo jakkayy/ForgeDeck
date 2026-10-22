@@ -37,7 +37,6 @@ dry=""
 
 die() { echo "error: $*" >&2; exit 1; }
 say() { echo "==> $*"; }
-# act runs a command, or only prints it in a dry run.
 act() {
   if [ -n "$dry" ]; then echo "[dry-run] $*"; else "$@"; fi
 }
@@ -61,7 +60,6 @@ fi
 [ "$(uname -s)" = Linux ] || die "the Agent installer supports Linux with systemd"
 [ -n "$dry" ] || command -v systemctl >/dev/null || die "systemd is required"
 
-# --- uninstall -----------------------------------------------------------
 if [ -n "$uninstall" ]; then
   say "stopping and removing the service"
   act systemctl disable --now forgedeck-agent 2>/dev/null || true
@@ -78,7 +76,6 @@ if [ -n "$uninstall" ]; then
   exit 0
 fi
 
-# --- checks --------------------------------------------------------------
 [ -n "$binary" ] || die "give --binary PATH (build it with: make build-agent)"
 [ -f "$binary" ] || die "no such file: $binary"
 if [ -z "$dry" ]; then
@@ -94,7 +91,6 @@ elif [ -z "$url" ]; then
   die "this host is not enrolled yet: give --url https://<your ForgeDeck>"
 fi
 
-# --- install -------------------------------------------------------------
 say "creating the $user user"
 if ! id -u "$user" >/dev/null 2>&1; then
   act useradd --system --home-dir "$state_dir" --no-create-home --shell /usr/sbin/nologin "$user"
@@ -105,10 +101,9 @@ say "installing the binary and the service"
 act install -m 0755 "$binary" "$binary_dest"
 act install -m 0644 "$here/forgedeck-agent.service" "$unit_dest"
 act systemctl daemon-reload
-# The state directory is created by systemd (StateDirectory=); enrolling needs it before the first start.
+# systemd creates StateDirectory= only at first start; enrolling needs it earlier
 act install -d -m 0700 -o "$user" -g "$user" "$state_dir"
 
-# --- enroll --------------------------------------------------------------
 if [ -n "$already_enrolled" ]; then
   say "already enrolled: keeping the existing identity"
 else
@@ -127,7 +122,6 @@ else
   fi
 fi
 
-# --- start ---------------------------------------------------------------
 say "starting the Agent"
 act systemctl enable forgedeck-agent
 act systemctl restart forgedeck-agent

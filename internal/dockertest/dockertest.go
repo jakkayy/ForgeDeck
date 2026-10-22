@@ -1,5 +1,4 @@
-// Package dockertest helps tests that need a real Docker daemon. They run
-// only when FORGEDECK_TEST_DOCKER=1.
+// Package dockertest helps tests that need a real Docker daemon
 package dockertest
 
 import (
@@ -12,7 +11,7 @@ import (
 	"time"
 )
 
-// Require skips the test unless Docker tests are enabled.
+// Require skips the test unless Docker tests are enabled
 func Require(t testing.TB) {
 	t.Helper()
 	if os.Getenv("FORGEDECK_TEST_DOCKER") != "1" {
@@ -20,7 +19,7 @@ func Require(t testing.TB) {
 	}
 }
 
-// RemoveImage deletes an image when the test ends, ignoring errors.
+// RemoveImage deletes an image when the test ends, ignoring errors
 func RemoveImage(t testing.TB, ref string) {
 	t.Helper()
 	t.Cleanup(func() {
@@ -28,8 +27,7 @@ func RemoveImage(t testing.TB, ref string) {
 	})
 }
 
-// StartRegistry runs a throwaway registry on a free local port and returns
-// its host:port. Docker allows plain HTTP to localhost registries.
+// StartRegistry runs a throwaway registry on a free local port and returns its host:port
 func StartRegistry(t testing.TB) string {
 	t.Helper()
 	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
@@ -63,16 +61,13 @@ func StartRegistry(t testing.TB) string {
 	}
 }
 
-// Postgres is a throwaway PostgreSQL server in a container.
+// Postgres is a throwaway PostgreSQL server in a container
 type Postgres struct {
-	// Container is the container's name, for `docker exec`.
 	Container string
-	// URL reaches the database "forgedeck" from this machine.
-	URL string
+	URL       string
 }
 
-// StartPostgres runs PostgreSQL 17 in a container with a database named
-// "forgedeck" and returns once it accepts connections.
+// StartPostgres runs PostgreSQL 17 in a container and returns once it accepts connections
 func StartPostgres(t testing.TB) Postgres {
 	t.Helper()
 	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
@@ -98,7 +93,6 @@ func StartPostgres(t testing.TB) Postgres {
 	for {
 		ready := exec.CommandContext(context.Background(), "docker", "exec", name, "pg_isready", "-U", "forgedeck", "-d", "forgedeck").Run() //nolint:gosec // see above
 		if ready == nil {
-			// pg_isready answers during the image's own bootstrap restart; a real query does not.
 			if exec.CommandContext(context.Background(), "docker", "exec", name, "psql", "-U", "forgedeck", "-d", "forgedeck", "-tAc", "SELECT 1").Run() == nil { //nolint:gosec // see above
 				break
 			}

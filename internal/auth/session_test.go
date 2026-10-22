@@ -108,7 +108,7 @@ func TestSessionEndsAtMaxLifetime(t *testing.T) {
 			t.Fatalf("day %d: %v", day, err)
 		}
 	}
-	f.clock.Advance(6*24*time.Hour + time.Second) // day 30 + 1s
+	f.clock.Advance(6*24*time.Hour + time.Second)
 	if err := f.authenticate(token); !errors.Is(err, auth.ErrInvalidSession) {
 		t.Fatalf("after 30 days: got %v, want ErrInvalidSession", err)
 	}

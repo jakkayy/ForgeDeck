@@ -10,7 +10,7 @@ import (
 
 const connectTimeout = 10 * time.Second
 
-// Connect opens a pgx connection pool and verifies it with a ping.
+// Connect opens a pgx connection pool and verifies it with a ping
 func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	poolCfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {

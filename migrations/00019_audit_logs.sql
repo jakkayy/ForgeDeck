@@ -1,13 +1,10 @@
 -- +goose Up
--- An append-only record of who did what. Rows are never updated; they are
--- removed only by the retention job. project_id has no foreign key on
--- purpose: deleting a project must not erase the record of who deleted it.
+-- Append-only audit record; no FK on project_id so deleting a project keeps the record.
 CREATE TABLE audit_logs (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id    uuid,
     actor_user_id uuid REFERENCES users (id) ON DELETE SET NULL,
-    -- Who, as text, so the record survives the user: an email address, or
-    -- "agent"/"runner"/"system" for non-human actors.
+    -- text, so the record survives the user; "agent"/"runner"/"system" for non-humans
     actor         text NOT NULL,
     action        text NOT NULL CHECK (action ~ '^[a-z_]+(\.[a-z_]+)+$'),
     target_type   text NOT NULL,

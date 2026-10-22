@@ -16,10 +16,7 @@ const (
 	maxReconnectDelay = 30 * time.Second
 )
 
-// Notifier holds one LISTEN connection per process and wakes in-memory
-// waiters when a job is queued for their key (a server ID or "runner").
-// A wake-up is only a hint to re-run the claim query; waiters must also
-// recheck on a timer in case a notification is missed.
+// Notifier holds one LISTEN connection and wakes waiters; a wake-up is a hint, waiters also recheck on a timer
 type Notifier struct {
 	pool   *pgxpool.Pool
 	logger *slog.Logger
@@ -28,14 +25,11 @@ type Notifier struct {
 	waiters map[string]map[chan struct{}]struct{}
 }
 
-// NewNotifier returns a Notifier; call Run to start listening.
 func NewNotifier(pool *pgxpool.Pool, logger *slog.Logger) *Notifier {
 	return &Notifier{pool: pool, logger: logger, waiters: map[string]map[chan struct{}]struct{}{}}
 }
 
-// Subscribe registers interest in key. The returned channel receives a value
-// (without blocking the Notifier) when a job for key may be available.
-// Callers must call unsubscribe when done.
+// Subscribe returns a channel signalled when a job for key may be available; call unsubscribe when done
 func (n *Notifier) Subscribe(key string) (wake <-chan struct{}, unsubscribe func()) {
 	ch := make(chan struct{}, 1)
 	n.mu.Lock()
@@ -55,8 +49,7 @@ func (n *Notifier) Subscribe(key string) (wake <-chan struct{}, unsubscribe func
 	}
 }
 
-// Run listens until ctx is cancelled, reconnecting with backoff. After a
-// reconnect every waiter is woken, since notifications may have been lost.
+// Run listens until ctx is cancelled, reconnecting with backoff and waking all waiters after a reconnect
 func (n *Notifier) Run(ctx context.Context) {
 	delay := minReconnectDelay
 	for ctx.Err() == nil {
@@ -80,7 +73,7 @@ func (n *Notifier) listen(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("acquire connection: %w", err)
 	}
-	// Take the connection out of the pool: it is held for as long as we listen.
+	// hold the connection out of the pool while listening
 	conn := pooled.Hijack()
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 

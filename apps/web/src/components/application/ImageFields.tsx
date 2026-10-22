@@ -10,7 +10,6 @@ type Props = {
   onChange: (value: ImageValue) => void;
 };
 
-/** Where an application's images are pushed: a registry and an image path. */
 export function ImageFields({ projectId, value, onChange }: Props) {
   const registries = useQuery(registriesQuery(projectId));
   const host = registries.data?.find((r) => r.id === value.registryId)?.host;

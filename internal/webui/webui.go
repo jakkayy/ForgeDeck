@@ -1,6 +1,4 @@
-// Package webui embeds the built dashboard (apps/web) into the API binary.
-// `make web` copies the Vite build into ./dist before `go build`; without it
-// the binary still builds and serves only the API.
+// Package webui embeds the built dashboard into the API binary
 package webui
 
 import (

@@ -3,7 +3,6 @@ import { useMutation } from "@tanstack/react-query";
 import { requestCredentialRotation } from "../api/servers";
 import type { Server } from "../api/types";
 
-/** Asks the Agent to replace its credential. The Agent does it within a heartbeat or two. */
 export function RotateCredentialButton({ server }: { server: Server }) {
   const rotate = useMutation({
     mutationFn: () => requestCredentialRotation(server.id),

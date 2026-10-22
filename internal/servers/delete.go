@@ -14,10 +14,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// Delete removes a server. Its Agent row goes with it, which revokes the
-// Agent credential immediately: the next Agent request gets 401, and a
-// pending long-poll claim is woken so it ends now rather than at its timeout.
-// Containers already running on the host are left untouched.
+// Delete removes a server and revokes its Agent credential at once; running containers are untouched
 func (s *Service) Delete(ctx context.Context, userID, serverID uuid.UUID) error {
 	if _, err := s.authorizeServer(ctx, userID, serverID, authz.ManageServers); err != nil {
 		return err

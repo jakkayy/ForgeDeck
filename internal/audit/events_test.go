@@ -13,7 +13,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
-// eventsOf returns the project's audit entries, newest first.
 func eventsOf(t *testing.T, client *apitest.Client, projectID uuid.UUID) []audit.Entry {
 	t.Helper()
 	var page httpx.List[audit.Entry]
@@ -81,12 +80,11 @@ func TestKeyActionsAreRecordedWithoutTheirSecrets(t *testing.T) {
 	if m := meta(t, find(entries, "member.add")[0]); m["role"] != "developer" {
 		t.Errorf("member.add metadata %v", m)
 	}
-	// An update records what it changed, not just what it touched.
 	if m := meta(t, find(entries, "project.update")[0]); m["name"] != "Shop Renamed" {
 		t.Errorf("project.update metadata %v", m)
 	}
 
-	// No secret, password, or token reaches the audit log in any form.
+	// no secret, password or token reaches the audit log in any form.
 	all, _ := json.Marshal(entries)
 	for _, forbidden := range []string{secretValue, "another-secret-value", registryPassword, token} {
 		if strings.Contains(string(all), forbidden) {
@@ -145,7 +143,7 @@ func TestSigningInIsRecordedUnderTheUsersEmail(t *testing.T) {
 	projectID := owner.CreateProject("Shop")
 	_ = userID
 
-	// Login is installation-level (no project), so read it from the table.
+	// login is installation-level (no project), so read it from the table.
 	var actor string
 	if err := env.Pool.QueryRow(t.Context(), `SELECT actor FROM audit_logs WHERE action = 'user.login' ORDER BY created_at DESC LIMIT 1`).Scan(&actor); err != nil {
 		t.Fatal(err)

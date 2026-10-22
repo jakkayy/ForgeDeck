@@ -19,12 +19,10 @@ type Handler struct {
 	logger *slog.Logger
 }
 
-// NewHandler returns Git connection endpoints.
 func NewHandler(svc *Service, logger *slog.Logger) *Handler {
 	return &Handler{svc: svc, logger: logger}
 }
 
-// Routes mounts the endpoints that need a signed-in user.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/projects/{projectID}/git-connections", httpx.Handle(h.list))
 	r.Post("/projects/{projectID}/git-connections/github", httpx.Handle(h.startGitHub))
@@ -33,9 +31,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/git-connections/{connectionID}/repositories", httpx.Handle(h.repositories))
 }
 
-// PublicRoutes mounts the GitHub setup callback. It runs without a session
-// cookie: GitHub's redirect is a cross-site navigation, so the SameSite=Strict
-// cookie is not sent. The sealed state identifies the user instead.
+// PublicRoutes mounts the GitHub callback; no session cookie (cross-site redirect), the sealed state identifies the user
 func (h *Handler) PublicRoutes(r chi.Router) {
 	r.Get("/git/github/setup", h.gitHubSetup)
 }
@@ -109,8 +105,7 @@ func (h *Handler) repositories(w http.ResponseWriter, r *http.Request) error {
 	return httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": repos})
 }
 
-// gitHubSetup finishes an install and sends the browser back to the project
-// page, with ?git=connected or ?git_error=<code>.
+// gitHubSetup finishes an install and redirects to the project page
 func (h *Handler) gitHubSetup(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	projectID, err := h.svc.CompleteGitHubInstall(r.Context(), GitHubCallback{

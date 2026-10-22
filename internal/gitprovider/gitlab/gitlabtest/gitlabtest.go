@@ -13,14 +13,12 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/gitprovider/gitlab"
 )
 
-// Token is an access token the fake accepts.
 type Token struct {
 	Username string
 	Scopes   []string
 	Projects []gitlab.Project
 }
 
-// Hook is a webhook registered through the fake.
 type Hook struct {
 	ID        int64
 	ProjectID int64
@@ -28,7 +26,6 @@ type Hook struct {
 	Token     string
 }
 
-// Server fakes the parts of the GitLab API ForgeDeck uses.
 type Server struct {
 	*httptest.Server
 	mu      sync.Mutex
@@ -38,7 +35,6 @@ type Server struct {
 	nextID  int64
 }
 
-// New starts a fake GitLab that is closed when the test ends.
 func New(t testing.TB) *Server {
 	t.Helper()
 	s := &Server{tokens: map[string]Token{}, hooks: map[int64]Hook{}, commits: map[string]gitlab.Commit{}}
@@ -47,7 +43,6 @@ func New(t testing.TB) *Server {
 	return s
 }
 
-// Hooks returns the webhooks currently registered.
 func (s *Server) Hooks() []Hook {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -58,14 +53,12 @@ func (s *Server) Hooks() []Hook {
 	return hooks
 }
 
-// AddCommit makes ref (a branch or SHA) resolve to commit in a project.
 func (s *Server) AddCommit(projectID int64, ref string, commit gitlab.Commit) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.commits[strconv.FormatInt(projectID, 10)+":"+ref] = commit
 }
 
-// AddToken makes value a valid token.
 func (s *Server) AddToken(value string, token Token) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

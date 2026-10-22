@@ -1,5 +1,4 @@
-// Package registries manages the container registries a project's
-// applications push images to.
+// Package registries manages the container registries a project pushes images to.
 package registries
 
 import (
@@ -29,17 +28,15 @@ const (
 )
 
 var (
-	// errRegistryNotFound also covers registries in projects the user cannot see.
+	// errRegistryNotFound also covers registries in projects the user cannot see
 	errRegistryNotFound = apperr.NotFound("Registry not found.")
 	errNameTaken        = validate.Errors{"name": "Another registry in this project already uses this name."}
 
-	// validHost is a registry hostname with an optional port, as Docker
-	// expects it in an image reference (no scheme, no path).
+	// validHost is a hostname with optional port, as Docker expects (no scheme, no path)
 	validHost = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:[0-9]{1,5})?$`)
 )
 
-// Registry is the API view of a registry connection. The password never
-// leaves the server.
+// Registry is the API view of a registry connection; the password never leaves the server
 type Registry struct {
 	ID        uuid.UUID `json:"id"`
 	ProjectID uuid.UUID `json:"project_id"`
@@ -49,26 +46,22 @@ type Registry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Credentials authenticate a push to a registry.
 type Credentials struct {
 	Host     string
 	Username string
 	Password string
 }
 
-// Service implements registry connection operations.
 type Service struct {
 	queries *store.Queries
 	authz   *authz.Authorizer
 	keyring *keyring.Keyring
 }
 
-// NewService returns a registry Service.
 func NewService(queries *store.Queries, authorizer *authz.Authorizer, ring *keyring.Keyring) *Service {
 	return &Service{queries: queries, authz: authorizer, keyring: ring}
 }
 
-// List returns the project's registries by name.
 func (s *Service) List(ctx context.Context, userID, projectID uuid.UUID) ([]Registry, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ViewProject); err != nil {
 		return nil, err
@@ -84,7 +77,6 @@ func (s *Service) List(ctx context.Context, userID, projectID uuid.UUID) ([]Regi
 	return registries, nil
 }
 
-// CreateInput describes a new registry connection.
 type CreateInput struct {
 	Name     string
 	Host     string
@@ -92,8 +84,7 @@ type CreateInput struct {
 	Password string
 }
 
-// Create stores a registry with its password encrypted. The credentials are
-// not checked here: the Runner's first push does that, from the build host.
+// Create stores a registry with its password encrypted; credentials are checked by the Runner's first push
 func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in CreateInput) (Registry, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ManageApps); err != nil {
 		return Registry{}, err
@@ -120,7 +111,6 @@ func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in Cr
 	return toRegistry(row), nil
 }
 
-// Delete removes a registry and its stored password.
 func (s *Service) Delete(ctx context.Context, userID, registryID uuid.UUID) error {
 	if _, err := s.authorize(ctx, userID, registryID, authz.ManageApps); err != nil {
 		return err
@@ -135,8 +125,7 @@ func (s *Service) Delete(ctx context.Context, userID, registryID uuid.UUID) erro
 	return nil
 }
 
-// CheckInProject reports errRegistryNotFound unless the registry belongs to
-// projectID. Callers have already authorized the user in that project.
+// CheckInProject reports errRegistryNotFound unless the registry belongs to projectID
 func (s *Service) CheckInProject(ctx context.Context, projectID, registryID uuid.UUID) error {
 	row, err := s.queries.GetRegistryConnection(ctx, registryID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.ProjectID != projectID) {
@@ -148,9 +137,7 @@ func (s *Service) CheckInProject(ctx context.Context, projectID, registryID uuid
 	return nil
 }
 
-// Credentials decrypts a registry's push credentials. It does no user
-// authorization; it is for the Control Plane's own use when handing a build
-// to a Runner.
+// Credentials decrypts push credentials; no user authorization, for handing a build to a Runner
 func (s *Service) Credentials(ctx context.Context, registryID uuid.UUID) (Credentials, error) {
 	row, err := s.queries.GetRegistryConnection(ctx, registryID)
 	if err != nil {
@@ -180,7 +167,7 @@ func (s *Service) authorize(ctx context.Context, userID, registryID uuid.UUID, p
 	return row, nil
 }
 
-// normalizeHost accepts what users paste: "https://ghcr.io/" becomes "ghcr.io".
+// normalizeHost turns "https://ghcr.io/" into "ghcr.io"
 func normalizeHost(raw string) string {
 	host := strings.ToLower(strings.TrimSpace(raw))
 	host = strings.TrimPrefix(strings.TrimPrefix(host, "https://"), "http://")
@@ -204,7 +191,6 @@ func checkInput(in CreateInput) error {
 	return errs.Err()
 }
 
-// passwordAAD binds a password's ciphertext to its registry row.
 func passwordAAD(id uuid.UUID) []byte {
 	return []byte("registry_connection:" + id.String() + ":password")
 }

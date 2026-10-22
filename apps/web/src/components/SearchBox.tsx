@@ -7,7 +7,6 @@ type Props = {
   onChange: (value: string) => void;
 };
 
-/** A search field with a clear button; the page decides when to ask the API. */
 export function SearchBox({ label, placeholder, value, onChange }: Props) {
   return (
     <SearchField aria-label={label} value={value} onChange={onChange} className="w-full sm:w-64">

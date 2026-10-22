@@ -1,5 +1,4 @@
-// Package runner builds images on a dedicated build host. It claims build
-// jobs from the Control Plane over the shared worker protocol.
+// Package runner builds images on a dedicated build host
 package runner
 
 import (
@@ -20,8 +19,7 @@ type Config struct {
 	Version         string
 }
 
-// Run sends heartbeats and runs claimed jobs with handlers until ctx ends or
-// the Runner is deleted on the Control Plane.
+// Run sends heartbeats and runs claimed jobs until ctx ends or the Runner is deleted
 func Run(ctx context.Context, cfg Config, handlers map[string]worker.Handler, status worker.StatusFunc, logger *slog.Logger) error {
 	client := worker.NewClient(cfg.ControlPlaneURL, worker.RunnerAPI, cfg.Credential)
 	heartbeater := worker.NewHeartbeater(client, cfg.Version, status, logger)

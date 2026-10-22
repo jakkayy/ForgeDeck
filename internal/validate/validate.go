@@ -1,5 +1,4 @@
-// Package validate collects field-level validation failures in a transport-
-// neutral form, so services can reject input without knowing about HTTP.
+// Package validate collects field-level validation failures in a transport-neutral form
 package validate
 
 import (

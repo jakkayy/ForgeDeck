@@ -19,8 +19,7 @@ const (
 	maxContainerLabels = 64
 	maxLabelBytes      = 1024
 	maxContainerText   = 512
-	// clockSkewTolerance is how far ahead of the Control Plane an Agent's
-	// clock may be before observed_at is clamped to the receive time.
+	// clockSkewTolerance is how far ahead an Agent clock may be before observed_at is clamped
 	clockSkewTolerance = 30 * time.Second
 )
 
@@ -32,14 +31,12 @@ var (
 	}
 )
 
-// ApplySnapshot replaces the server's stored containers with snapshot unless
-// a newer snapshot was already stored. It reports whether it was applied.
+// ApplySnapshot replaces the stored containers unless a newer snapshot exists; reports if applied
 func (s *Service) ApplySnapshot(ctx context.Context, identity AgentIdentity, snapshot agentproto.ContainerSnapshot) (bool, error) {
 	if err := validateSnapshot(snapshot); err != nil {
 		return false, err
 	}
-	// PostgreSQL stores microseconds; truncate so comparisons with the stored
-	// time are exact.
+	// PostgreSQL stores microseconds; truncate so comparisons are exact
 	receivedAt := s.now().Truncate(time.Microsecond)
 	observedAt := snapshot.ObservedAt.Truncate(time.Microsecond)
 	if observedAt.After(receivedAt.Add(clockSkewTolerance)) {

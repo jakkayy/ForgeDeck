@@ -1,5 +1,4 @@
-// Package builds connects build jobs to the services they depend on: it
-// mints the credentials a Runner needs for one build attempt.
+// Package builds connects build jobs to the services they depend on
 package builds
 
 import (
@@ -16,7 +15,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// Error is a build that cannot start, with a code and message for users.
+// Error is a build that cannot start, with a code and message for users
 type Error struct {
 	Code    string
 	Message string
@@ -31,22 +30,19 @@ var (
 	errNoRegistry      = &Error{Code: "build_credentials_unavailable", Message: "ForgeDeck could not read the registry credentials for this build. Check the application's registry."}
 )
 
-// Credentials mints build credentials at claim time.
+// Credentials mints build credentials at claim time
 type Credentials struct {
 	queries    *store.Queries
 	git        *gitconn.Service
 	registries *registries.Service
 }
 
-// NewCredentials returns a Credentials minter.
+// NewCredentials returns a Credentials minter
 func NewCredentials(queries *store.Queries, git *gitconn.Service, registryService *registries.Service) *Credentials {
 	return &Credentials{queries: queries, git: git, registries: registryService}
 }
 
-// Mint returns the credentials for one attempt of the build described by
-// payload. The image destination is read from the application now, so a
-// queued build pushes where the application currently points. Errors that
-// users can act on are *Error; others are internal.
+// Mint returns the credentials for one attempt of the build described by payload
 func (c *Credentials) Mint(ctx context.Context, payload json.RawMessage) (*agentproto.BuildCredentials, error) {
 	var build agentproto.BuildPayload
 	if err := json.Unmarshal(payload, &build); err != nil {

@@ -24,10 +24,7 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
-/**
- * Calls the ForgeDeck API on the same origin. The session cookie is sent
- * automatically; there is no token handling in the browser.
- */
+/** Calls the ForgeDeck API on the same origin; the session cookie is sent automatically. */
 export async function api<T>(
   path: string,
   { method = "GET", body, signal }: RequestOptions = {},

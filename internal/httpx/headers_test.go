@@ -46,7 +46,7 @@ func TestContentSecurityPolicyForbidsInlineAndForeignContent(t *testing.T) {
 		name, value, _ := strings.Cut(strings.TrimSpace(d), " ")
 		directives[name] = value
 	}
-	// Inline styles are refused except the one react-aria text, named by hash.
+	// inline styles are refused except the one react-aria text, named by hash.
 	if style := directives["style-src"]; !strings.HasPrefix(style, "'self' 'sha256-") || strings.Count(style, "'sha256-") != 1 {
 		t.Errorf("style-src = %q, want 'self' and exactly one hash", style)
 	}

@@ -1,6 +1,4 @@
-// Package keyring encrypts stored credentials with AES-256-GCM. Keys come
-// from configuration, never the database, and carry an ID so ciphertext
-// written with an older key can still be opened after rotation.
+// Package keyring encrypts stored credentials with AES-256-GCM using keys from configuration.
 package keyring
 
 import (
@@ -18,17 +16,14 @@ const keyBytes = 32
 
 var validKeyID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
 
-// ErrUnknownKey means ciphertext was sealed with a key that is not configured.
 var ErrUnknownKey = errors.New("ciphertext was encrypted with an unknown key")
 
-// Keyring holds the active key and any older keys still needed for reading.
 type Keyring struct {
 	activeID string
 	keys     map[string]cipher.AEAD
 }
 
-// Parse reads "id:base64key[,id:base64key...]". The first key is used for new
-// ciphertext; the rest only decrypt. Generate a key with: openssl rand -base64 32
+// Parse reads "id:base64key[,...]"; the first key seals, the rest only open
 func Parse(spec string) (*Keyring, error) {
 	ring := &Keyring{keys: map[string]cipher.AEAD{}}
 	for i, entry := range strings.Split(spec, ",") {
@@ -59,9 +54,7 @@ func Parse(spec string) (*Keyring, error) {
 	return ring, nil
 }
 
-// Seal encrypts plaintext with the active key. aad binds the ciphertext to
-// its owner (for example "git_connection:<id>:token"), so it cannot be
-// copied into another row and decrypted there.
+// Seal encrypts plaintext with the active key; aad binds it to its owner so it cannot be moved to another row
 func (k *Keyring) Seal(plaintext, aad []byte) (ciphertext []byte, keyID string) {
 	aead := k.keys[k.activeID]
 	nonce := make([]byte, aead.NonceSize())
@@ -69,7 +62,6 @@ func (k *Keyring) Seal(plaintext, aad []byte) (ciphertext []byte, keyID string) 
 	return aead.Seal(nonce, nonce, plaintext, aad), k.activeID
 }
 
-// Open decrypts ciphertext produced by Seal with keyID and the same aad.
 func (k *Keyring) Open(ciphertext []byte, keyID string, aad []byte) ([]byte, error) {
 	aead, ok := k.keys[keyID]
 	if !ok {

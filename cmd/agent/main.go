@@ -1,10 +1,4 @@
-// Command agent runs the ForgeDeck Agent on a Docker host.
-//
-// Usage:
-//
-//	forgedeck-agent enroll --url https://forgedeck.example.com
-//	    (prompts for the token; or pipe it on stdin / set FORGEDECK_ENROLLMENT_TOKEN)
-//	forgedeck-agent run
+// Command agent runs the ForgeDeck Agent on a Docker host
 package main
 
 import (
@@ -118,9 +112,7 @@ func runAgent(ctx context.Context, args []string) error {
 	return agent.Run(ctx, identity, state, version, handlers, engine, logger)
 }
 
-// enrollmentToken reads the token from the environment, a hidden terminal
-// prompt, or piped stdin, never from arguments, so it does not end up in
-// shell history or process listings.
+// enrollmentToken reads the token from env, a hidden prompt or stdin, never from arguments
 func enrollmentToken(stdin *os.File) (string, error) {
 	if token := strings.TrimSpace(os.Getenv("FORGEDECK_ENROLLMENT_TOKEN")); token != "" {
 		return token, nil

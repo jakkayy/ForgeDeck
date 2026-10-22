@@ -24,8 +24,7 @@ import (
 // errConnectionNotFound also covers connections in projects the user cannot see.
 var errConnectionNotFound = apperr.NotFound("Git connection not found.")
 
-// Connection is a project's link to a Git provider. Credentials never leave
-// the server.
+// Connection is a project's link to a Git provider; credentials never leave the server
 type Connection struct {
 	ID          uuid.UUID `json:"id"`
 	ProjectID   uuid.UUID `json:"project_id"`
@@ -60,7 +59,6 @@ type Deps struct {
 	Now       func() time.Time
 }
 
-// NewService returns a Service.
 func NewService(d Deps) *Service {
 	return &Service{
 		pool: d.Pool, queries: store.New(d.Pool), authz: d.Authz, keyring: d.Keyring, github: d.GitHub,
@@ -125,13 +123,10 @@ func toConnection(row store.GitConnection) Connection {
 	}
 }
 
-// ErrNoWebhookSecret means the connection does not exist or has no
-// per-connection webhook secret (GitHub uses the App-wide one).
+// ErrNoWebhookSecret means the connection has no per-connection webhook secret
 var ErrNoWebhookSecret = errors.New("connection has no webhook secret")
 
-// GitLabWebhookSecret returns the secret GitLab sends in X-Gitlab-Token for
-// a connection. It is used by the unauthenticated webhook endpoint, so it
-// does no user authorization.
+// GitLabWebhookSecret returns the X-Gitlab-Token secret; used by the unauthenticated webhook, no user authorization
 func (s *Service) GitLabWebhookSecret(ctx context.Context, connectionID uuid.UUID) (string, error) {
 	row, err := s.queries.GetGitConnection(ctx, connectionID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.Provider != "gitlab") {

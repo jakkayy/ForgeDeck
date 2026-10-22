@@ -58,7 +58,6 @@ func TestBlockedAndFailCountOnlyFailures(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	l := New(10*time.Second, 3, func() time.Time { return now })
 
-	// Successful work consumes nothing: checking never uses a token.
 	for range 10 {
 		if blocked, _ := l.Blocked("1.2.3.4"); blocked {
 			t.Fatal("blocked before any failure")
@@ -75,7 +74,6 @@ func TestBlockedAndFailCountOnlyFailures(t *testing.T) {
 		t.Fatal("another key was blocked")
 	}
 
-	// Further failures do not extend the block beyond what the bucket holds.
 	l.Fail("1.2.3.4")
 	l.Fail("1.2.3.4")
 	now = now.Add(10 * time.Second)

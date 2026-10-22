@@ -11,8 +11,7 @@ CREATE TABLE servers (
     UNIQUE (project_id, name)
 );
 
--- One Agent identity per server. Deleting the server deletes the Agent,
--- which revokes its credential.
+-- One Agent identity per server; deleting the server revokes its credential.
 CREATE TABLE agents (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     server_id       uuid NOT NULL UNIQUE REFERENCES servers (id) ON DELETE CASCADE,

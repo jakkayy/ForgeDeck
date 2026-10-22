@@ -15,15 +15,13 @@ const (
 	maxPageLimit     = 100
 )
 
-// Page is a parsed ?limit=&cursor= pair. The cursor is opaque to clients;
-// for offset-paginated lists it encodes the next offset.
+// Page is a parsed ?limit=&cursor= pair; the cursor is opaque to clients
 type Page struct {
 	Limit  int32
 	Offset int32
 }
 
-// ParseLimit reads ?limit=, applying the default and maximum. Endpoints with
-// keyset cursors use it directly and decode their own cursor.
+// ParseLimit reads ?limit= with default and maximum
 func ParseLimit(r *http.Request) (int32, error) {
 	raw := r.URL.Query().Get("limit")
 	if raw == "" {
@@ -36,7 +34,6 @@ func ParseLimit(r *http.Request) (int32, error) {
 	return int32(min(limit, maxPageLimit)), nil //nolint:gosec // clamped to maxPageLimit
 }
 
-// ParsePage reads limit and an offset cursor, applying defaults and bounds.
 func ParsePage(r *http.Request) (Page, error) {
 	limit, err := ParseLimit(r)
 	if err != nil {
@@ -59,8 +56,6 @@ type List[T any] struct {
 	NextCursor *string `json:"next_cursor"`
 }
 
-// NewList builds a List from rows fetched with page; a full page implies there
-// may be more.
 func NewList[T any](items []T, page Page) List[T] {
 	list := List[T]{Items: items}
 	if int32(len(items)) == page.Limit { //nolint:gosec // len is bounded by Limit
@@ -70,15 +65,13 @@ func NewList[T any](items []T, page Page) List[T] {
 	return list
 }
 
-// EncodeTimeCursor makes the opaque keyset cursor for a list ordered by
-// (created_at, id) newest first: the position after the last row of a page.
+// EncodeTimeCursor makes the keyset cursor for lists ordered by (created_at, id) newest first
 func EncodeTimeCursor(createdAt time.Time, id uuid.UUID) string {
 	raw := strconv.FormatInt(createdAt.UnixMicro(), 10) + "_" + id.String()
 	return base64.RawURLEncoding.EncodeToString([]byte(raw))
 }
 
-// DecodeTimeCursor parses a cursor from EncodeTimeCursor. An empty string is
-// the first page (ok, with a nil position).
+// DecodeTimeCursor parses a cursor from EncodeTimeCursor; empty is the first page
 func DecodeTimeCursor(s string) (createdAt *time.Time, id *uuid.UUID, ok bool) {
 	if s == "" {
 		return nil, nil, true
@@ -97,12 +90,10 @@ func DecodeTimeCursor(s string) (createdAt *time.Time, id *uuid.UUID, ok bool) {
 	return &t, &parsed, true
 }
 
-// maxSearchLength bounds ?q= so a filter cannot be used to send large patterns.
+// maxSearchLength bounds ?q=
 const maxSearchLength = 100
 
-// ParseSearch reads ?q=, a case-insensitive "contains" filter. It returns nil
-// when there is none. LIKE wildcards in the text are escaped, so the user's
-// input only ever matches itself.
+// ParseSearch reads ?q= as a case-insensitive contains filter; LIKE wildcards are escaped
 func ParseSearch(r *http.Request) (*string, error) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q == "" {

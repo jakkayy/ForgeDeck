@@ -9,9 +9,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 )
 
-// TestServersAreInvisibleAcrossProjects checks that an admin of one project
-// cannot see or operate another project's server through any endpoint, and
-// gets 404 rather than 403 so server IDs cannot be probed.
+// TestServersAreInvisibleAcrossProjects: another project's admin gets 404, not 403, everywhere.
 func TestServersAreInvisibleAcrossProjects(t *testing.T) {
 	env := apitest.New(t)
 	owner, _ := env.NewUser("owner@example.com")
@@ -47,7 +45,6 @@ func TestServersAreInvisibleAcrossProjects(t *testing.T) {
 		t.Fatalf("intruder lists %d foreign servers", len(visible.Items))
 	}
 
-	// The server is untouched and still works for its owner.
 	owner.Do(http.MethodGet, server, nil).RequireStatus(http.StatusOK)
 	var jobs int
 	if err := env.Pool.QueryRow(t.Context(), "SELECT count(*) FROM jobs").Scan(&jobs); err != nil || jobs != 0 {

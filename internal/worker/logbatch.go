@@ -9,8 +9,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 )
 
-// logBatcher numbers job output lines and sends them in batches, so a
-// chatty job does not make one request per line.
+// logBatcher numbers output lines and sends them in batches
 type logBatcher struct {
 	ctx    context.Context
 	client *Client

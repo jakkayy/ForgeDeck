@@ -42,7 +42,6 @@ fi
 
 target_db=$(db_name)
 
-# Counts that say "this is a ForgeDeck database with data in it".
 summarize() {
   local database=$1
   for table in users projects servers applications environments releases audit_logs; do

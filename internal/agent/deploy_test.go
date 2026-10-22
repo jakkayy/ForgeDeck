@@ -22,15 +22,13 @@ import (
 
 const testImage = "ghcr.io/acme/shop-api@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
-// fakeDocker records commands and fails the ones a test names.
 type fakeDocker struct {
-	mu       sync.Mutex
-	commands []procexec.Command
-	failOn   string // a word that must appear in the command's arguments
-	// dockerConfigs holds what DOCKER_CONFIG contained when login ran.
+	mu         sync.Mutex
+	commands   []procexec.Command
+	failOn     string // a word that must appear in the command's arguments
 	loginStdin string
 	env        []string
-	// inspectOut is what `docker inspect` prints; empty means a running container.
+	// inspectOut is what `docker inspect` prints; empty means running.
 	inspectOut string
 }
 
@@ -84,7 +82,6 @@ func (f *fakeDocker) inspect() string {
 	return "running false 0 "
 }
 
-// count returns how many recorded commands contain word in their arguments.
 func (f *fakeDocker) count(word string) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -97,11 +94,9 @@ func (f *fakeDocker) count(word string) int {
 	return n
 }
 
-// composeBaseArgs is how many arguments precede the subcommand:
-// compose --project-name P --file F --project-directory D.
+// composeBaseArgs is how many arguments precede the compose subcommand.
 const composeBaseArgs = 7
 
-// subcommands summarizes the recorded commands, such as "compose pull".
 func (f *fakeDocker) subcommands() []string {
 	var out []string
 	for _, c := range f.commands {
@@ -134,8 +129,7 @@ func (l *logRecorder) String() string {
 	return strings.Join(l.lines, "\n")
 }
 
-// fakeClock makes sleeping instantaneous while still advancing time, so
-// health-check timeouts can be tested without waiting.
+// fakeClock makes sleeping instant but advances time, so health-check timeouts run fast.
 type fakeClock struct{ t time.Time }
 
 func (c *fakeClock) now() time.Time { return c.t }
@@ -144,7 +138,6 @@ func (c *fakeClock) sleep(_ context.Context, d time.Duration) error {
 	return nil
 }
 
-// passingProbes answers every host probe with ok, recording how often it was asked.
 type passingProbes struct {
 	mu     sync.Mutex
 	http   []string
@@ -236,7 +229,6 @@ func TestDeployPullsThenStartsAndReportsTheContainer(t *testing.T) {
 		}
 	}
 
-	// The compose file is in place for the environment and names the digest.
 	composeFile := filepath.Join(d.dir, payload.EnvironmentID.String(), "compose.yml")
 	data, err := os.ReadFile(composeFile)
 	if err != nil || !strings.Contains(string(data), testImage) {
@@ -245,11 +237,10 @@ func TestDeployPullsThenStartsAndReportsTheContainer(t *testing.T) {
 	if info, _ := os.Stat(composeFile); info.Mode().Perm() != 0o600 {
 		t.Fatalf("compose file mode %v", info.Mode().Perm())
 	}
-	// Registry logins happen in the job's own Docker config, not the Agent's.
+	// registry logins use the job's own Docker config, not the Agent's.
 	if cfg := envValue(fake.env, "DOCKER_CONFIG"); !strings.HasPrefix(cfg, d.dir+string(filepath.Separator)+"job-") {
 		t.Fatalf("DOCKER_CONFIG %q is not job-private", cfg)
 	}
-	// Nothing of the job outlives it: no scratch directory, no registry login.
 	entries, _ := os.ReadDir(d.dir)
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), "job-") {
@@ -333,8 +324,6 @@ func envValue(env []string, key string) string {
 	return ""
 }
 
-// healthJob is a deploy job with the given health check and, optionally, a
-// previous release to restore.
 func healthJob(t *testing.T, check servicecfg.HealthCheck, previous *agentproto.PreviousRelease) *agentproto.Job {
 	t.Helper()
 	job, payload := deployJob(t, nil)
@@ -397,7 +386,6 @@ func TestUnhealthyServiceWithoutPreviousReleaseIsStopped(t *testing.T) {
 func TestUnhealthyServiceRestoresThePreviousRelease(t *testing.T) {
 	previous := previousRelease()
 	fake := &fakeDocker{}
-	// The new version never answers; the restored one does.
 	probes := &passingProbes{}
 	probes.failFn = func() error {
 		if fake.count("up --detach") >= 2 {
@@ -417,14 +405,13 @@ func TestUnhealthyServiceRestoresThePreviousRelease(t *testing.T) {
 	if fake.count("up --detach") != 2 || fake.count(" stop") != 0 {
 		t.Fatalf("commands %v", fake.subcommands())
 	}
-	// The restored release's image is what the Compose file names now.
 	var payload agentproto.DeployImagePayload
 	_ = json.Unmarshal(job.Payload, &payload)
 	data, readErr := os.ReadFile(filepath.Join(d.dir, payload.EnvironmentID.String(), "compose.yml"))
 	if readErr != nil || !strings.Contains(string(data), previous.ImageRef) {
 		t.Fatalf("compose file after restore: %v\n%s", readErr, data)
 	}
-	// Restoring tolerates an image that is already local, even if the pull fails.
+	// restoring tolerates a local image even if the pull fails.
 	if fake.count("pull --ignore-pull-failures") != 1 {
 		t.Fatalf("commands %v", fake.subcommands())
 	}
@@ -457,7 +444,7 @@ func TestContainerThatExitsFailsImmediately(t *testing.T) {
 }
 
 func TestDockerHealthCheckNeedsAnImageHealthcheck(t *testing.T) {
-	fake := &fakeDocker{} // no health status reported
+	fake := &fakeDocker{}
 	job := healthJob(t, servicecfg.HealthCheck{Type: servicecfg.HealthDocker, TimeoutSeconds: 4, IntervalSeconds: 2}, nil)
 	log := &logRecorder{}
 	if _, err := newTestDeployer(t, fake).handle(context.Background(), job, log); err == nil {
@@ -518,7 +505,6 @@ func TestSecretsReachComposeThroughTheEnvironmentOnly(t *testing.T) {
 	if _, err := d.handle(context.Background(), job, &logRecorder{}); err != nil {
 		t.Fatal(err)
 	}
-	// Every compose command gets exactly the secrets the release lists.
 	for _, c := range fake.commands {
 		if len(c.Args) > 0 && c.Args[0] == "compose" && len(c.Args) > composeBaseArgs {
 			if strings.Join(c.Env, " ") != "DATABASE_PASSWORD=db-secret-value" {
@@ -529,7 +515,6 @@ func TestSecretsReachComposeThroughTheEnvironmentOnly(t *testing.T) {
 			t.Fatalf("secret in arguments: %v", c.Args)
 		}
 	}
-	// The file on disk refers to the secret and never holds it.
 	data, err := os.ReadFile(filepath.Join(d.dir, payload.EnvironmentID.String(), "compose.yml"))
 	if err != nil || !strings.Contains(string(data), "${DATABASE_PASSWORD}") || strings.Contains(string(data), "db-secret-value") {
 		t.Fatalf("compose file: %v\n%s", err, data)

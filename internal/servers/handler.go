@@ -10,8 +10,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
-// Handler serves the user-facing server endpoints. Routes must be mounted
-// behind auth.RequireUser.
+// Handler serves the user-facing server endpoints
 type Handler struct {
 	svc *Service
 }
@@ -90,8 +89,7 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// requestRotation asks the server's Agent to replace its credential at its
-// next heartbeat. It returns at once; the Agent does the work.
+// requestRotation asks the server's Agent to replace its credential at its next heartbeat
 func (h *Handler) requestRotation(w http.ResponseWriter, r *http.Request) error {
 	serverID, err := httpx.UUIDParam(r, "serverID")
 	if err != nil {

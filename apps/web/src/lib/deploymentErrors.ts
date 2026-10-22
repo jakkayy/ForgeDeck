@@ -1,7 +1,5 @@
-/** What a deployment failure means and what to do about it, by error code. */
 export type DeploymentErrorHelp = {
   title: string;
-  /** Concrete steps, most likely first. */
   steps: string[];
 };
 

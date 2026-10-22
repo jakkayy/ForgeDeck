@@ -13,15 +13,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// AutoDeploy is a jobs.SuccessHook: when a build succeeds, it queues a
-// deployment into every environment of the application that opted in with
-// auto_deploy. It runs in the transaction that records the build's outcome.
-//
-// Builds of an explicit older commit are not deployed, and neither is a
-// build older than what the environment already deploys, because builds can
-// finish out of order. A failure in one environment (say, an invalid stored
-// configuration) is logged and isolated in a savepoint; it never fails the
-// build or the other environments.
+// AutoDeploy is a jobs.SuccessHook
 func (s *Service) AutoDeploy(logger *slog.Logger) func(context.Context, pgx.Tx, store.Job) error {
 	return func(ctx context.Context, tx pgx.Tx, job store.Job) error {
 		if job.Type != agentproto.JobBuild || job.ApplicationID == nil {
@@ -86,7 +78,7 @@ func (s *Service) autoDeployOne(ctx context.Context, tx pgx.Tx, env store.Enviro
 	if err != nil {
 		return err
 	}
-	// Recorded in the same transaction, so the event exists exactly when the deployment does.
+	// recorded in the same transaction, so the event exists exactly when the deployment does
 	s.audit.RecordIn(ctx, sp, audit.Event{
 		ProjectID: &app.ProjectID, Actor: audit.ActorSystem, Action: "deployment.start", TargetType: "environment",
 		TargetID: env.ID.String(), TargetName: env.Name,

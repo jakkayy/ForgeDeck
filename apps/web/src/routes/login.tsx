@@ -20,7 +20,6 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-/** Sign-in, or, on a new installation with no account yet, creating the first one. */
 function LoginPage() {
   const setup = useQuery(setupQuery);
   return setup.data ? <CreateFirstAccount /> : <SignIn />;
@@ -87,11 +86,7 @@ function SignIn() {
   );
 }
 
-/**
- * Shown only while no account exists. Whoever gets here first becomes the
- * owner, and the API refuses a second registration, so the page disappears for
- * good after the first account is made.
- */
+/** Shown only while no account exists; the API refuses a second registration. */
 function CreateFirstAccount() {
   const { redirect: next } = Route.useSearch();
   const navigate = useNavigate();
@@ -106,7 +101,6 @@ function CreateFirstAccount() {
       navigate({ to: next ?? "/" });
     },
     onError: (error) => {
-      // Someone else registered first: this page is no longer right.
       if (isApiError(error, 409)) {
         queryClient.setQueryData(setupQuery.queryKey, false);
       }

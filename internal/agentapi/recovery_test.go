@@ -7,14 +7,12 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 )
 
-// TestLostAttemptIsRetriedAndItsLateResultRejected follows a job whose Agent
-// vanishes mid-attempt: the lease expires, recovery requeues the job, the
-// next attempt finishes it, and the first attempt's late result is refused.
+// TestLostAttemptIsRetriedAndItsLateResultRejected: a lost attempt's late result is refused.
 func TestLostAttemptIsRetriedAndItsLateResultRejected(t *testing.T) {
 	f := newClaimFixture(t)
-	jobID := f.enqueue(t, f.agent.ServerID) // container_action: one attempt by policy
+	jobID := f.enqueue(t, f.agent.ServerID)
 
-	// Retry needs a job type that allows it; fetch_logs gets two attempts.
+	// fetch_logs allows two attempts; container_action allows one.
 	if _, err := f.env.Pool.Exec(t.Context(), "UPDATE jobs SET type = $1, max_attempts = 2 WHERE id = $2",
 		agentproto.JobFetchLogs, jobID); err != nil {
 		t.Fatal(err)
@@ -22,7 +20,6 @@ func TestLostAttemptIsRetriedAndItsLateResultRejected(t *testing.T) {
 
 	var first agentproto.Job
 	claim(f.agent, 0).RequireStatus(http.StatusOK).Decode(&first)
-	// The Agent disappears: no renewals until the lease runs out.
 	if _, err := f.env.Pool.Exec(t.Context(), "UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = $1", jobID); err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +34,7 @@ func TestLostAttemptIsRetriedAndItsLateResultRejected(t *testing.T) {
 	}
 	complete(f.agent, second, agentproto.CompleteRequest{Outcome: agentproto.OutcomeSucceeded}).RequireStatus(http.StatusNoContent)
 
-	// The first attempt comes back late; its result must not overwrite the retry's.
+	// the late result must not overwrite the retry's.
 	late := complete(f.agent, first, agentproto.CompleteRequest{Outcome: agentproto.OutcomeFailed, ErrorCode: "late"})
 	if late.Status != http.StatusConflict || late.ErrorCode() != "lease_lost" {
 		t.Fatalf("late result: %d %s", late.Status, late.Body)

@@ -23,8 +23,7 @@ var (
 	errImageNotSet         = apperr.Conflict("no_image_destination", "Choose a registry and image for this application before building it.")
 )
 
-// NewJob describes the build of one commit of app. Webhook builds add an
-// idempotency key so a redelivered push is built once.
+// NewJob describes the build of one commit of app
 func NewJob(app store.Application, branch, commitSHA, commitMessage, trigger string) jobs.NewJob {
 	return jobs.NewJob{
 		ProjectID:     app.ProjectID,
@@ -47,14 +46,14 @@ func NewJob(app store.Application, branch, commitSHA, commitMessage, trigger str
 	}
 }
 
-// Queued is a build job accepted for running.
+// Queued is a build job accepted for running
 type Queued struct {
 	JobID     uuid.UUID   `json:"job_id"`
 	Status    jobs.Status `json:"status"`
 	CommitSHA string      `json:"commit_sha"`
 }
 
-// Service starts builds on request.
+// Service starts builds on request
 type Service struct {
 	queries *store.Queries
 	authz   *authz.Authorizer
@@ -62,15 +61,12 @@ type Service struct {
 	jobs    *jobs.Service
 }
 
-// NewService returns a build Service.
+// NewService returns a build Service
 func NewService(queries *store.Queries, authorizer *authz.Authorizer, git *gitconn.Service, jobService *jobs.Service) *Service {
 	return &Service{queries: queries, authz: authorizer, git: git, jobs: jobService}
 }
 
-// Trigger queues a build of commitSHA, or of the head of the application's
-// branch when commitSHA is empty. The commit is resolved through the Git
-// provider, so only commits that exist in the repository are built. If the
-// same commit is already queued or building, that build is returned.
+// Trigger queues a build of commitSHA, or of the branch head when empty
 func (s *Service) Trigger(ctx context.Context, userID, applicationID uuid.UUID, commitSHA string) (Queued, error) {
 	commitSHA = strings.ToLower(strings.TrimSpace(commitSHA))
 	if commitSHA != "" && !validCommit(commitSHA) {

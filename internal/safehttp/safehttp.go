@@ -1,7 +1,4 @@
-// Package safehttp builds HTTP clients for user-supplied URLs (self-hosted
-// GitLab, health checks) that cannot be pointed at ForgeDeck's own network.
-// Addresses are checked when connecting, after DNS resolution, so a hostname
-// that later resolves to an internal address (DNS rebinding) is still blocked.
+// Package safehttp builds HTTP clients for user-supplied URLs that cannot reach internal addresses (checked after DNS)
 package safehttp
 
 import (
@@ -16,8 +13,7 @@ import (
 
 // Policy chooses which destinations are reachable besides public addresses.
 type Policy struct {
-	// AllowPrivate permits RFC 1918 / unique-local addresses, for operators
-	// whose GitLab or registry lives on an internal network.
+	// AllowPrivate permits RFC 1918 / unique-local addresses
 	AllowPrivate bool
 	// AllowLoopback permits 127.0.0.0/8 and ::1. Tests only.
 	AllowLoopback bool
@@ -26,8 +22,7 @@ type Policy struct {
 // ErrBlockedDestination is returned when a URL resolves to a forbidden address.
 var ErrBlockedDestination = errors.New("destination address is not allowed")
 
-// NewClient returns a client that refuses blocked destinations and does not
-// follow redirects (a redirect could lead somewhere the policy forbids).
+// NewClient returns a client that refuses blocked destinations and never follows redirects
 func NewClient(policy Policy, timeout time.Duration) *http.Client {
 	dialer := &net.Dialer{
 		Timeout: 10 * time.Second,
@@ -69,7 +64,6 @@ func (p Policy) check(address string) error {
 	case ip.IsGlobalUnicast() && !ip.IsLinkLocalUnicast():
 		return nil
 	}
-	// Everything else: link-local (cloud metadata at 169.254.169.254),
-	// unspecified, multicast, and anything not explicitly allowed.
+	// link-local (cloud metadata), unspecified, multicast and the rest stay blocked
 	return fmt.Errorf("%w: %s", ErrBlockedDestination, ip)
 }

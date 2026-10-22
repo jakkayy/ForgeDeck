@@ -87,7 +87,6 @@ func TestRenderDefaultsAreSafe(t *testing.T) {
 	if _, ok := file["volumes"]; ok {
 		t.Error("top-level volumes without any volume")
 	}
-	// Without a published port, nothing is exposed.
 	if _, ok := service(render(t, spec(servicecfg.Config{ContainerPort: ptr(8080)})))["ports"]; ok {
 		t.Error("ports without published_port")
 	}
@@ -133,8 +132,7 @@ func TestRenderRefusesTamperedInput(t *testing.T) {
 	}
 }
 
-// TestComposeAcceptsRenderedFile asks the real Compose plugin to parse the
-// output and keeps "$" in values literal.
+// TestComposeAcceptsRenderedFile has real Compose parse the output, keeping "$" literal.
 func TestComposeAcceptsRenderedFile(t *testing.T) {
 	if os.Getenv("FORGEDECK_TEST_DOCKER") != "1" {
 		t.Skip("set FORGEDECK_TEST_DOCKER=1 to run against Docker Compose")
@@ -166,9 +164,7 @@ func TestComposeAcceptsRenderedFile(t *testing.T) {
 	if err := json.Unmarshal(out, &parsed); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	// `config` prints values re-escaped so the output can be read back, so
-	// the literal "pa$word ${X}" appears as "pa$$word $${X}". Had the value
-	// been interpolated instead, "$word" and "${X}" would be empty here.
+	// config re-escapes "$", so the literal prints as "pa$$word $${X}"; interpolation would empty it.
 	environment := parsed.Services[compose.ServiceName].Environment
 	if got := environment["PASSWORD"]; got != "pa$$word $${X}" {
 		t.Fatalf("Compose resolved PASSWORD to %q", got)

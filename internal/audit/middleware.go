@@ -19,9 +19,7 @@ const (
 	maxResponseCopy  = 64 << 10
 )
 
-// Middleware records the successful requests that Rules describes. It sits
-// behind authentication, so the actor is the signed-in user. Requests that
-// fail record nothing: an audit event says that something happened.
+// Middleware records the successful requests that Rules describes
 func (rec *Recorder) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rule, ok := Rules[r.Method+" "+chi.RouteContext(r.Context()).RoutePattern()]
@@ -30,7 +28,7 @@ func (rec *Recorder) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Resolve what the request is about before the handler may delete it.
+		// resolve what the request is about before the handler may delete it
 		target := rec.resolve(r.Context(), rule, r)
 		metadata := rec.requestFields(r, rule)
 
@@ -86,8 +84,7 @@ func (rec *Recorder) resolve(ctx context.Context, rule Rule, r *http.Request) re
 		return out // the handler will reject it; there is nothing to record
 	}
 	out.projectID = &projectID
-	// The looked-up resource is the event's target only when the rule is about
-	// that kind of resource: a registry created in a project is not the project.
+	// the looked-up resource is the event's target only when the rule is about that kind of resource
 	if kindType[rule.Kind] == rule.TargetType {
 		if out.id == "" {
 			out.id = id.String()
@@ -99,7 +96,7 @@ func (rec *Recorder) resolve(ctx context.Context, rule Rule, r *http.Request) re
 	return out
 }
 
-// kindType is the target type of a resource of each Kind.
+// kindType is the target type of a resource of each Kind
 var kindType = map[Kind]string{
 	KindProject: "project", KindApplication: "application", KindEnvironment: "environment",
 	KindRelease: "release", KindJob: "job", KindGitConnection: "git_connection",
@@ -108,7 +105,7 @@ var kindType = map[Kind]string{
 
 var errUnknownKind = errors.New("unknown audit kind")
 
-// lookup finds the project and a display name of a resource.
+// lookup finds the project and a display name of a resource
 func (rec *Recorder) lookup(ctx context.Context, kind Kind, id uuid.UUID) (uuid.UUID, string, error) {
 	q := rec.queries
 	switch kind {
@@ -160,8 +157,7 @@ func shortSHA(sha string) string {
 	return sha
 }
 
-// requestFields copies the rule's whitelisted JSON body fields into metadata
-// and puts the body back for the handler.
+// requestFields copies the rule's whitelisted JSON body fields into metadata and restores the body
 func (rec *Recorder) requestFields(r *http.Request, rule Rule) map[string]any {
 	if len(rule.RequestFields) == 0 || r.Body == nil {
 		return nil
@@ -170,7 +166,6 @@ func (rec *Recorder) requestFields(r *http.Request, rule Rule) map[string]any {
 	if err != nil {
 		return nil
 	}
-	// Hand the handler the same bytes, including any tail past the limit.
 	r.Body = struct {
 		io.Reader
 		io.Closer
@@ -202,10 +197,7 @@ func withMeta(metadata map[string]any, key string, value any) map[string]any {
 	return metadata
 }
 
-// fromResponse fills what a create route's response says: the new resource's
-// ID and name, and where the response names it, its project. Only a fixed set
-// of identifying fields is read, never anything else in the response (an
-// enrollment token, a session).
+// fromResponse fills what a create route's response says
 func fromResponse(e *Event, body []byte, rule Rule) {
 	var doc struct {
 		ID          string `json:"id"`
@@ -245,7 +237,7 @@ func fromResponse(e *Event, body []byte, rule Rule) {
 	}
 }
 
-// serverFromResponse names the server an Agent enrolled as, and its project.
+// serverFromResponse names the server an Agent enrolled as, and its project
 func (rec *Recorder) serverFromResponse(ctx context.Context, e *Event, body []byte) {
 	var doc struct {
 		ServerID string `json:"server_id"`
@@ -273,7 +265,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// captureWriter remembers the status and the start of the response body.
+// captureWriter remembers the status and the start of the response body
 type captureWriter struct {
 	http.ResponseWriter
 	code  int
@@ -298,8 +290,7 @@ func (c *captureWriter) Write(p []byte) (int, error) {
 	return c.ResponseWriter.Write(p)
 }
 
-// Unwrap lets http.ResponseController reach the real writer (flushing, write
-// deadlines), which the SSE and long-poll handlers rely on.
+// Unwrap lets http.ResponseController reach the real writer (SSE and long-poll need it)
 func (c *captureWriter) Unwrap() http.ResponseWriter { return c.ResponseWriter }
 
 func (c *captureWriter) status() int {

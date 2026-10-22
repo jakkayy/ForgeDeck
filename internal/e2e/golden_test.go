@@ -1,5 +1,4 @@
-// Package e2e holds tests that run ForgeDeck's components together, with real
-// Docker, git and a registry. They run only when FORGEDECK_TEST_DOCKER=1.
+// Package e2e runs ForgeDeck's components together; opt-in via FORGEDECK_TEST_DOCKER=1.
 package e2e_test
 
 import (
@@ -37,14 +36,12 @@ import (
 
 const (
 	dockerfile = "FROM busybox:1.37\nCOPY index.html /www/index.html\nCMD [\"httpd\", \"-f\", \"-p\", \"8080\", \"-h\", \"/www\"]\n"
-	// brokenDockerfile runs, but never listens: it passes the build and its
-	// tests and must fail the deployment's health check.
+	// brokenDockerfile builds and passes tests but never listens, so the health check must fail.
 	brokenDockerfile = "FROM busybox:1.37\nCOPY index.html /www/index.html\nCMD [\"sleep\", \"3600\"]\n"
 	token            = "glpat-golden"
 )
 
-// stack is a running ForgeDeck: Control Plane, Runner, and an Agent that
-// manages the local Docker.
+// stack is a running ForgeDeck: Control Plane, Runner and an Agent on the local Docker.
 type stack struct {
 	t         *testing.T
 	env       *apitest.Env
@@ -68,7 +65,6 @@ func startStack(t *testing.T) *stack {
 	git := gittest.New(t, fake, token)
 	git.AddRepo(t, "acme/shop", map[string]string{"Dockerfile": dockerfile, "index.html": "v1\n"})
 	registryHost := dockertest.StartRegistry(t)
-	// The Agent pulls every released image onto this machine; remove them afterwards.
 	t.Cleanup(func() {
 		out, _ := exec.CommandContext(context.Background(), "docker", "images", "--quiet", registryHost+"/acme/shop").Output() //nolint:gosec // test
 		for _, id := range strings.Fields(string(out)) {
@@ -94,7 +90,6 @@ func startStack(t *testing.T) *stack {
 		"test_command": "test -s /www/index.html && echo tests-passed",
 	}).RequireStatus(http.StatusCreated).Decode(&app)
 
-	// The Agent runs on this machine and manages its Docker.
 	enrolled := env.EnrollAgent(owner, projectID, "prod-01")
 	engine, err := docker.New()
 	if err != nil {
@@ -112,7 +107,6 @@ func startStack(t *testing.T) *stack {
 		return agent.Run(ctx, identity, agentState, "test", handlers, engine, quiet)
 	})
 
-	// The Runner builds, tests and pushes.
 	registered := env.NewRunner("build-01")
 	runnerCfg := runner.Config{ControlPlaneURL: env.Server.URL, Credential: registered.Credential, Version: "test"}
 	build := runner.Handlers(runner.BuildConfig{WorkDir: t.TempDir(), GitProtocols: "http", Timeout: 3 * time.Minute, TestLimits: runner.DefaultTestLimits})
@@ -121,8 +115,6 @@ func startStack(t *testing.T) *stack {
 	s := &stack{t: t, env: env, owner: owner, git: git, fake: fake, app: app, port: freePort(t),
 		hookPath: "/api/v1/webhooks/gitlab/" + conn.ID.String(), hookToken: fake.Hooks()[0].Token}
 
-	// A staging environment that deploys every successful build, with an HTTP
-	// health check.
 	container := 8080
 	owner.Do(http.MethodPost, "/api/v1/applications/"+app.ID.String()+"/environments", map[string]any{
 		"name": "staging", "server_id": enrolled.ServerID, "auto_deploy": true,
@@ -135,7 +127,6 @@ func startStack(t *testing.T) *stack {
 	return s
 }
 
-// runInBackground runs fn until the test ends and requires it to stop cleanly.
 func runInBackground(t *testing.T, fn func(ctx context.Context) error) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -159,8 +150,6 @@ func freePort(t *testing.T) int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 
-// push commits files to the repository and tells ForgeDeck about it the way
-// GitLab does, with a webhook.
 func (s *stack) push(files map[string]string, message string) string {
 	s.t.Helper()
 	sha := s.git.Commit(s.t, "acme/shop", files, message)
@@ -175,7 +164,6 @@ func (s *stack) push(files map[string]string, message string) string {
 	return sha
 }
 
-// deploymentOf waits until the deployment of commit has finished.
 func (s *stack) deploymentOf(commit string) deployments.Deployment {
 	s.t.Helper()
 	deadline := time.Now().Add(4 * time.Minute)
@@ -201,7 +189,6 @@ func (s *stack) releases() []deployments.Release {
 	return list.Items
 }
 
-// served returns what the deployed service answers on its published port.
 func (s *stack) served() string {
 	s.t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
@@ -230,13 +217,10 @@ func (s *stack) logOf(d deployments.Deployment) string {
 	return strings.Join(lines, "\n")
 }
 
-// TestGoldenPath is the product's promise in one test: push code, and it is
-// built, tested, shipped, health-checked and recorded; a bad version does not
-// replace a good one; and an old release comes back with one request.
+// TestGoldenPath is the product's promise: push, build, deploy, health-check, roll back.
 func TestGoldenPath(t *testing.T) {
 	s := startStack(t)
 
-	// 1. Push v1: webhook → build → test → push image → deploy → healthy.
 	v1 := s.push(map[string]string{"index.html": "v1\n"}, "Ship v1")
 	first := s.deploymentOf(v1)
 	if first.Status != "succeeded" || first.ReleaseID == nil {
@@ -251,7 +235,6 @@ func TestGoldenPath(t *testing.T) {
 	}
 	v1Release := releases[0]
 
-	// 2. Push v2: the same path again; v2 replaces v1 and is the current release.
 	v2 := s.push(map[string]string{"index.html": "v2\n"}, "Ship v2")
 	if d := s.deploymentOf(v2); d.Status != "succeeded" {
 		t.Fatalf("v2 deployment %+v\n%s", d, s.logOf(d))
@@ -263,8 +246,7 @@ func TestGoldenPath(t *testing.T) {
 		t.Fatalf("releases after v2: %+v", releases)
 	}
 
-	// 3. Push a version that builds and passes its tests but never serves:
-	// the deployment fails its health check, v2 keeps running, no release.
+	// a build that passes tests but never serves must fail health check and keep v2.
 	v3 := s.push(map[string]string{"Dockerfile": brokenDockerfile, "index.html": "v3\n"}, "Break the service")
 	failed := s.deploymentOf(v3)
 	if failed.Status != "failed" || failed.Error == nil || failed.Error.Code != "health_check_failed" ||
@@ -281,7 +263,6 @@ func TestGoldenPath(t *testing.T) {
 		t.Fatalf("the failed deployment's log lacks the service output:\n%s", log)
 	}
 
-	// 4. Roll back to v1: its exact image and configuration, no rebuild.
 	var rollback deployments.Deployment
 	s.owner.Do(http.MethodPost, "/api/v1/releases/"+v1Release.ID.String()+"/rollback", nil).RequireStatus(http.StatusAccepted).Decode(&rollback)
 	deadline := time.Now().Add(3 * time.Minute)
@@ -300,7 +281,6 @@ func TestGoldenPath(t *testing.T) {
 		t.Fatalf("releases after the rollback: %+v", final)
 	}
 
-	// One managed container serves the environment throughout.
 	out, err := exec.CommandContext(t.Context(), "docker", "ps", "--quiet", "--filter", "label="+compose.LabelEnvironment+"="+s.staging.ID.String()).Output() //nolint:gosec // test
 	if err != nil || len(strings.Fields(string(out))) != 1 {
 		t.Fatalf("managed containers %q, %v", out, err)

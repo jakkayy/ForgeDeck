@@ -16,8 +16,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// MintError is a deployment that cannot start, with a code and message for
-// users.
+// MintError is a deployment that cannot start, with a code and message for users
 type MintError struct {
 	Code    string
 	Message string
@@ -31,22 +30,19 @@ var (
 	errNoSecretValues  = &MintError{Code: "secret_unavailable", Message: "ForgeDeck could not read a secret this environment uses."}
 )
 
-// ContextMinter builds the DeployContext of a claimed deploy_image job.
+// ContextMinter builds the DeployContext of a claimed deploy_image job
 type ContextMinter struct {
 	queries    *store.Queries
 	registries *registries.Service
 	secrets    *secrets.Service
 }
 
-// NewContextMinter returns a ContextMinter.
+// NewContextMinter returns a ContextMinter
 func NewContextMinter(queries *store.Queries, registryService *registries.Service, secretService *secrets.Service) *ContextMinter {
 	return &ContextMinter{queries: queries, registries: registryService, secrets: secretService}
 }
 
-// Mint returns the context for one attempt of the deployment in payload.
-// Registry credentials are scoped to the registry host of the image: other
-// registries of the project are never sent to the server. Errors users can
-// act on are *MintError; others are internal.
+// Mint returns the context for one attempt of the deployment in payload
 func (m *ContextMinter) Mint(ctx context.Context, payload json.RawMessage) (*agentproto.DeployContext, error) {
 	var p agentproto.DeployImagePayload
 	if err := json.Unmarshal(payload, &p); err != nil {
@@ -95,10 +91,7 @@ func (m *ContextMinter) Mint(ctx context.Context, payload json.RawMessage) (*age
 		out.Previous = &agentproto.PreviousRelease{ReleaseID: release.ID, CommitSHA: release.CommitSha, ImageRef: release.ImageRef, Config: config}
 	}
 
-	// Secrets: the current values of everything the new release lists, plus
-	// what the release it may restore lists. A secret the previous release
-	// used and that has since been deleted is simply absent; the Agent then
-	// does not restore that release.
+	// A secret the previous release used and that has since been deleted is simply absent
 	names := p.Config.Secrets
 	if out.Previous != nil {
 		names = append(slices.Clone(names), out.Previous.Config.Secrets...)

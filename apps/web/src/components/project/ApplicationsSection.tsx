@@ -16,7 +16,6 @@ import { QueryBoundary } from "../QueryBoundary";
 import { SearchBox } from "../SearchBox";
 import { NewApplicationDialog } from "./NewApplicationDialog";
 
-/** The project's applications and what each builds from. */
 export function ApplicationsSection({ projectId }: { projectId: string }) {
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim()) || undefined;

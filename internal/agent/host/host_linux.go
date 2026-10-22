@@ -72,6 +72,5 @@ func diskPercent(path string) (float32, error) {
 		return 0, fmt.Errorf("statfs %s: no blocks", path)
 	}
 	used := stat.Blocks - stat.Bfree
-	// Percent of the space available to unprivileged users, as df reports.
 	return clampPercent(100 * float64(used) / float64(used+stat.Bavail)), nil
 }

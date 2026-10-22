@@ -1,9 +1,4 @@
-// Command runner runs a ForgeDeck build Runner on a dedicated build host.
-//
-// Usage:
-//
-//	forgedeck-runner run --url https://forgedeck.example.com --credential-file /etc/forgedeck/runner.credential
-//	    (or set FORGEDECK_RUNNER_CREDENTIAL instead of --credential-file)
+// Command runner runs a ForgeDeck build Runner on a dedicated build host
 package main
 
 import (
@@ -80,8 +75,7 @@ func run(args []string) error {
 	return runner.Run(ctx, cfg, handlers, runner.DockerStatus, logger)
 }
 
-// loadCredential reads the credential from a file or the environment, never
-// from arguments, so it stays out of process listings.
+// loadCredential reads the credential from a file or env, never from arguments
 func loadCredential(path string) (string, error) {
 	raw := os.Getenv("FORGEDECK_RUNNER_CREDENTIAL")
 	if path != "" {

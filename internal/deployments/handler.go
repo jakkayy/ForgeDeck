@@ -10,17 +10,17 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
-// Handler serves the deployment endpoints behind auth.RequireUser.
+// Handler serves the deployment endpoints behind auth.RequireUser
 type Handler struct {
 	svc *Service
 }
 
-// NewHandler returns deployment endpoints.
+// NewHandler returns deployment endpoints
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// Routes mounts the deployment endpoints on r.
+// Routes mounts the deployment endpoints on r
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/environments/{environmentID}/deployments", httpx.Handle(h.list))
 	r.Post("/environments/{environmentID}/deployments", httpx.Handle(h.deploy))

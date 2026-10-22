@@ -73,7 +73,7 @@ func TestContainerLogsQueuesBoundedFetch(t *testing.T) {
 	agent.ReportContainers(t, apiContainer)
 	path := "/api/v1/servers/" + agent.ServerID.String() + "/containers/" + apiContainer + "/logs"
 
-	// Container output can hold sensitive data: developers and above only.
+	// container output can hold sensitive data: developers and above only.
 	viewer.Do(http.MethodPost, path, map[string]any{}).RequireStatus(http.StatusForbidden)
 	developer.Do(http.MethodPost, path, map[string]any{}).RequireStatus(http.StatusAccepted)
 	owner.Do(http.MethodPost, path, map[string]any{"tail_lines": agentproto.MaxTailLines + 1}).

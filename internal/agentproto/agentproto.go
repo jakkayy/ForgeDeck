@@ -1,6 +1,4 @@
-// Package agentproto defines the wire contract between the Control Plane and
-// the ForgeDeck Agent. Both sides import it, so changes here are protocol
-// changes: bump ProtocolVersion for incompatible ones.
+// Package agentproto defines the wire contract between the Control Plane and the ForgeDeck Agent
 package agentproto
 
 import (
@@ -13,29 +11,27 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/servicecfg"
 )
 
-// ProtocolVersion is the Agent protocol spoken by this build.
+// ProtocolVersion is the Agent protocol spoken by this build
 const ProtocolVersion = 1
 
-// CredentialPrefix marks Agent credentials so they are recognizable in
-// accidental logs and secret scanners.
+// CredentialPrefix makes Agent credentials recognizable to secret scanners
 const CredentialPrefix = "fda_"
 
-// EnrollRequest exchanges a single-use enrollment token for a credential.
+// EnrollRequest exchanges a single-use enrollment token for a credential
 type EnrollRequest struct {
 	Token           string `json:"token"`
 	AgentVersion    string `json:"agent_version"`
 	ProtocolVersion int    `json:"protocol_version"`
 }
 
-// EnrollResponse carries the Agent's long-lived credential. It is returned
-// once; the Control Plane keeps only its hash.
+// EnrollResponse carries the Agent's long-lived credential
 type EnrollResponse struct {
 	AgentID    uuid.UUID `json:"agent_id"`
 	ServerID   uuid.UUID `json:"server_id"`
 	Credential string    `json:"credential"`
 }
 
-// HeartbeatRequest reports liveness and a status summary.
+// HeartbeatRequest reports liveness and a status summary
 type HeartbeatRequest struct {
 	AgentVersion    string     `json:"agent_version"`
 	ProtocolVersion int        `json:"protocol_version"`
@@ -43,47 +39,41 @@ type HeartbeatRequest struct {
 	Resources       *Resources `json:"resources,omitempty"`
 }
 
-// Docker describes the local Docker Engine as seen by the Agent.
+// Docker describes the local Docker Engine as seen by the Agent
 type Docker struct {
 	Available bool   `json:"available"`
 	Version   string `json:"version,omitempty"`
 }
 
-// Resources is a host usage summary in percent (0–100).
+// Resources is a host usage summary in percent (0–100)
 type Resources struct {
 	CPUPercent    float32 `json:"cpu_percent"`
 	MemoryPercent float32 `json:"memory_percent"`
 	DiskPercent   float32 `json:"disk_percent"`
 }
 
-// HeartbeatResponse tells the Agent when to send the next heartbeat.
+// HeartbeatResponse tells the Agent when to send the next heartbeat
 type HeartbeatResponse struct {
-	IntervalSeconds int `json:"interval_seconds"`
-	// RotateCredential asks the Agent to replace its credential now: it is
-	// old, an admin asked for it, or the Agent still uses one that was
-	// already replaced.
+	IntervalSeconds  int  `json:"interval_seconds"`
 	RotateCredential bool `json:"rotate_credential,omitempty"`
 }
 
-// RotateResponse carries the Agent's new credential. The one it presented
-// keeps working for a short grace period.
+// RotateResponse carries the Agent's new credential
 type RotateResponse struct {
 	ServerID   uuid.UUID `json:"server_id"`
 	Credential string    `json:"credential"`
 }
 
-// MaxSnapshotContainers caps one snapshot; the Control Plane rejects more.
+// MaxSnapshotContainers caps one snapshot
 const MaxSnapshotContainers = 500
 
-// ContainerSnapshot is the full list of containers on the Agent's host at
-// ObservedAt. It replaces the previous snapshot; it is not a diff.
+// ContainerSnapshot is the full list of containers on the Agent's host at ObservedAt
 type ContainerSnapshot struct {
 	ObservedAt time.Time   `json:"observed_at"`
 	Containers []Container `json:"containers"`
 }
 
-// Container is one Docker container. It deliberately omits environment
-// variables, mounts, and other inspect data that may contain secrets.
+// Container is one Docker container
 type Container struct {
 	ID         string            `json:"container_id"`
 	Name       string            `json:"name"`
@@ -93,54 +83,41 @@ type Container struct {
 	Labels     map[string]string `json:"labels,omitempty"`
 }
 
-// SnapshotResponse reports whether the snapshot replaced the stored one.
-// A snapshot older than the stored one is ignored, not an error.
+// SnapshotResponse reports whether the snapshot replaced the stored one
 type SnapshotResponse struct {
 	Accepted bool `json:"accepted"`
 }
 
-// MaxClaimWaitSeconds caps how long a claim request is held open. It stays
-// below common reverse-proxy idle timeouts (often 30–60 seconds).
+// MaxClaimWaitSeconds caps how long a claim request is held open
 const MaxClaimWaitSeconds = 25
 
-// ClaimRequest asks for the next job targeted at this Agent's server.
-// WaitSeconds (0–MaxClaimWaitSeconds) is how long to hold the request open
-// when nothing is queued; omitted means the maximum.
+// ClaimRequest asks for the next job targeted at this Agent's server
 type ClaimRequest struct {
 	WaitSeconds *int `json:"wait_seconds,omitempty"`
 }
 
-// Job is a job assigned to the Agent. The response is 204 No Content when
-// no job became available within the wait.
+// Job is a job assigned to the Agent
 type Job struct {
 	ID             uuid.UUID       `json:"id"`
 	Type           string          `json:"type"`
 	Attempt        int32           `json:"attempt"`
 	Payload        json.RawMessage `json:"payload"`
 	LeaseExpiresAt time.Time       `json:"lease_expires_at"`
-	// Credentials are minted for this attempt of a build job. They are sent
-	// only in the claim response, never stored or logged.
+	// they are sent only in the claim response, never stored or logged
 	Credentials *BuildCredentials `json:"credentials,omitempty"`
-	// Deploy is added to a claimed deploy_image job. It is never stored.
+	// it is never stored
 	Deploy *DeployContext `json:"deploy,omitempty"`
 }
 
-// DeployContext is what an Agent needs to run one deployment beyond its payload.
+// DeployContext is what an Agent needs to run one deployment beyond its payload
 type DeployContext struct {
-	// Registry holds credentials for the one registry that hosts the image,
-	// and for no other. It is nil when the project has no registry for that
-	// host, in which case the Agent pulls anonymously.
 	Registry *RegistryCredentials `json:"registry,omitempty"`
-	// Previous is the environment's current release when the job was
-	// claimed. If the new version does not become healthy, the Agent
-	// restores it.
-	Previous *PreviousRelease `json:"previous,omitempty"`
-	// Secrets are the current values of the project secrets the new and the
-	// previous release list, by name. They are never stored or logged.
+	Previous *PreviousRelease     `json:"previous,omitempty"`
+	// they are never stored or logged
 	Secrets map[string]string `json:"secrets,omitempty"`
 }
 
-// PreviousRelease is a release the Agent can restore.
+// PreviousRelease is a release the Agent can restore
 type PreviousRelease struct {
 	ReleaseID uuid.UUID         `json:"release_id"`
 	CommitSHA string            `json:"commit_sha"`
@@ -148,80 +125,73 @@ type PreviousRelease struct {
 	Config    servicecfg.Config `json:"config"`
 }
 
-// BuildCredentials let a Runner fetch one repository and push its image.
+// BuildCredentials let a Runner fetch one repository and push its image
 type BuildCredentials struct {
 	Git      GitCredentials      `json:"git"`
 	Registry RegistryCredentials `json:"registry"`
-	// Image is the repository the build is pushed to, e.g. ghcr.io/acme/shop-api.
-	Image string `json:"image"`
+	Image    string              `json:"image"`
 }
 
-// RegistryCredentials authenticate docker login to one registry.
+// RegistryCredentials authenticate docker login to one registry
 type RegistryCredentials struct {
 	Host     string `json:"host"`
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// GitCredentials authenticate an HTTPS clone with HTTP Basic auth.
+// GitCredentials authenticate an HTTPS clone with HTTP Basic auth
 type GitCredentials struct {
 	URL      string `json:"url"`
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// LeaseRequest renews the lease on a claimed job attempt.
+// LeaseRequest renews the lease on a claimed job attempt
 type LeaseRequest struct {
 	Attempt int32 `json:"attempt"`
 }
 
-// LeaseResponse carries the new lease expiry. A 409 with code "lease_lost"
-// means the attempt no longer belongs to this Agent and must be abandoned.
+// LeaseResponse carries the new lease expiry
 type LeaseResponse struct {
 	LeaseExpiresAt time.Time `json:"lease_expires_at"`
 }
 
-// Log streams accepted in job events.
+// Log streams accepted in job events
 const (
 	StreamStdout = "stdout"
 	StreamStderr = "stderr"
 	StreamSystem = "system"
 )
 
-// Batch limits for job events.
+// Batch limits for job events
 const (
 	MaxEventsPerBatch = 500
 	MaxEventBytes     = 16 * 1024
 )
 
-// EventsRequest appends log lines for a job attempt. Sequence numbers
-// increase monotonically per attempt; resending a batch is safe because
-// duplicates are ignored.
+// EventsRequest appends log lines for a job attempt
 type EventsRequest struct {
 	Attempt int32      `json:"attempt"`
 	Events  []LogEvent `json:"events"`
 }
 
-// LogEvent is one line of job output. Secrets must be redacted by the Agent
-// before sending.
+// LogEvent is one line of job output
 type LogEvent struct {
 	Sequence int64  `json:"sequence"`
 	Stream   string `json:"stream"`
 	Message  string `json:"message"`
 }
 
-// Outcomes an Agent may report for a job attempt.
+// Outcomes an Agent may report for a job attempt
 const (
 	OutcomeSucceeded = "succeeded"
 	OutcomeFailed    = "failed"
 )
 
-// MaxResultBytes bounds the structured result stored with a job.
+// MaxResultBytes bounds the structured result stored with a job
 const MaxResultBytes = 64 * 1024
 
-// CompleteRequest reports the final outcome of an attempt. Resending the
-// same outcome is safe. ErrorCode is a stable machine-readable code such as
-// "container_not_found"; ErrorMessage is shown to users.
+// CompleteRequest reports the final outcome of an attempt
 type CompleteRequest struct {
 	Attempt      int32           `json:"attempt"`
 	Outcome      string          `json:"outcome"`
@@ -230,7 +200,7 @@ type CompleteRequest struct {
 	ErrorMessage string          `json:"error_message,omitempty"`
 }
 
-// Job types. Agents run container and deployment jobs; Runners run builds.
+// Job types
 const (
 	JobContainerAction = "container_action"
 	JobFetchLogs       = "fetch_logs"
@@ -238,8 +208,7 @@ const (
 	JobBuild           = "build"
 )
 
-// BuildResult is a successful build's job result. Deployments use
-// ImageRef, which pins the exact image pushed.
+// BuildResult is a successful build's job result
 type BuildResult struct {
 	CommitSHA string `json:"commit_sha"`
 	Image     string `json:"image"`     // e.g. ghcr.io/acme/shop-api
@@ -248,21 +217,19 @@ type BuildResult struct {
 	ImageRef  string `json:"image_ref"` // Image@Digest
 }
 
-// Stages of a deployment. The Agent tags the log lines of each stage
-// ("[pull] Pulling …") so the Control Plane can show progress while the job
-// runs.
+// Stages of a deployment
 const (
 	StagePull        = "pull"
 	StageStart       = "start"
 	StageHealthCheck = "health_check"
 )
 
-// StageLine formats a system log line that belongs to a deployment stage.
+// StageLine formats a system log line that belongs to a deployment stage
 func StageLine(stage, message string) string {
 	return "[" + stage + "] " + message
 }
 
-// StageOfLine returns the stage a StageLine belongs to, or "" for other lines.
+// StageOfLine returns the stage a StageLine belongs to, or "" for other lines
 func StageOfLine(line string) string {
 	for _, stage := range []string{StagePull, StageStart, StageHealthCheck} {
 		if strings.HasPrefix(line, "["+stage+"] ") {
@@ -272,16 +239,13 @@ func StageOfLine(line string) string {
 	return ""
 }
 
-// DeployResult is a successful deploy_image job's result.
+// DeployResult is a successful deploy_image job's result
 type DeployResult struct {
 	ImageRef    string `json:"image_ref"`
 	ContainerID string `json:"container_id"`
 }
 
-// DeployImagePayload deploys one image digest to one environment on the
-// Agent's server. It never carries secrets: registry credentials are added
-// to the claimed job, not stored in the payload. The Agent re-validates
-// Config before rendering it.
+// DeployImagePayload deploys one image digest to one environment on the Agent's server
 type DeployImagePayload struct {
 	DeploymentID  uuid.UUID         `json:"deployment_id"`
 	EnvironmentID uuid.UUID         `json:"environment_id"`
@@ -291,8 +255,7 @@ type DeployImagePayload struct {
 	Config        servicecfg.Config `json:"config"`
 }
 
-// BuildPayload builds and pushes an image for one commit. The Runner checks
-// out exactly CommitSHA, never the moving branch.
+// BuildPayload builds and pushes an image for one commit
 type BuildPayload struct {
 	ApplicationID      uuid.UUID `json:"application_id"`
 	GitConnectionID    uuid.UUID `json:"git_connection_id"`
@@ -304,41 +267,37 @@ type BuildPayload struct {
 	DockerfilePath     string    `json:"dockerfile_path"`
 	BuildContext       string    `json:"build_context"`
 	TestCommand        *string   `json:"test_command,omitempty"`
-	// Trigger says why the build exists: TriggerPush, TriggerManual (branch
-	// head), or TriggerCommit (an explicit commit, which is not auto-deployed).
-	Trigger string `json:"trigger,omitempty"`
+	Trigger            string    `json:"trigger,omitempty"`
 }
 
-// Build triggers.
+// Build triggers
 const (
 	TriggerPush   = "push"
 	TriggerManual = "manual"
 	TriggerCommit = "commit"
 )
 
-// Container actions accepted by JobContainerAction.
+// Container actions accepted by JobContainerAction
 const (
 	ActionStart   = "start"
 	ActionStop    = "stop"
 	ActionRestart = "restart"
 )
 
-// ContainerActionPayload starts, stops, or restarts one container. Applying
-// an action that is already in effect (start a running container) succeeds.
+// ContainerActionPayload starts, stops, or restarts one container
 type ContainerActionPayload struct {
 	ContainerID string `json:"container_id"`
 	Action      string `json:"action"`
 }
 
-// Log fetch limits. The Agent enforces them too, even if a payload asks for more.
+// Log fetch limits
 const (
 	DefaultTailLines = 500
 	MaxTailLines     = 2000
 	MaxFetchLogBytes = 1 << 20
 )
 
-// FetchLogsPayload reads a bounded range of a container's past output. The
-// Agent streams it back as job events and reports truncation in the result.
+// FetchLogsPayload reads a bounded range of a container's past output
 type FetchLogsPayload struct {
 	ContainerID string     `json:"container_id"`
 	TailLines   int        `json:"tail_lines"`

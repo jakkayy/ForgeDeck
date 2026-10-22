@@ -10,17 +10,15 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// snapshotInterval keeps the dashboard's container list well inside the
-// Control Plane's two-minute staleness threshold.
+// snapshotInterval keeps the container list inside the Control Plane's two-minute staleness limit
 const snapshotInterval = 45 * time.Second
 
-// ContainerLister lists the host's containers.
+// ContainerLister lists the host's containers
 type ContainerLister interface {
 	ListContainers(ctx context.Context) ([]agentproto.Container, error)
 }
 
-// SnapshotReporter sends the full container list periodically and whenever
-// Trigger is called (for example after a container action).
+// SnapshotReporter sends the full container list periodically and on Trigger
 type SnapshotReporter struct {
 	client  *worker.Client
 	engine  ContainerLister
@@ -28,12 +26,12 @@ type SnapshotReporter struct {
 	trigger chan struct{}
 }
 
-// NewSnapshotReporter returns a reporter for engine's containers.
+// NewSnapshotReporter returns a reporter for engine's containers
 func NewSnapshotReporter(client *worker.Client, engine ContainerLister, logger *slog.Logger) *SnapshotReporter {
 	return &SnapshotReporter{client: client, engine: engine, logger: logger, trigger: make(chan struct{}, 1)}
 }
 
-// Trigger asks for a snapshot as soon as possible without blocking.
+// Trigger asks for a snapshot as soon as possible without blocking
 func (r *SnapshotReporter) Trigger() {
 	select {
 	case r.trigger <- struct{}{}:
@@ -41,8 +39,7 @@ func (r *SnapshotReporter) Trigger() {
 	}
 }
 
-// Run reports until ctx ends. It returns worker.ErrUnauthorized when the
-// credential is rejected; other failures are logged and retried.
+// Run reports until ctx ends
 func (r *SnapshotReporter) Run(ctx context.Context) error {
 	ticker := time.NewTicker(snapshotInterval)
 	defer ticker.Stop()

@@ -16,11 +16,9 @@ import (
 var errGitHubNotConfigured = apperr.Conflict("github_not_configured",
 	"The GitHub App is not configured on this ForgeDeck. An administrator can set it up; see docs/13-git-providers.md.")
 
-// StartGitHubInstall returns the GitHub URL where the user installs the
-// ForgeDeck App for projectID.
+// StartGitHubInstall returns the GitHub URL where the user installs the App for projectID
 func (s *Service) StartGitHubInstall(ctx context.Context, userID, projectID uuid.UUID) (string, error) {
-	// Authorize first: whether this installation has a GitHub App is not for
-	// non-members to learn.
+	// authorize first: non-members must not learn whether an installation has a GitHub App
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ManageGit); err != nil {
 		return "", err
 	}
@@ -42,8 +40,7 @@ type GitHubCallback struct {
 	Code           string
 }
 
-// InstallError is a failed GitHub install. ProjectID is set when known so
-// the user can be sent back to the right project.
+// InstallError is a failed GitHub install; ProjectID is set when known
 type InstallError struct {
 	ProjectID uuid.UUID
 	Code      string
@@ -53,9 +50,7 @@ type InstallError struct {
 func (e *InstallError) Error() string { return e.Code + ": " + e.Err.Error() }
 func (e *InstallError) Unwrap() error { return e.Err }
 
-// CompleteGitHubInstall verifies the callback and stores the connection. It
-// trusts nothing in the URL on its own: the state proves who started the
-// install, and the OAuth code proves that user can access the installation.
+// CompleteGitHubInstall verifies the callback; the state and OAuth code prove who and what
 func (s *Service) CompleteGitHubInstall(ctx context.Context, cb GitHubCallback) (uuid.UUID, error) {
 	if s.github == nil {
 		return uuid.Nil, &InstallError{Code: "github_not_configured", Err: errGitHubNotConfigured}

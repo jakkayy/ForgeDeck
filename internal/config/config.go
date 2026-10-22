@@ -1,4 +1,4 @@
-// Package config loads Control Plane settings from environment variables.
+// Package config loads Control Plane settings from environment variables
 package config
 
 import (
@@ -17,39 +17,27 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/safehttp"
 )
 
-// Config holds the Control Plane runtime settings.
+// Config holds the Control Plane runtime settings
 type Config struct {
-	HTTPAddr     string
-	DatabaseURL  string
-	LogLevel     string
-	LogFormat    string
-	CookieSecure bool
-	// DisableWebSetup stops the sign-in page from offering to create the first
-	// account; it is then created with `forgedeck-api create-user`.
-	DisableWebSetup bool
-	// Keyring encrypts stored credentials; parsed from FORGEDECK_SECRET_KEYS.
-	Keyring *keyring.Keyring
-	// PublicURL is where users and Git providers reach ForgeDeck, used for
-	// webhook and OAuth callback URLs. Optional until a provider needs it.
-	PublicURL string
-	// GitHub is nil unless the ForgeDeck GitHub App is configured.
-	GitHub *github.Config
-	// GitHubWebhookSecret verifies GitHub App webhook deliveries.
+	HTTPAddr            string
+	DatabaseURL         string
+	LogLevel            string
+	LogFormat           string
+	CookieSecure        bool
+	DisableWebSetup     bool
+	Keyring             *keyring.Keyring
+	PublicURL           string
+	GitHub              *github.Config
 	GitHubWebhookSecret string
-	// TrustedProxies are the reverse proxies whose X-Forwarded-For header is
-	// believed when finding a client's address (FORGEDECK_TRUSTED_PROXIES).
-	TrustedProxies []netip.Prefix
-	// Retention says how long old data is kept; zero keeps a kind forever.
-	Retention retention.Policy
-	// Outbound limits requests to user-supplied URLs such as a self-hosted
-	// GitLab. FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS opens private networks.
-	Outbound safehttp.Policy
+	TrustedProxies      []netip.Prefix
+	Retention           retention.Policy
+	Outbound            safehttp.Policy
 }
 
-// LookupFunc matches os.LookupEnv so tests can supply their own environment.
+// LookupFunc matches os.LookupEnv so tests can supply their own environment
 type LookupFunc func(key string) (string, bool)
 
-// Load reads FORGEDECK_* variables, applies defaults, and validates the result.
+// Load reads FORGEDECK_* variables, applies defaults, and validates the result
 func Load(lookup LookupFunc) (Config, error) {
 	env := reader{lookup: lookup}
 	cfg := Config{
@@ -117,8 +105,7 @@ func (r *reader) string(key, fallback string) string {
 	return fallback
 }
 
-// gitHubApp reads the optional GitHub App settings. Setting the App ID turns
-// the integration on and makes the remaining settings required.
+// gitHubApp reads the optional GitHub App settings
 func (r *reader) gitHubApp() (*github.Config, string) {
 	rawID := r.string("FORGEDECK_GITHUB_APP_ID", "")
 	if rawID == "" {
@@ -149,8 +136,7 @@ func (r *reader) gitHubApp() (*github.Config, string) {
 	return cfg, webhookSecret
 }
 
-// secretValue reads KEY, or the file named by KEY_FILE, which keeps
-// multi-line secrets such as PEM keys out of the environment.
+// secretValue reads KEY, or the file named by KEY_FILE (for multi-line secrets such as PEM keys)
 func (r *reader) secretValue(key string) ([]byte, error) {
 	if path := r.string(key+"_FILE", ""); path != "" {
 		data, err := os.ReadFile(path) //nolint:gosec // path comes from operator configuration
@@ -173,7 +159,7 @@ func (r *reader) required(key string) string {
 	return value
 }
 
-// days reads a whole number of days, 0 meaning "keep forever".
+// days reads a whole number of days, 0 meaning "keep forever"
 func (r *reader) days(key string, fallback int) int {
 	raw, ok := r.lookup(key)
 	if !ok || strings.TrimSpace(raw) == "" {
@@ -187,7 +173,7 @@ func (r *reader) days(key string, fallback int) int {
 	return n
 }
 
-// prefixes reads a comma-separated list of addresses or CIDR ranges.
+// prefixes reads a comma-separated list of addresses or CIDR ranges
 func (r *reader) prefixes(key string) []netip.Prefix {
 	raw, ok := r.lookup(key)
 	if !ok || strings.TrimSpace(raw) == "" {

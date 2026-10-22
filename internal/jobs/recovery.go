@@ -9,14 +9,10 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// recoveryInterval is how often expired leases are swept. With a 60-second
-// lease, a lost job is retried within about 75 seconds.
+// recoveryInterval is how often expired leases are swept (lost jobs retry within ~75s)
 const recoveryInterval = 15 * time.Second
 
-// RecoverExpiredLeases requeues (or fails, when out of attempts) running jobs
-// whose worker stopped renewing its lease, and wakes workers for requeued
-// jobs. A lease expiring does not prove the old worker stopped, which is why
-// job handlers must be idempotent.
+// RecoverExpiredLeases requeues or fails running jobs whose lease expired; handlers must be idempotent
 func (s *Service) RecoverExpiredLeases(ctx context.Context) (requeued, failed int, err error) {
 	rows, err := s.queries.RecoverExpiredLeases(ctx, s.now())
 	if err != nil {
@@ -42,7 +38,6 @@ func (s *Service) RecoverExpiredLeases(ctx context.Context) (requeued, failed in
 	return requeued, failed, nil
 }
 
-// RunRecovery sweeps expired leases until ctx is cancelled.
 func (s *Service) RunRecovery(ctx context.Context, logger *slog.Logger) {
 	ticker := time.NewTicker(recoveryInterval)
 	defer ticker.Stop()

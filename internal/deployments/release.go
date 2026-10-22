@@ -16,8 +16,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// Release is the API view of a release: a deployment that passed its health
-// check, with the configuration it ran with.
+// Release is the API view of a release
 type Release struct {
 	ID            uuid.UUID         `json:"id"`
 	ApplicationID uuid.UUID         `json:"application_id"`
@@ -27,13 +26,10 @@ type Release struct {
 	ImageRef      string            `json:"image_ref"`
 	Config        servicecfg.Config `json:"config"`
 	CreatedAt     time.Time         `json:"created_at"`
-	// Current marks the release the environment runs now: its newest one.
-	Current bool `json:"current"`
+	Current       bool              `json:"current"`
 }
 
-// RecordRelease is a jobs.SuccessHook: a deploy_image job succeeds only
-// after its health check passed, so the deployment becomes a release in the
-// same transaction that records the job's outcome. Recording is idempotent.
+// RecordRelease is a jobs.SuccessHook
 func (s *Service) RecordRelease(ctx context.Context, tx pgx.Tx, job store.Job) error {
 	if job.Type != agentproto.JobDeployImage {
 		return nil
@@ -66,7 +62,7 @@ func (s *Service) RecordRelease(ctx context.Context, tx pgx.Tx, job store.Job) e
 	return nil
 }
 
-// ListReleases returns an environment's releases, newest first.
+// ListReleases returns an environment's releases, newest first
 func (s *Service) ListReleases(ctx context.Context, userID, environmentID uuid.UUID, limit, offset int32) ([]Release, error) {
 	if _, _, err := s.authorizeEnvironment(ctx, userID, environmentID, authz.ViewProject); err != nil {
 		return nil, err
@@ -101,7 +97,7 @@ func toRelease(row store.Release) (Release, error) {
 	}, nil
 }
 
-// stageOfError maps a deployment's failure code to the stage that failed.
+// stageOfError maps a deployment's failure code to the stage that failed
 var stageOfError = map[string]string{
 	"registry_login_failed": agentproto.StagePull,
 	"pull_failed":           agentproto.StagePull,
@@ -109,10 +105,7 @@ var stageOfError = map[string]string{
 	"health_check_failed":   agentproto.StageHealthCheck,
 }
 
-// stageOf says which stage a deployment is in or failed at. A running
-// deployment reports the newest stage the Agent logged; a failed one the
-// stage its error code names (the log's last stage can be a later recovery
-// step). Queued and succeeded deployments have none.
+// stageOf says which stage a deployment is in or failed at
 func (s *Service) stageOf(ctx context.Context, d Deployment) *string {
 	var stage string
 	switch jobs.Status(d.Status) {

@@ -14,33 +14,30 @@ import (
 )
 
 const (
-	// sessionIdleTimeout ends a session that has not been used for this long.
 	sessionIdleTimeout = 7 * 24 * time.Hour
-	// sessionMaxLifetime ends a session this long after sign-in regardless of use.
 	sessionMaxLifetime = 30 * 24 * time.Hour
-	// sessionTouchInterval limits how often activity is written back, so most
-	// authenticated requests are read-only.
+	// sessionTouchInterval limits how often activity is written back
 	sessionTouchInterval = time.Hour
 
 	sessionTokenPrefix = "fds_"
 )
 
-// ErrInvalidSession means the session token is unknown, expired, or signed out.
+// ErrInvalidSession means the session token is unknown, expired, or signed out
 var ErrInvalidSession = errors.New("invalid session")
 
-// User is the authenticated user attached to a request.
+// User is the authenticated user attached to a request
 type User struct {
 	ID    uuid.UUID `json:"id"`
 	Email string    `json:"email"`
 }
 
-// NewSession is a started session; Token is shown to the client once.
+// NewSession is a started session
 type NewSession struct {
 	Token     string
 	ExpiresAt time.Time
 }
 
-// StartSession creates a session for userID.
+// StartSession creates a session for userID
 func (s *Service) StartSession(ctx context.Context, userID uuid.UUID) (NewSession, error) {
 	now := s.now()
 	token, hash := securetoken.New(sessionTokenPrefix)
@@ -56,8 +53,7 @@ func (s *Service) StartSession(ctx context.Context, userID uuid.UUID) (NewSessio
 	return NewSession{Token: token, ExpiresAt: session.ExpiresAt}, nil
 }
 
-// Authenticate resolves a session token to its user and slides the idle
-// expiry forward, capped at the session's maximum lifetime.
+// Authenticate resolves a session token to its user and slides the idle expiry, capped at max lifetime
 func (s *Service) Authenticate(ctx context.Context, token string) (User, error) {
 	now := s.now()
 	session, err := s.queries.GetActiveSession(ctx, store.GetActiveSessionParams{
@@ -84,7 +80,7 @@ func (s *Service) Authenticate(ctx context.Context, token string) (User, error) 
 	return User{ID: session.UserID, Email: session.Email}, nil
 }
 
-// EndSession deletes the session for token. Unknown tokens are ignored.
+// EndSession deletes the session for token
 func (s *Service) EndSession(ctx context.Context, token string) error {
 	if err := s.queries.DeleteSessionByTokenHash(ctx, securetoken.Hash(token)); err != nil {
 		return fmt.Errorf("delete session: %w", err)

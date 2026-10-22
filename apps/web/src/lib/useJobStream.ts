@@ -3,21 +3,11 @@ import type { Job, LogLine } from "../api/types";
 
 type Stream = { job: Job | null; lines: LogLine[]; ended: boolean };
 
-/** Log lines that arrive together are shown together: one render per batch, not per line. */
 const FLUSH_MS = 100;
-/** A tab hidden this long stops following; it picks up where it left off when shown again. */
+/** A tab hidden this long stops following the stream and resumes when shown again. */
 const HIDDEN_GRACE_MS = 60_000;
 
-/**
- * Follows a job's status and output over SSE. EventSource reconnects on its
- * own after a dropped connection and sends Last-Event-ID, so lines are neither
- * lost nor repeated.
- *
- * The stream is closed when the page is left or the job changes, and while the
- * tab has been hidden for a minute: every open stream costs the server a
- * wakeup every few seconds, and nobody reads a log in a background tab. When
- * the tab is shown again the stream resumes after the last line received.
- */
+/** Follows a job's status and output over SSE; EventSource resumes via Last-Event-ID. */
 export function useJobStream(jobId: string): Stream {
   const [state, setState] = useState<Stream>({ job: null, lines: [], ended: false });
 

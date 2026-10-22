@@ -1,7 +1,4 @@
-// Package procexec runs external programs for Runner and Agent jobs. Commands
-// start with a minimal environment, so they never see the credential of the
-// process that runs them, and their output goes line by line into the job
-// log.
+// Package procexec runs external programs with a minimal environment and streams output to the job log.
 package procexec
 
 import (
@@ -18,21 +15,16 @@ import (
 )
 
 const (
-	// maxLineBytes splits very long output lines (minified files, progress
-	// bars) so one line cannot hold an unbounded buffer.
+	// maxLineBytes splits very long lines so one line cannot hold an unbounded buffer
 	maxLineBytes = 16 << 10
-	// killGrace is how long a cancelled command may take to exit after
-	// being killed before its output pipes are abandoned.
+	// killGrace is how long a killed command may take to exit before its pipes are abandoned
 	killGrace = 10 * time.Second
 )
 
-// passedDockerEnv are the only variables inherited from the parent process
-// besides PATH, so the Docker CLI reaches the same daemon as its parent.
+// passedDockerEnv are the only variables inherited besides PATH, so the Docker CLI reaches the parent's daemon
 var passedDockerEnv = []string{"DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"}
 
-// BaseEnv is the environment commands start with: PATH, a private HOME and
-// DOCKER_CONFIG (so registry logins stay inside one job), and the Docker
-// daemon settings of the parent.
+// BaseEnv is the environment commands start with: PATH, a private HOME and DOCKER_CONFIG, Docker daemon settings
 func BaseEnv(home, dockerConfig string) []string {
 	env := []string{
 		"PATH=" + os.Getenv("PATH"),
@@ -48,7 +40,6 @@ func BaseEnv(home, dockerConfig string) []string {
 	return env
 }
 
-// Command is one process to run.
 type Command struct {
 	Name  string
 	Args  []string
@@ -57,18 +48,15 @@ type Command struct {
 	Stdin io.Reader
 }
 
-// Executor runs commands with a fixed base environment, logging their output.
 type Executor struct {
 	baseEnv []string
 	log     worker.Logger
 }
 
-// New returns an Executor whose commands start with baseEnv.
 func New(baseEnv []string, log worker.Logger) *Executor {
 	return &Executor{baseEnv: baseEnv, log: log}
 }
 
-// Run executes c, streaming its output to the log, and returns its exit error.
 func (e *Executor) Run(ctx context.Context, c Command) error {
 	cmd := e.command(ctx, c)
 	stdout := &lineWriter{log: e.log, stream: "stdout"}
@@ -81,7 +69,6 @@ func (e *Executor) Run(ctx context.Context, c Command) error {
 	return err
 }
 
-// Output executes c and returns its trimmed stdout instead of logging it.
 func (e *Executor) Output(ctx context.Context, c Command) (string, error) {
 	cmd := e.command(ctx, c)
 	stderr := &lineWriter{log: e.log, stream: "stderr"}
@@ -99,7 +86,6 @@ func (e *Executor) command(ctx context.Context, c Command) *exec.Cmd {
 	return cmd
 }
 
-// lineWriter turns a byte stream into log lines.
 type lineWriter struct {
 	log    worker.Logger
 	stream string

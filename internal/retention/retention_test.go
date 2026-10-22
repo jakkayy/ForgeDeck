@@ -37,7 +37,6 @@ func newWorld(t *testing.T) world {
 	return w
 }
 
-// job inserts a build job in status that finished daysAgo, with three log lines.
 func (w world) job(t *testing.T, status string, finishedDaysAgo int) uuid.UUID {
 	t.Helper()
 	var id uuid.UUID
@@ -102,7 +101,6 @@ func TestOldJobLogsAreRemovedButTheJobsStay(t *testing.T) {
 		t.Fatalf("%d jobs marked, want 2", n)
 	}
 
-	// A second pass does nothing more.
 	if again := run(t, w, retention.Policy{JobLogDays: 30}); again != (retention.Result{}) {
 		t.Fatalf("second pass removed %+v", again)
 	}
@@ -111,7 +109,7 @@ func TestOldJobLogsAreRemovedButTheJobsStay(t *testing.T) {
 func TestOldFinishedJobsAreDeletedButNeverOnesInProgress(t *testing.T) {
 	w := newWorld(t)
 	old := w.job(t, "succeeded", 200)
-	stuck := w.job(t, "running", -1) // never finished: not ours to delete
+	stuck := w.job(t, "running", -1)
 	queued := w.job(t, "queued", -1)
 	recent := w.job(t, "failed", 10)
 
@@ -124,7 +122,6 @@ func TestOldFinishedJobsAreDeletedButNeverOnesInProgress(t *testing.T) {
 			t.Errorf("job %s: %d rows, want %d", id, got, want)
 		}
 	}
-	// A deleted job takes its log lines with it.
 	if n := w.count(t, `SELECT count(*) FROM job_log_chunks WHERE job_id = $1`, old); n != 0 {
 		t.Fatalf("%d log lines of the deleted job remain", n)
 	}
@@ -231,7 +228,6 @@ func TestZeroKeepsEverythingAndTheCleanupWorksInBatches(t *testing.T) {
 		t.Fatalf("%d log lines left, want 3", n)
 	}
 
-	// More old jobs than one batch.
 	for range 2100 {
 		if _, err := w.pool.Exec(context.Background(), `INSERT INTO jobs (project_id, type, worker_kind, status, payload, finished_at)
 			VALUES ($1, 'build', 'runner', 'succeeded', '{}', $2)`, w.projectID, daysAgo(500)); err != nil {

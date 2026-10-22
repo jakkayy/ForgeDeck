@@ -1,5 +1,4 @@
-// Package environments manages the deployment targets of an application: one
-// server and one validated service configuration each.
+// Package environments manages the deployment targets of an application
 package environments
 
 import (
@@ -23,7 +22,6 @@ import (
 )
 
 var (
-	// errEnvironmentNotFound also covers environments in projects the user cannot see.
 	errEnvironmentNotFound = apperr.NotFound("Environment not found.")
 	errApplicationNotFound = apperr.NotFound("Application not found.")
 	errServerNotFound      = validate.Errors{"server_id": "Choose a server from this project."}
@@ -38,7 +36,7 @@ const (
 	portConstraint = "environments_server_port_key"
 )
 
-// Environment is the API view of an environment.
+// Environment is the API view of an environment
 type Environment struct {
 	ID            uuid.UUID         `json:"id"`
 	ApplicationID uuid.UUID         `json:"application_id"`
@@ -50,24 +48,24 @@ type Environment struct {
 	UpdatedAt     time.Time         `json:"updated_at"`
 }
 
-// SecretChecker says which secret names a project does not have.
+// SecretChecker says which secret names a project does not have
 type SecretChecker interface {
 	Missing(ctx context.Context, projectID uuid.UUID, names []string) ([]string, error)
 }
 
-// Service implements environment operations.
+// Service implements environment operations
 type Service struct {
 	queries *store.Queries
 	authz   *authz.Authorizer
 	secrets SecretChecker
 }
 
-// NewService returns an environment Service.
+// NewService returns an environment Service
 func NewService(queries *store.Queries, authorizer *authz.Authorizer, secretChecker SecretChecker) *Service {
 	return &Service{queries: queries, authz: authorizer, secrets: secretChecker}
 }
 
-// checkSecrets requires every secret an environment lists to exist in the project.
+// checkSecrets requires every secret an environment lists to exist in the project
 func (s *Service) checkSecrets(ctx context.Context, projectID uuid.UUID, config servicecfg.Config) error {
 	missing, err := s.secrets.Missing(ctx, projectID, config.Secrets)
 	if err != nil {
@@ -79,7 +77,7 @@ func (s *Service) checkSecrets(ctx context.Context, projectID uuid.UUID, config 
 	return nil
 }
 
-// CreateInput describes a new environment.
+// CreateInput describes a new environment
 type CreateInput struct {
 	Name       string
 	ServerID   uuid.UUID
@@ -87,7 +85,7 @@ type CreateInput struct {
 	Config     servicecfg.Config
 }
 
-// Create adds an environment to an application.
+// Create adds an environment to an application
 func (s *Service) Create(ctx context.Context, userID, applicationID uuid.UUID, in CreateInput) (Environment, error) {
 	app, err := s.authorizeApplication(ctx, userID, applicationID, authz.ManageApps)
 	if err != nil {
@@ -121,7 +119,7 @@ func (s *Service) Create(ctx context.Context, userID, applicationID uuid.UUID, i
 	return toEnvironment(row)
 }
 
-// Get returns an environment the user may view.
+// Get returns an environment the user may view
 func (s *Service) Get(ctx context.Context, userID, environmentID uuid.UUID) (Environment, error) {
 	row, err := s.authorize(ctx, userID, environmentID, authz.ViewProject)
 	if err != nil {
@@ -130,7 +128,7 @@ func (s *Service) Get(ctx context.Context, userID, environmentID uuid.UUID) (Env
 	return toEnvironment(row)
 }
 
-// List returns an application's environments by name.
+// List returns an application's environments by name
 func (s *Service) List(ctx context.Context, userID, applicationID uuid.UUID) ([]Environment, error) {
 	if _, err := s.authorizeApplication(ctx, userID, applicationID, authz.ViewProject); err != nil {
 		return nil, err
@@ -148,8 +146,7 @@ func (s *Service) List(ctx context.Context, userID, applicationID uuid.UUID) ([]
 	return out, nil
 }
 
-// UpdateInput changes the non-nil fields. Config replaces the whole
-// configuration.
+// UpdateInput changes the non-nil fields
 type UpdateInput struct {
 	Name       *string
 	ServerID   *uuid.UUID
@@ -157,8 +154,7 @@ type UpdateInput struct {
 	Config     *servicecfg.Config
 }
 
-// Update changes an environment. A changed configuration applies to the next
-// deployment; running services are not touched.
+// Update changes an environment
 func (s *Service) Update(ctx context.Context, userID, environmentID uuid.UUID, in UpdateInput) (Environment, error) {
 	current, err := s.authorize(ctx, userID, environmentID, authz.ManageApps)
 	if err != nil {
@@ -207,7 +203,7 @@ func (s *Service) Update(ctx context.Context, userID, environmentID uuid.UUID, i
 	return toEnvironment(row)
 }
 
-// Delete removes an environment. Volumes on its server are left in place.
+// Delete removes an environment
 func (s *Service) Delete(ctx context.Context, userID, environmentID uuid.UUID) error {
 	if _, err := s.authorize(ctx, userID, environmentID, authz.ManageApps); err != nil {
 		return err
@@ -218,8 +214,7 @@ func (s *Service) Delete(ctx context.Context, userID, environmentID uuid.UUID) e
 	return nil
 }
 
-// checkServer requires the server to exist in the application's project.
-// A server of another project is reported as missing.
+// checkServer requires the server to exist in the application's project
 func (s *Service) checkServer(ctx context.Context, projectID, serverID uuid.UUID) error {
 	row, err := s.queries.GetServer(ctx, serverID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.Server.ProjectID != projectID) {
@@ -275,7 +270,7 @@ func checkName(errs validate.Errors, name string) {
 	}
 }
 
-// mergeErrors copies validation failures from err into errs.
+// mergeErrors copies validation failures from err into errs
 func mergeErrors(errs validate.Errors, err error) {
 	var fields validate.Errors
 	if errors.As(err, &fields) {

@@ -20,7 +20,6 @@ CREATE TABLE applications (
     UNIQUE (project_id, name)
 );
 
--- Webhook routing: which applications build from a repository.
 CREATE INDEX applications_repository_idx ON applications (git_connection_id, repository_id);
 
 -- +goose Down

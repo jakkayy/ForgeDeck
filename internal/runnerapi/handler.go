@@ -1,6 +1,4 @@
-// Package runnerapi serves the machine-to-machine endpoints used by build
-// Runners. It speaks the Agent protocol (internal/agentproto) under
-// /runner/, with Runner identities instead of Agent ones.
+// Package runnerapi serves the machine-to-machine endpoints used by build Runners
 package runnerapi
 
 import (
@@ -160,10 +158,7 @@ func (h *Handler) claim(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// claimWithCredentials claims the next job and mints its build credentials.
-// An attempt that cannot start (no image destination, credentials cannot be
-// minted) fails at once, so the Runner
-// is never handed a build it cannot start; the next job is tried instead.
+// claimWithCredentials claims the next job; attempts that cannot start fail and the next is tried
 func (h *Handler) claimWithCredentials(ctx context.Context, workerID string) (*jobs.Claimed, *agentproto.BuildCredentials, error) {
 	for {
 		job, err := h.jobs.ClaimForRunner(ctx, workerID)

@@ -27,9 +27,7 @@ type CreateFirstUserParams struct {
 	PasswordHash string
 }
 
-// Creates the user only if there is none and nobody else is registering at the
-// same moment. One statement: a concurrent caller blocks on the claim row until
-// this one commits, then finds it taken and inserts nothing (no rows returned).
+// Creates the user only if none exists and nobody else is registering; a race inserts nothing.
 func (q *Queries) CreateFirstUser(ctx context.Context, arg CreateFirstUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createFirstUser, arg.Email, arg.PasswordHash)
 	var i User

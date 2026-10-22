@@ -1,6 +1,4 @@
-// Package github talks to GitHub as the ForgeDeck GitHub App: it verifies
-// installations, mints short-lived installation tokens, and lists the
-// repositories an installation grants.
+// Package github talks to GitHub as the ForgeDeck GitHub App.
 package github
 
 import (
@@ -20,8 +18,7 @@ import (
 	"time"
 )
 
-// Config identifies the GitHub App. URLs default to github.com and can point
-// at GitHub Enterprise Server.
+// Config identifies the GitHub App; URLs can point at GitHub Enterprise Server
 type Config struct {
 	AppID        int64
 	Slug         string
@@ -35,8 +32,7 @@ type Config struct {
 // ErrNotFound means GitHub returned 404 for the resource.
 var ErrNotFound = errors.New("not found on GitHub")
 
-// Client is a GitHub App API client. Installation tokens are cached until
-// shortly before they expire.
+// Client is a GitHub App API client; installation tokens are cached until near expiry
 type Client struct {
 	cfg  Config
 	http *http.Client
@@ -51,18 +47,15 @@ type installationToken struct {
 	expiresAt time.Time
 }
 
-// NewClient returns a Client for the App described by cfg.
 func NewClient(cfg Config, now func() time.Time) *Client {
 	cfg.WebURL = strings.TrimRight(cfg.WebURL, "/")
 	cfg.APIURL = strings.TrimRight(cfg.APIURL, "/")
 	return &Client{cfg: cfg, http: &http.Client{Timeout: 15 * time.Second}, now: now, tokens: map[int64]installationToken{}}
 }
 
-// WebURL is the GitHub web address, e.g. https://github.com.
 func (c *Client) WebURL() string { return c.cfg.WebURL }
 
-// InstallURL is where a user installs the App; GitHub sends them back to the
-// App's setup URL with installation_id, code, and this state.
+// InstallURL is where a user installs the App
 func (c *Client) InstallURL(state string) string {
 	return fmt.Sprintf("%s/apps/%s/installations/new?state=%s", c.cfg.WebURL, url.PathEscape(c.cfg.Slug), url.QueryEscape(state))
 }
@@ -83,10 +76,7 @@ type Repository struct {
 	Private       bool   `json:"private"`
 }
 
-// UserCanAccessInstallation exchanges the OAuth code GitHub returns after
-// installation and reports whether that user can access installationID.
-// This stops someone from claiming another account's installation by
-// editing installation_id in the callback URL.
+// UserCanAccessInstallation checks the OAuth code, so installation_id in the callback cannot be forged
 func (c *Client) UserCanAccessInstallation(ctx context.Context, code string, installationID int64) (bool, error) {
 	userToken, err := c.exchangeCode(ctx, code)
 	if err != nil {
@@ -165,8 +155,7 @@ func (c *Client) Commit(ctx context.Context, installationID int64, fullName, ref
 	return Commit{SHA: resp.SHA, Message: resp.Commit.Message}, nil
 }
 
-// InstallationToken returns a token scoped to the installation, reusing a
-// cached one while it has more than five minutes left.
+// InstallationToken returns a cached token while it has more than five minutes left
 func (c *Client) InstallationToken(ctx context.Context, installationID int64) (string, error) {
 	c.mu.Lock()
 	cached, ok := c.tokens[installationID]
@@ -193,9 +182,7 @@ func (c *Client) InstallationToken(ctx context.Context, installationID int64) (s
 	return resp.Token, nil
 }
 
-// RepositoryReadToken mints a fresh token that can only read the contents
-// of one repository. It is not cached: each build gets its own, and it
-// expires after an hour.
+// RepositoryReadToken mints an uncached, read-only token for one repository
 func (c *Client) RepositoryReadToken(ctx context.Context, installationID, repositoryID int64) (string, error) {
 	jwt, err := appJWT(c.cfg.AppID, c.cfg.PrivateKey, c.now())
 	if err != nil {

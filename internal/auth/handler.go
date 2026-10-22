@@ -12,8 +12,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/ratelimit"
 )
 
-// Login attempts are limited per client IP and per email. The per-email limit
-// still protects an account when every request arrives from one proxy IP.
+// Login attempts are limited per client IP and per email
 const (
 	loginBurstPerIP     = 20
 	loginRefillPerIP    = 3 * time.Second
@@ -21,7 +20,7 @@ const (
 	loginRefillPerEmail = 30 * time.Second
 )
 
-// Handler serves the /auth endpoints.
+// Handler serves the /auth endpoints
 type Handler struct {
 	svc          *Service
 	cookie       cookieConfig
@@ -30,15 +29,13 @@ type Handler struct {
 	webSetup     bool
 }
 
-// Option changes how a Handler behaves.
+// Option changes how a Handler behaves
 type Option func(*Handler)
 
-// WithoutWebSetup turns off registering the first account from the web: the
-// first account must then be created with `forgedeck-api create-user`.
+// WithoutWebSetup turns off registering the first account from the web
 func WithoutWebSetup() Option { return func(h *Handler) { h.webSetup = false } }
 
-// NewHandler returns auth endpoints. secureCookies must be true when the
-// Control Plane is served over HTTPS.
+// NewHandler returns auth endpoints
 func NewHandler(svc *Service, secureCookies bool, options ...Option) *Handler {
 	h := &Handler{
 		svc:          svc,
@@ -53,7 +50,7 @@ func NewHandler(svc *Service, secureCookies bool, options ...Option) *Handler {
 	return h
 }
 
-// Routes mounts the auth endpoints on r.
+// Routes mounts the auth endpoints on r
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/auth/login", httpx.Handle(h.login))
 	r.Get("/auth/setup", httpx.Handle(h.setupStatus))
@@ -90,8 +87,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// setupStatus tells the sign-in page whether to offer creating the first
-// account. It reveals only that no account exists yet.
+// setupStatus tells the sign-in page whether to offer creating the first account
 func (h *Handler) setupStatus(w http.ResponseWriter, r *http.Request) error {
 	required := false
 	if h.webSetup {
@@ -103,8 +99,7 @@ func (h *Handler) setupStatus(w http.ResponseWriter, r *http.Request) error {
 	return httpx.WriteJSON(w, http.StatusOK, map[string]bool{"required": required})
 }
 
-// setup registers the first account, signs it in, and closes itself: the
-// person who reaches a new installation first is its owner. Later calls get 409.
+// setup registers the first account, signs it in, and closes itself
 func (h *Handler) setup(w http.ResponseWriter, r *http.Request) error {
 	if !h.webSetup {
 		return httpx.NotFound("Creating the first account from the web is turned off; use forgedeck-api create-user.")
@@ -137,8 +132,7 @@ func (h *Handler) limitLogin(w http.ResponseWriter, r *http.Request, email strin
 	return nil
 }
 
-// logout ends the current session, if any, and clears the cookie. It succeeds
-// even without a valid session so the client can always reach a signed-out state.
+// logout ends the current session, if any, and clears the cookie
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) error {
 	if token, ok := h.cookie.read(r); ok {
 		if err := h.svc.EndSession(r.Context(), token); err != nil {
@@ -154,8 +148,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) error {
 	return httpx.WriteJSON(w, http.StatusOK, map[string]any{"user": UserFrom(r.Context())})
 }
 
-// cookieConfig names and scopes the session cookie. Over HTTPS the __Host-
-// prefix pins the cookie to this exact origin.
+// cookieConfig names and scopes the session cookie
 type cookieConfig struct {
 	name   string
 	secure bool

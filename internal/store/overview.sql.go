@@ -45,10 +45,7 @@ type CountEnvironmentsByLastDeploymentRow struct {
 	NotDeployed int64
 }
 
-// Groups the user's environments by how their newest deployment ended. The
-// job is the live source of status while it exists (see ListDeployments). The
-// newest deployment of each environment is one index lookup, not a sort of
-// every deployment there is.
+// Environments grouped by how their newest deployment ended (the job is the live status).
 func (q *Queries) CountEnvironmentsByLastDeployment(ctx context.Context, userID uuid.UUID) (CountEnvironmentsByLastDeploymentRow, error) {
 	row := q.db.QueryRow(ctx, countEnvironmentsByLastDeployment, userID)
 	var i CountEnvironmentsByLastDeploymentRow
@@ -89,8 +86,7 @@ type CountServersByConnectivityRow struct {
 	Offline     int64
 }
 
-// Mirrors servers.ConnectivityStatus: the caller passes the heartbeat
-// thresholds, so the windows are defined in one place.
+// Mirrors servers.ConnectivityStatus; the caller passes the heartbeat thresholds.
 func (q *Queries) CountServersByConnectivity(ctx context.Context, arg CountServersByConnectivityParams) (CountServersByConnectivityRow, error) {
 	row := q.db.QueryRow(ctx, countServersByConnectivity, arg.OnlineAfter, arg.UnreachableAfter, arg.UserID)
 	var i CountServersByConnectivityRow
@@ -159,10 +155,7 @@ type ListRecentDeploymentsForUserRow struct {
 	FinishedAt      *time.Time
 }
 
-// Newest deployments across the user's projects: each environment offers its
-// newest few (an index range), and the newest of those are kept. When
-// only_failed is set, each offers only its single newest deployment and only a
-// failed one counts: what still needs attention, not history.
+// Newest deployments across the user's projects; only_failed keeps each environment's newest failure.
 func (q *Queries) ListRecentDeploymentsForUser(ctx context.Context, arg ListRecentDeploymentsForUserParams) ([]ListRecentDeploymentsForUserRow, error) {
 	rows, err := q.db.Query(ctx, listRecentDeploymentsForUser, arg.UserID, arg.OnlyFailed, arg.PageLimit)
 	if err != nil {

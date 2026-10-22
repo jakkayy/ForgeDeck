@@ -6,7 +6,6 @@ import { auditActions, describeAudit } from "../../lib/describeAudit";
 import { timeAgo } from "../../lib/time";
 import { QueryBoundary } from "../QueryBoundary";
 
-/** Who did what in this project, newest first. Admins only; the API enforces it. */
 export function AuditSection({ projectId }: { projectId: string }) {
   const [action, setAction] = useState<string | undefined>();
   const events = useInfiniteQuery({

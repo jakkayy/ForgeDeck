@@ -123,7 +123,6 @@ func TestApplicationsInvisibleAcrossProjects(t *testing.T) {
 	ownProject := outsider.CreateProject("Mine")
 
 	outsider.Do(http.MethodGet, "/api/v1/applications/"+app.ID.String(), nil).RequireStatus(http.StatusNotFound)
-	// Using another project's connection from your own project is refused too.
 	outsider.Do(http.MethodPost, "/api/v1/projects/"+ownProject.String()+"/applications",
 		map[string]any{"name": "steal", "git_connection_id": f.connectionID, "repository_id": "77"}).
 		RequireStatus(http.StatusNotFound)
@@ -140,7 +139,7 @@ func TestGitLabWebhookFollowsApplicationLifecycle(t *testing.T) {
 		t.Fatalf("hooks %+v", hooks)
 	}
 
-	// A failed create (duplicate name) must not leave a hook behind.
+	// a failed create must not leave a webhook behind.
 	f.create(t, map[string]any{"name": "API"}).RequireStatus(http.StatusUnprocessableEntity)
 	if n := len(f.gitlab.Hooks()); n != 1 {
 		t.Fatalf("%d hooks after failed create", n)
@@ -192,7 +191,6 @@ func TestApplicationImageSettings(t *testing.T) {
 	}
 	f.owner.Do(http.MethodDelete, "/api/v1/registries/"+registry.ID.String(), nil).RequireStatus(http.StatusNoContent)
 
-	// A registry from another project is refused.
 	other := f.owner.CreateProject("Other")
 	var foreign struct{ ID uuid.UUID }
 	f.owner.Do(http.MethodPost, "/api/v1/projects/"+other.String()+"/registries",

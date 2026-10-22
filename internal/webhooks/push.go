@@ -1,5 +1,4 @@
-// Package webhooks receives Git provider webhooks: it verifies them,
-// drops redeliveries, and turns pushes into build jobs.
+// Package webhooks receives Git provider webhooks: verifies, deduplicates, and queues builds
 package webhooks
 
 import (
@@ -19,8 +18,7 @@ type Push struct {
 
 var validSHA = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
 
-// branchFromRef returns the branch of a "refs/heads/<branch>" ref; tags and
-// other refs are not builds.
+// branchFromRef returns the branch of a refs/heads/ ref; tags are not builds
 func branchFromRef(ref string) (string, bool) {
 	branch, ok := strings.CutPrefix(ref, "refs/heads/")
 	return branch, ok && branch != ""

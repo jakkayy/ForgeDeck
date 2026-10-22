@@ -29,7 +29,6 @@ const roles: { id: Role; description: string }[] = [
   { id: "owner", description: "Everything, including deleting the project" },
 ];
 
-/** The project's members, with add/remove for admins. */
 export function MembersSection({ projectId }: { projectId: string }) {
   const members = useQuery(membersQuery(projectId));
   const canManage = useHasRole(projectId, "admin");

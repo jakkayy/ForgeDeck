@@ -45,8 +45,7 @@ func NewService(queries *store.Queries, now func() time.Time) *Service {
 	return &Service{queries: queries, now: now}
 }
 
-// Create registers a Runner and returns its credential. Only the hash is
-// stored, so the credential cannot be shown again.
+// Create registers a Runner and returns its credential
 func (s *Service) Create(ctx context.Context, name string) (Identity, string, error) {
 	if !validName.MatchString(name) {
 		return Identity{}, "", errors.New("runner name must be lowercase letters, digits and hyphens, e.g. build-01")

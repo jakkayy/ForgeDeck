@@ -16,7 +16,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// runJob has the project's Agent claim a new job and send the given lines.
 func runJob(t *testing.T, env *apitest.Env, owner *apitest.Client, agent apitest.Agent, projectID uuid.UUID, lines ...string) []jobs.LogLine {
 	t.Helper()
 	svc := jobs.NewService(env.Pool, authz.New(store.New(env.Pool)), time.Now)
@@ -48,7 +47,7 @@ func TestProjectSecretsAreMaskedInStoredLogs(t *testing.T) {
 	agent := env.EnrollAgent(owner, projectID, "prod-01")
 	put(owner, projectID, "DATABASE_PASSWORD", "db-secret-value-1").RequireStatus(http.StatusCreated)
 
-	// Even if the Agent forgot to mask a value, it is masked before it is stored.
+	// a value the Agent forgot to mask is masked before it is stored.
 	logs := runJob(t, env, owner, agent, projectID,
 		"connecting with db-secret-value-1", "nothing to hide here", "db-secret-value-1 twice db-secret-value-1")
 	if len(logs) != 3 || logs[0].Message != "connecting with ********" || logs[1].Message != "nothing to hide here" ||
@@ -56,14 +55,12 @@ func TestProjectSecretsAreMaskedInStoredLogs(t *testing.T) {
 		t.Fatalf("logs %+v", logs)
 	}
 
-	// A replaced secret is masked at once, and the old value is no longer special.
 	put(owner, projectID, "DATABASE_PASSWORD", "db-secret-value-2").RequireStatus(http.StatusOK)
 	logs = runJob(t, env, owner, agent, projectID, "old db-secret-value-1 new db-secret-value-2")
 	if len(logs) != 1 || logs[0].Message != "old db-secret-value-1 new ********" {
 		t.Fatalf("logs after replacing %+v", logs)
 	}
 
-	// A deleted secret is no longer masked.
 	owner.Do(http.MethodDelete, "/api/v1/projects/"+projectID.String()+"/secrets/DATABASE_PASSWORD", nil).RequireStatus(http.StatusNoContent)
 	logs = runJob(t, env, owner, agent, projectID, "db-secret-value-2")
 	if len(logs) != 1 || !strings.Contains(logs[0].Message, "db-secret-value-2") {

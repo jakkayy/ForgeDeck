@@ -18,13 +18,7 @@ var (
 	errPortInUse       = apperr.Conflict("port_in_use", "Another environment on this server now publishes the port this release used. Change that environment first.")
 )
 
-// Rollback deploys a previous release again: the same image digest and the
-// configuration it ran with, never a rebuild of old source. It is an
-// ordinary deployment (source: the release) and, once healthy, becomes the
-// environment's newest release; history is not rewritten.
-//
-// The environment's own configuration is left alone, so later deployments
-// still use what the user set there.
+// Rollback deploys a previous release again
 func (s *Service) Rollback(ctx context.Context, userID, releaseID uuid.UUID) (Deployment, error) {
 	release, err := s.queries.GetRelease(ctx, releaseID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -52,8 +46,7 @@ func (s *Service) Rollback(ctx context.Context, userID, releaseID uuid.UUID) (De
 	})
 }
 
-// checkPortFree refuses a configuration whose host port another environment
-// on the same server publishes now.
+// checkPortFree refuses a host port already published by another environment on the server
 func (s *Service) checkPortFree(ctx context.Context, env store.Environment, port *int) error {
 	if port == nil {
 		return nil

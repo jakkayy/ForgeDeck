@@ -18,7 +18,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// WorkerKind says which kind of worker may claim a job.
 type WorkerKind string
 
 const (
@@ -26,7 +25,6 @@ const (
 	WorkerRunner WorkerKind = "runner"
 )
 
-// Status is a job's lifecycle state.
 type Status string
 
 const (
@@ -37,19 +35,14 @@ const (
 	StatusCancelled Status = "cancelled"
 )
 
-// NotifyChannel carries one notification per queued job. The payload is the
-// target server ID for Agent jobs and "runner" for Runner jobs.
+// NotifyChannel payload is the target server ID for Agent jobs, "runner" for Runner jobs
 const NotifyChannel = "forgedeck_jobs"
 
 const runnerNotifyKey = "runner"
 
-// SuccessHook runs inside the transaction that records a job's successful
-// outcome, so what it creates exists exactly when the outcome does. A hook
-// that can fail for reasons of its own must isolate that failure (for
-// example with a savepoint): a returned error aborts the completion.
+// SuccessHook runs in the transaction recording success; a failing hook must isolate itself (savepoint)
 type SuccessHook func(ctx context.Context, tx pgx.Tx, job store.Job) error
 
-// Service implements the job queue.
 type Service struct {
 	pool        *pgxpool.Pool
 	queries     *store.Queries
@@ -59,31 +52,25 @@ type Service struct {
 	redactor    LogRedactor
 }
 
-// LogRedactor returns a function that masks a project's secret values.
 type LogRedactor interface {
 	For(ctx context.Context, projectID uuid.UUID) (func(string) string, error)
 }
 
-// SetLogRedactor makes every stored log line pass through r, so a project
-// secret that an Agent or Runner failed to mask never reaches the database or
-// a browser. Call it while wiring the application.
+// SetLogRedactor masks stored log lines so unmasked secrets never reach the database; call while wiring
 func (s *Service) SetLogRedactor(r LogRedactor) {
 	s.redactor = r
 }
 
-// OnSucceeded registers a hook for jobs that succeed. Call it while wiring
-// the application, before the Service handles requests.
+// OnSucceeded registers a success hook; call while wiring
 func (s *Service) OnSucceeded(hook SuccessHook) {
 	s.onSucceeded = append(s.onSucceeded, hook)
 }
 
-// NewService returns a job Service; now is time.Now outside tests.
 func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, now func() time.Time) *Service {
 	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, now: now}
 }
 
-// NewJob describes a job to enqueue. TargetServerID is required for Agent
-// jobs and must be nil for Runner jobs.
+// NewJob describes a job to enqueue; TargetServerID is required for Agent jobs, nil for Runner jobs
 type NewJob struct {
 	ProjectID      uuid.UUID
 	ApplicationID  *uuid.UUID
@@ -91,23 +78,17 @@ type NewJob struct {
 	WorkerKind     WorkerKind
 	TargetServerID *uuid.UUID
 	Payload        any
-	// MaxAttempts overrides the retry policy for the job type when > 0.
-	MaxAttempts int32
-	CreatedBy   *uuid.UUID
-	// IdempotencyKey, when set, makes Enqueue return the existing job for the
-	// same key in the project instead of queueing a duplicate.
+	MaxAttempts    int32
+	CreatedBy      *uuid.UUID
 	IdempotencyKey string
 }
 
-// Enqueue stores a queued job and notifies waiting workers when the
-// transaction commits. With an IdempotencyKey already used in the project it
-// returns that earlier job and created is false.
+// Enqueue stores a queued job and wakes workers on commit; a reused IdempotencyKey returns the earlier job
 func (s *Service) Enqueue(ctx context.Context, job NewJob) (store.Job, error) {
 	created, _, err := s.EnqueueOnce(ctx, job)
 	return created, err
 }
 
-// EnqueueOnce is Enqueue that also reports whether a new job was created.
 func (s *Service) EnqueueOnce(ctx context.Context, job NewJob) (store.Job, bool, error) {
 	var stored store.Job
 	isNew := true
@@ -119,10 +100,7 @@ func (s *Service) EnqueueOnce(ctx context.Context, job NewJob) (store.Job, bool,
 	return stored, isNew, err
 }
 
-// EnqueueIn queues job inside the caller's transaction, so the job exists
-// exactly when the caller's own rows do. Workers are woken when tx commits.
-// Idempotency keys are not supported here: callers that need them use
-// EnqueueOnce.
+// EnqueueIn queues a job inside the caller's transaction; idempotency keys are not supported
 func (s *Service) EnqueueIn(ctx context.Context, tx pgx.Tx, job NewJob) (store.Job, error) {
 	if job.IdempotencyKey != "" {
 		return store.Job{}, errors.New("EnqueueIn does not support idempotency keys")

@@ -1,6 +1,4 @@
-// Package agent implements the ForgeDeck Agent: it enrolls with the Control
-// Plane, reports heartbeats and container snapshots, and runs claimed jobs
-// against the local Docker Engine.
+// Package agent implements the ForgeDeck Agent
 package agent
 
 import (
@@ -14,15 +12,15 @@ import (
 	"github.com/google/uuid"
 )
 
-// DefaultStateDir holds the Agent's identity on a Linux host.
+// DefaultStateDir holds the Agent's identity on a Linux host
 const DefaultStateDir = "/var/lib/forgedeck-agent"
 
 const identityFile = "identity.json"
 
-// ErrNotEnrolled means no credential is stored yet.
+// ErrNotEnrolled means no credential is stored yet
 var ErrNotEnrolled = errors.New("agent is not enrolled: run `forgedeck-agent enroll` first")
 
-// Identity is what the Agent keeps after enrolling. Credential is a secret.
+// Identity is what the Agent keeps after enrolling
 type Identity struct {
 	ControlPlaneURL string    `json:"control_plane_url"`
 	AgentID         uuid.UUID `json:"agent_id"`
@@ -30,12 +28,12 @@ type Identity struct {
 	Credential      string    `json:"credential"`
 }
 
-// State reads and writes the Agent identity in a private directory.
+// State reads and writes the Agent identity in a private directory
 type State struct {
 	dir string
 }
 
-// NewState uses dir, creating it with owner-only permissions if needed.
+// NewState uses dir, creating it with owner-only permissions if needed
 func NewState(dir string) (*State, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("create state dir: %w", err)
@@ -46,7 +44,7 @@ func NewState(dir string) (*State, error) {
 	return &State{dir: dir}, nil
 }
 
-// Load returns the stored identity or ErrNotEnrolled.
+// Load returns the stored identity or ErrNotEnrolled
 func (s *State) Load() (Identity, error) {
 	data, err := os.ReadFile(filepath.Join(s.dir, identityFile))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -62,8 +60,7 @@ func (s *State) Load() (Identity, error) {
 	return id, nil
 }
 
-// Save stores id atomically with owner-only permissions, so a crash never
-// leaves a truncated credential file.
+// Save stores id atomically with owner-only permissions
 func (s *State) Save(id Identity) error {
 	data, err := json.MarshalIndent(id, "", "  ")
 	if err != nil {

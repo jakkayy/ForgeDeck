@@ -13,22 +13,21 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
 
-// ErrEmailTaken is returned when creating a user whose email already exists.
+// ErrEmailTaken is returned when creating a user whose email already exists
 var ErrEmailTaken = errors.New("email already registered")
 
-// Service implements user and session operations.
+// Service implements user and session operations
 type Service struct {
 	queries *store.Queries
 	now     func() time.Time
 }
 
-// NewService returns a Service backed by queries; now supplies the current
-// time (time.Now in production, a fixed clock in tests).
+// NewService returns a Service backed by queries
 func NewService(queries *store.Queries, now func() time.Time) *Service {
 	return &Service{queries: queries, now: now}
 }
 
-// newCredentials validates an email and password and hashes the password.
+// newCredentials validates an email and password and hashes the password
 func newCredentials(email, password string) (cleanEmail, hash string, err error) {
 	email = strings.TrimSpace(email)
 	errs := validate.Errors{}
@@ -48,7 +47,7 @@ func newCredentials(email, password string) (cleanEmail, hash string, err error)
 	return email, hash, nil
 }
 
-// CreateUser validates the input, hashes the password, and stores the user.
+// CreateUser validates the input, hashes the password, and stores the user
 func (s *Service) CreateUser(ctx context.Context, email, password string) (store.User, error) {
 	email, hash, err := newCredentials(email, password)
 	if err != nil {
@@ -64,8 +63,7 @@ func (s *Service) CreateUser(ctx context.Context, email, password string) (store
 	return user, nil
 }
 
-// isEmail accepts a bare address such as "dev@example.com", rejecting display
-// names like "Dev <dev@example.com>".
+// isEmail accepts a bare address and rejects display names like "Dev <dev@example.com>"
 func isEmail(s string) bool {
 	addr, err := mail.ParseAddress(s)
 	return err == nil && addr.Address == s

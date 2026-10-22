@@ -1,5 +1,4 @@
-// Package secrets stores a project's named secret values, encrypted and
-// write-only, for injection into services at deployment time.
+// Package secrets stores a project's named secret values, encrypted and write-only
 package secrets
 
 import (
@@ -22,8 +21,7 @@ import (
 )
 
 const (
-	// MinValueLength keeps secrets long enough to be masked in logs without
-	// also masking ordinary words.
+	// MinValueLength keeps secrets long enough to mask without masking ordinary words
 	MinValueLength = 6
 	maxValueLength = 4096
 )
@@ -57,7 +55,6 @@ func (s *Service) changed(projectID uuid.UUID) {
 	}
 }
 
-// NewService returns a secrets Service.
 func NewService(queries *store.Queries, authorizer *authz.Authorizer, ring *keyring.Keyring) *Service {
 	return &Service{queries: queries, authz: authorizer, keyring: ring}
 }
@@ -78,8 +75,7 @@ func (s *Service) List(ctx context.Context, userID, projectID uuid.UUID) ([]Secr
 	return out, nil
 }
 
-// Set creates the secret or replaces its value, and reports which. A
-// replaced value takes effect at each environment's next deployment.
+// Set creates the secret or replaces its value, and reports which
 func (s *Service) Set(ctx context.Context, userID, projectID uuid.UUID, name, value string) (Secret, bool, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ManageApps); err != nil {
 		return Secret{}, false, err
@@ -165,10 +161,7 @@ func (s *Service) Missing(ctx context.Context, projectID uuid.UUID, names []stri
 	return missing, nil
 }
 
-// Values decrypts the named secrets of a project, and reports names that do
-// not exist. It does no user authorization: it is for the Control Plane's own
-// use when handing a deployment to an Agent, and its result must never be
-// stored or logged.
+// Values decrypts the named secrets without user authorization; never store or log the result
 func (s *Service) Values(ctx context.Context, projectID uuid.UUID, names []string) (values map[string]string, missing []string, err error) {
 	values = map[string]string{}
 	if len(names) == 0 {
@@ -193,8 +186,7 @@ func (s *Service) Values(ctx context.Context, projectID uuid.UUID, names []strin
 	return values, missing, nil
 }
 
-// AllValues decrypts every secret of a project. It is used to mask the
-// values in logs and has the same handling rules as Values.
+// AllValues decrypts every secret of a project, for log masking; same handling rules as Values
 func (s *Service) AllValues(ctx context.Context, projectID uuid.UUID) ([]string, error) {
 	rows, err := s.queries.ListProjectSecrets(ctx, projectID)
 	if err != nil {

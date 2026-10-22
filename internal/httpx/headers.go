@@ -2,19 +2,10 @@ package httpx
 
 import "net/http"
 
-// reactAriaPressStyle is the hash of the one inline <style> element that
-// react-aria's press handling adds at run time (`touch-action` for pressable
-// elements). Allowing exactly that text, instead of 'unsafe-inline', keeps
-// every other inline style blocked. The same rule is in the dashboard's own
-// CSS, so if a react-aria upgrade changes the text and this hash stops
-// matching, behavior is unchanged and the browser console reports a blocked
-// style: take the new hash from that message.
+// reactAriaPressStyle is the hash of react-aria's one inline <style>; update it if a CSP violation appears
 const reactAriaPressStyle = "'sha256-38RhXrc7EdReTKsOm23ZPOCUgniTUUcjky8QOOrQx6o='"
 
-// contentSecurityPolicy lets the page load only what ForgeDeck itself serves.
-// There is no inline script, no third-party origin, no framing, and no plugin
-// content: a cross-site scripting bug in the dashboard cannot load attacker
-// code, send data to another origin, or be framed for clickjacking.
+// contentSecurityPolicy lets the page load only what ForgeDeck serves: no inline script, third party or framing
 const contentSecurityPolicy = "default-src 'none'; " +
 	"script-src 'self'; " +
 	"style-src 'self' " + reactAriaPressStyle + "; " +
@@ -27,13 +18,10 @@ const contentSecurityPolicy = "default-src 'none'; " +
 	"frame-ancestors 'none'; " +
 	"object-src 'none'"
 
-// hstsValue is two years, the value browsers' preload lists expect.
+// hstsValue is two years, as preload lists expect
 const hstsValue = "max-age=63072000; includeSubDomains"
 
-// SecurityHeaders sets the browser security headers on every response.
-// hsts adds Strict-Transport-Security; enable it only when ForgeDeck is
-// served over HTTPS, since a browser that sees it refuses plain HTTP to the
-// host for the whole period.
+// SecurityHeaders sets browser security headers; enable hsts only over HTTPS
 func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,8 +41,7 @@ func SecurityHeaders(hsts bool) func(http.Handler) http.Handler {
 	}
 }
 
-// NoStore marks responses as not cacheable. API responses carry session-
-// scoped data, so neither the browser nor a proxy may keep them.
+// NoStore marks responses as not cacheable; they carry session-scoped data
 func NoStore(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")

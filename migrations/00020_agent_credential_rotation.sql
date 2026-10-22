@@ -1,7 +1,5 @@
 -- +goose Up
--- Rotating an Agent's credential: the new one takes effect at once and the
--- one it replaces keeps working for a short grace period, so an Agent that
--- loses the rotation response (or crashes before saving it) is not locked out.
+-- The replaced credential keeps working for a grace period so a lost rotation response cannot lock the Agent out.
 ALTER TABLE agents
     ADD COLUMN previous_credential_hash bytea UNIQUE,
     ADD COLUMN previous_expires_at      timestamptz,

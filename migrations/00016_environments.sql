@@ -1,7 +1,5 @@
 -- +goose Up
--- A named target of an application: one server and one service configuration
--- (docs/15-deployments.md). config is validated JSON (internal/servicecfg);
--- there is no user-supplied Compose file.
+-- A named target of an application: one server and one validated service config.
 CREATE TABLE environments (
     id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     application_id uuid NOT NULL REFERENCES applications (id) ON DELETE CASCADE,
@@ -10,8 +8,7 @@ CREATE TABLE environments (
     server_id      uuid NOT NULL REFERENCES servers (id) ON DELETE RESTRICT,
     auto_deploy    boolean NOT NULL DEFAULT false,
     config         jsonb NOT NULL,
-    -- Copy of config.published_port so the database can refuse two
-    -- environments claiming the same host port on one server.
+    -- copy of config.published_port so the database refuses duplicate host ports per server
     published_port integer CHECK (published_port BETWEEN 1024 AND 65535),
     created_by     uuid REFERENCES users (id) ON DELETE SET NULL,
     created_at     timestamptz NOT NULL DEFAULT now(),

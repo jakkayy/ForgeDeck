@@ -9,10 +9,7 @@ export function getJob(jobId: string, signal?: AbortSignal) {
   return api<Job>(`/jobs/${jobId}`, { signal });
 }
 
-/**
- * Polls a job until it finishes. Used only while the user waits on an action
- * they just started, so the short interval is bounded in time.
- */
+/** Polls a job until it finishes; only while the user waits, so the short interval is bounded. */
 export async function waitForJob(jobId: string, signal?: AbortSignal): Promise<Job> {
   const deadline = Date.now() + MAX_WAIT_MS;
   for (;;) {
@@ -27,7 +24,6 @@ export async function waitForJob(jobId: string, signal?: AbortSignal): Promise<J
   }
 }
 
-/** Reads every stored log line of a finished job, page by page. */
 export async function getAllJobLogs(jobId: string, signal?: AbortSignal): Promise<LogLine[]> {
   const lines: LogLine[] = [];
   let after: string | null = null;

@@ -3,7 +3,6 @@ import { ApiError, isApiError } from "./client";
 
 let onUnauthorized: () => void = () => {};
 
-/** Registers what to do when any query finds the session has ended. */
 export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler;
 }

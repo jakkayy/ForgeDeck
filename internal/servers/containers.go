@@ -11,12 +11,10 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/authz"
 )
 
-// snapshotStaleAfter marks a container list stale when no snapshot has been
-// observed for this long. Agents send one every 30–60 seconds.
+// snapshotStaleAfter marks a container list stale when no snapshot has been observed for this long
 const snapshotStaleAfter = 2 * time.Minute
 
-// ContainerList is the latest snapshot for a server. It is cached Agent
-// data, not a live query: ObservedAt and Stale tell the UI how fresh it is.
+// ContainerList is the latest snapshot for a server
 type ContainerList struct {
 	ServerID   uuid.UUID   `json:"server_id"`
 	ObservedAt *time.Time  `json:"observed_at"`

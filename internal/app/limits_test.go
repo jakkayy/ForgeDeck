@@ -12,9 +12,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/config"
 )
 
-// behindProxy makes the test server treat requests from this machine as
-// coming through a trusted reverse proxy, so a test can play different clients
-// by setting X-Forwarded-For.
+// behindProxy trusts this machine as a reverse proxy so tests can vary X-Forwarded-For.
 func behindProxy(cfg *config.Config) {
 	cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8")}
 }
@@ -40,7 +38,6 @@ func TestEnrollmentGuessingIsLimitedPerClientAddress(t *testing.T) {
 		t.Fatalf("limited response %d, Retry-After %q", resp.Status, resp.Header.Get("Retry-After"))
 	}
 
-	// Another client is not affected by the first one's guesses.
 	if got := anon.DoRaw(http.MethodPost, "/api/v1/agent/enroll", guess, asClient("198.51.100.11")).Status; got != http.StatusUnauthorized {
 		t.Fatalf("a different client got %d, want a plain 401", got)
 	}
@@ -52,14 +49,12 @@ func TestOneClientsGuessesDoNotLimitRealAgents(t *testing.T) {
 	agent := env.EnrollAgent(owner, owner.CreateProject("Infra"), "prod-01")
 	beat, _ := jsonBody(agentproto.HeartbeatRequest{AgentVersion: "t", ProtocolVersion: agentproto.ProtocolVersion})
 
-	// An Agent that authenticates is never throttled, however often it reports.
 	for i := range 60 {
 		if got := agent.DoRaw(http.MethodPost, "/api/v1/agent/heartbeat", beat, asClient("203.0.113.5")).Status; got != http.StatusOK {
 			t.Fatalf("heartbeat %d: %d", i, got)
 		}
 	}
 
-	// A client presenting bad Agent credentials is stopped after a while...
 	bad := env.Anonymous()
 	var last int
 	for range 25 {
@@ -68,7 +63,6 @@ func TestOneClientsGuessesDoNotLimitRealAgents(t *testing.T) {
 	if last != http.StatusTooManyRequests {
 		t.Fatalf("after 25 bad credentials the status is %d, want 429", last)
 	}
-	// ...while the real Agent, from its own address, carries on.
 	if got := agent.DoRaw(http.MethodPost, "/api/v1/agent/heartbeat", beat, asClient("203.0.113.5")).Status; got != http.StatusOK {
 		t.Fatalf("the real Agent got %d", got)
 	}
@@ -96,7 +90,7 @@ func TestSensitiveUserActionsHaveTighterLimits(t *testing.T) {
 	projectID := owner.CreateProject("Shop")
 	path := "/api/v1/projects/" + projectID.String() + "/members"
 
-	// Looking up emails one by one would reveal which have accounts.
+	// looking up emails one by one would reveal which have accounts.
 	var statuses []int
 	for i := range 12 {
 		statuses = append(statuses, owner.Do(http.MethodPost, path, map[string]string{"email": "nobody" + strconv.Itoa(i) + "@example.com", "role": "viewer"}).Status)
@@ -110,7 +104,6 @@ func TestSensitiveUserActionsHaveTighterLimits(t *testing.T) {
 			t.Fatalf("attempt %d: %d, want %d (statuses %v)", i, status, want, statuses)
 		}
 	}
-	// One user's burst does not limit another.
 	other, _ := env.NewUser("other@example.com")
 	otherProject := other.CreateProject("Other")
 	other.Do(http.MethodPost, "/api/v1/projects/"+otherProject.String()+"/members", map[string]string{"email": "x@example.com", "role": "viewer"}).
@@ -138,7 +131,6 @@ func TestUsersMayChangeThingsFastButNotWithoutLimit(t *testing.T) {
 	if limited < 5 {
 		t.Fatalf("%d of 70 rapid changes were limited, want most of those past the burst of 60", limited)
 	}
-	// Reading is never limited.
 	for range 100 {
 		owner.Do(http.MethodGet, path, nil).RequireStatus(http.StatusOK)
 	}

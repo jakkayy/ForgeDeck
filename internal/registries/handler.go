@@ -9,17 +9,15 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
-// Handler serves the registry endpoints behind auth.RequireUser.
+// Handler serves the registry endpoints behind auth.RequireUser
 type Handler struct {
 	svc *Service
 }
 
-// NewHandler returns registry endpoints.
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// Routes mounts the registry endpoints on r.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/projects/{projectID}/registries", httpx.Handle(h.list))
 	r.Post("/projects/{projectID}/registries", httpx.Handle(h.create))

@@ -10,12 +10,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ErrInvalidCredentials is returned for an unknown email or a wrong password,
-// without saying which.
+// ErrInvalidCredentials is returned for an unknown email or a wrong password, without saying which
 var ErrInvalidCredentials = errors.New("invalid email or password")
 
-// dummyHash is verified when the email is unknown so that response time does
-// not reveal whether an account exists.
+// dummyHash is verified for unknown emails so timing does not reveal account existence
 var dummyHash = sync.OnceValue(func() string {
 	hash, err := HashPassword("forgedeck-timing-equalizer")
 	if err != nil {
@@ -24,7 +22,7 @@ var dummyHash = sync.OnceValue(func() string {
 	return hash
 })
 
-// Login checks credentials and starts a session.
+// Login checks credentials and starts a session
 func (s *Service) Login(ctx context.Context, email, password string) (User, NewSession, error) {
 	record, err := s.queries.GetUserByEmail(ctx, strings.TrimSpace(email))
 	if errors.Is(err, pgx.ErrNoRows) {

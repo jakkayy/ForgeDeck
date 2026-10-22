@@ -9,8 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// TestConcurrentClaimsNeverShareAJob races many workers over one server's
-// queue: every job must be claimed exactly once.
+// TestConcurrentClaimsNeverShareAJob: racing workers must claim every job exactly once.
 func TestConcurrentClaimsNeverShareAJob(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()

@@ -9,8 +9,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 )
 
-// What a developer fetches from a container may be sensitive, so the lines
-// stay with developers; the fact that a job ran is visible to every member.
+// Container output may be sensitive: lines stay with developers; that a job ran is visible to all.
 func TestViewersCannotReadFetchedContainerLogs(t *testing.T) {
 	w := newWorld(t)
 	var queued servers.QueuedJob
@@ -28,7 +27,6 @@ func TestViewersCannotReadFetchedContainerLogs(t *testing.T) {
 		}
 	}
 
-	// A build's output is for every member.
 	var jobID uuid.UUID
 	if err := w.env.Pool.QueryRow(t.Context(), `SELECT id FROM jobs WHERE type = 'build'`).Scan(&jobID); err != nil {
 		t.Fatal(err)

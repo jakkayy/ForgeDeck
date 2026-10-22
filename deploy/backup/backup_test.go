@@ -1,5 +1,4 @@
-// Package backup_test runs the backup and restore scripts against a real
-// PostgreSQL in Docker. It runs only when FORGEDECK_TEST_DOCKER=1.
+// Package backup_test runs the backup and restore scripts on real PostgreSQL (FORGEDECK_TEST_DOCKER=1).
 package backup_test
 
 import (
@@ -17,8 +16,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/dockertest"
 )
 
-// seeded starts PostgreSQL, applies ForgeDeck's migrations, and adds the data
-// whose survival the tests check.
 func seeded(t *testing.T) dockertest.Postgres {
 	t.Helper()
 	dockertest.Require(t)
@@ -51,7 +48,6 @@ func seeded(t *testing.T) dockertest.Postgres {
 	return pg
 }
 
-// script runs one of the scripts with the given environment and returns its output.
 func script(t *testing.T, env []string, name string, args ...string) (string, error) {
 	t.Helper()
 	cmd := exec.CommandContext(t.Context(), name, args...) //nolint:gosec // test runs the repository's own scripts
@@ -89,7 +85,6 @@ func TestBackupAndRestoreThroughTheContainer(t *testing.T) {
 		t.Fatalf("no checksum: %v", err)
 	}
 
-	// --verify restores into a temporary database, reports what it found, and leaves nothing behind.
 	out, err = script(t, env, "./restore.sh", "--verify", file)
 	if err != nil {
 		t.Fatalf("verify: %v\n%s", err, out)
@@ -103,7 +98,6 @@ func TestBackupAndRestoreThroughTheContainer(t *testing.T) {
 		t.Errorf("%s temporary databases left behind", leftover)
 	}
 
-	// A real restore replaces the database: lose the data, restore, and it is back.
 	dockerSQL(t, pg, `TRUNCATE users, projects CASCADE`)
 	if got := dockerSQL(t, pg, `SELECT count(*) FROM projects`); got != "0" {
 		t.Fatalf("setup: %s projects", got)
@@ -120,14 +114,14 @@ func TestBackupAndRestoreThroughTheContainer(t *testing.T) {
 	if got := dockerSQL(t, pg, `SELECT count(*) FROM projects`); got != "1" {
 		t.Fatalf("after the restore: %s projects, want 1", got)
 	}
-	// The secret is still ciphertext: the backup never held the key.
+	// the secret stays ciphertext: the backup never held the key.
 	if got := dockerSQL(t, pg, `SELECT encode(ciphertext, 'hex') FROM project_secrets`); got != "deadbeef" {
 		t.Fatalf("restored ciphertext %q", got)
 	}
 }
 
 func TestBackupAndRestoreWithAConnectionURL(t *testing.T) {
-	// pg_dump refuses a server newer than itself, so the test needs a client of version 17 or later.
+	// pg_dump refuses a newer server, so the client must be version 17 or later.
 	version, err := exec.CommandContext(t.Context(), "pg_dump", "--version").Output()
 	if err != nil {
 		t.Skip("pg_dump is not installed on this machine")
@@ -168,7 +162,6 @@ func TestDamagedBackupsAreRefused(t *testing.T) {
 		t.Fatalf("a truncated backup was accepted: %v\n%s", err, out)
 	}
 
-	// Without the checksum file the damage is still caught, by PostgreSQL, and nothing is left behind.
 	if err := os.Remove(file + ".sha256"); err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +225,6 @@ func dockerSQL(t *testing.T, pg dockertest.Postgres, statement string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// major returns the major version number of "17.2" or "16.4.1".
 func major(version string) int {
 	n := 0
 	for _, r := range version {

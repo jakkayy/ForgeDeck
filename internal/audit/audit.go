@@ -1,5 +1,4 @@
-// Package audit records who did what, and lets project admins read it back.
-// The record is append-only: nothing here updates or deletes a row.
+// Package audit records who did what, and lets project admins read it back
 package audit
 
 import (
@@ -18,25 +17,20 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// Non-human actors.
+// Non-human actors
 const (
-	ActorSystem = "system"
-	ActorAgent  = "agent"
-	ActorRunner = "runner"
-	// ActorWebhook is a Git provider's push event.
+	ActorSystem  = "system"
+	ActorAgent   = "agent"
+	ActorRunner  = "runner"
 	ActorWebhook = "webhook"
 )
 
-// Event is one thing that happened. Metadata must hold non-sensitive details
-// only; values under keys that look like credentials are masked anyway.
+// Event is one thing that happened
 type Event struct {
-	// ProjectID scopes the event; nil for installation-level events.
-	ProjectID *uuid.UUID
-	// ActorUserID is the signed-in user, or nil for a non-human actor, which
-	// is then named by Actor (ActorSystem, ActorAgent, ActorRunner).
+	ProjectID   *uuid.UUID
 	ActorUserID *uuid.UUID
 	Actor       string
-	// Action is "<noun>.<verb>", such as "secret.set" or "deployment.start".
+	// action is "<noun>.<verb>", such as "secret.set" or "deployment.start"
 	Action     string
 	TargetType string
 	TargetID   string
@@ -44,29 +38,25 @@ type Event struct {
 	Metadata   map[string]any
 }
 
-// Recorder writes audit events.
+// Recorder writes audit events
 type Recorder struct {
 	queries *store.Queries
 	logger  *slog.Logger
 }
 
-// NewRecorder returns a Recorder.
+// NewRecorder returns a Recorder
 func NewRecorder(queries *store.Queries, logger *slog.Logger) *Recorder {
 	return &Recorder{queries: queries, logger: logger}
 }
 
-// Record stores e. It never fails the caller: the action it describes has
-// already happened, so a failure to record is logged loudly instead. The
-// actor's email and the request ID are filled in from the user and context.
+// Record stores e
 func (r *Recorder) Record(ctx context.Context, e Event) {
 	if err := r.write(ctx, e); err != nil {
 		r.logger.ErrorContext(ctx, "audit event not recorded", "action", e.Action, "target", e.TargetID, "error", err)
 	}
 }
 
-// RecordIn stores e inside the caller's transaction, so it commits or rolls
-// back with what it describes. It runs in a savepoint: if the insert fails,
-// only the event is lost (and logged), and the caller's transaction stays usable.
+// RecordIn stores e in the caller's transaction so it commits or rolls back together
 func (r *Recorder) RecordIn(ctx context.Context, tx pgx.Tx, e Event) {
 	sp, err := tx.Begin(ctx)
 	if err == nil {
@@ -109,11 +99,10 @@ func (r *Recorder) writeWith(ctx context.Context, q *store.Queries, e Event) err
 	})
 }
 
-// sensitiveKeys are fragments of metadata keys whose values are never kept.
+// sensitiveKeys are fragments of metadata keys whose values are never kept
 var sensitiveKeys = []string{"secret", "password", "token", "credential", "key", "value"}
 
-// sanitize masks metadata values under credential-like keys. It is a safety
-// net for a careless caller, not a license to put secrets in metadata.
+// sanitize masks metadata values under credential-like keys
 func sanitize(metadata map[string]any) map[string]any {
 	out := make(map[string]any, len(metadata))
 	for key, value := range metadata {
@@ -141,7 +130,7 @@ func optional(s string) *string {
 	return &s
 }
 
-// Entry is the API view of an audit event.
+// Entry is the API view of an audit event
 type Entry struct {
 	ID         uuid.UUID       `json:"id"`
 	Actor      string          `json:"actor"`
@@ -154,19 +143,18 @@ type Entry struct {
 	CreatedAt  time.Time       `json:"created_at"`
 }
 
-// Reader lists audit events for project admins.
+// Reader lists audit events for project admins
 type Reader struct {
 	queries *store.Queries
 	authz   *authz.Authorizer
 }
 
-// NewReader returns a Reader.
+// NewReader returns a Reader
 func NewReader(queries *store.Queries, authorizer *authz.Authorizer) *Reader {
 	return &Reader{queries: queries, authz: authorizer}
 }
 
-// List returns a project's events, newest first, and the cursor of the next
-// page (nil on the last). Only admins and owners may read the audit log.
+// List returns a project's events, newest first, and the cursor of the next page (nil on the last)
 func (r *Reader) List(ctx context.Context, userID, projectID uuid.UUID, action string, cursor string, limit int32) ([]Entry, *string, error) {
 	if _, err := r.authz.Require(ctx, userID, projectID, authz.ViewAudit); err != nil {
 		return nil, nil, err

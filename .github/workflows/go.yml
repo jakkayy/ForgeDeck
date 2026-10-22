@@ -19,11 +19,9 @@ jobs:
       - uses: golangci/golangci-lint-action@v8
         with:
           version: v2.5.0
-          # Build the linter with the module's Go version; prebuilt binaries
-          # can lag behind go.mod and refuse to load.
+          # prebuilt linter binaries can lag behind go.mod
           install-mode: goinstall
-          # Config verification downloads a JSON schema and fails on network
-          # hiccups; the config is checked by `golangci-lint run` itself.
+          # config verification downloads a schema and fails on network hiccups
           verify: false
 
   test:
@@ -44,7 +42,6 @@ jobs:
           --health-retries 10
     env:
       FORGEDECK_TEST_DATABASE_URL: postgres://forgedeck:forgedeck@localhost:5432/postgres?sslmode=disable
-      # GitHub-hosted runners ship a Docker daemon.
       FORGEDECK_TEST_DOCKER: "1"
     steps:
       - uses: actions/checkout@v5
@@ -53,15 +50,13 @@ jobs:
           go-version-file: go.mod
       - run: go test -race ./...
 
-  # The production image must keep building: it is what deploy/compose runs.
+  # the production image is what deploy/compose runs
   image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - run: docker build -f deploy/Dockerfile --build-arg VERSION=ci -t forgedeck-api:ci .
-      # The image has no shell, so run its own commands: with nothing configured
-      # it must refuse to start and say why, and its health check must fail
-      # (nothing is listening) rather than hang.
+      # the image has no shell: run its own commands (no config must fail fast, health check must not hang)
       - name: The image starts, explains a bad configuration, and is non-root
         run: |
           out=$(docker run --rm forgedeck-api:ci serve 2>&1 || true)

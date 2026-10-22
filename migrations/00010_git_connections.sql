@@ -1,8 +1,5 @@
 -- +goose Up
--- A project's link to a Git provider. GitHub uses the ForgeDeck GitHub App
--- (installation ID; the app's own key and webhook secret live in config).
--- GitLab uses a project access token and a per-connection webhook secret.
--- Credentials are AES-GCM ciphertext; *_key_id names the key that sealed them.
+-- A project's link to a Git provider; credentials are AES-GCM ciphertext (*_key_id names the key).
 CREATE TABLE git_connections (
     id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id            uuid NOT NULL REFERENCES projects (id) ON DELETE CASCADE,

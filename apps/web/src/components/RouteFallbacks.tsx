@@ -1,9 +1,7 @@
 import { type ErrorComponentProps, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-// These are registered on the router, so they load with the first page. They
-// use plain elements on purpose: importing HeroUI here would pull it into the
-// initial bundle.
+// plain elements on purpose: importing HeroUI here would pull it into the initial bundle
 
 function Centered({ children }: { children: ReactNode }) {
   return (
@@ -13,7 +11,6 @@ function Centered({ children }: { children: ReactNode }) {
   );
 }
 
-/** Shown for a URL that matches no page. */
 export function NotFoundPage() {
   return (
     <Centered>
@@ -29,7 +26,6 @@ export function NotFoundPage() {
   );
 }
 
-/** Shown when a page fails while rendering, instead of a blank screen. */
 export function RouteErrorPage({ error, reset }: ErrorComponentProps) {
   return (
     <Centered>

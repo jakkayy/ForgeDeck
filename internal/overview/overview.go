@@ -1,5 +1,4 @@
-// Package overview summarizes what needs attention across every project the
-// signed-in user belongs to.
+// Package overview summarizes what needs attention across the user's projects.
 package overview
 
 import (
@@ -18,7 +17,6 @@ const (
 	failureLimit = 5
 )
 
-// Overview is the dashboard summary.
 type Overview struct {
 	Servers      ServerCounts `json:"servers"`
 	Environments EnvCounts    `json:"environments"`
@@ -27,7 +25,6 @@ type Overview struct {
 	GeneratedAt  time.Time    `json:"generated_at"`
 }
 
-// ServerCounts groups servers by connectivity.
 type ServerCounts struct {
 	Total       int64 `json:"total"`
 	Online      int64 `json:"online"`
@@ -36,7 +33,6 @@ type ServerCounts struct {
 	Pending     int64 `json:"pending"`
 }
 
-// EnvCounts groups environments by how their newest deployment ended.
 type EnvCounts struct {
 	Total       int64 `json:"total"`
 	Succeeded   int64 `json:"succeeded"`
@@ -45,7 +41,6 @@ type EnvCounts struct {
 	NotDeployed int64 `json:"not_deployed"`
 }
 
-// Deployment is one deployment with the names needed to link to it.
 type Deployment struct {
 	ID              uuid.UUID  `json:"id"`
 	EnvironmentID   uuid.UUID  `json:"environment_id"`
@@ -60,19 +55,16 @@ type Deployment struct {
 	FinishedAt      *time.Time `json:"finished_at"`
 }
 
-// Service reads the summary. It needs no role check: every query is limited
-// to projects the user is a member of, and the data is visible to a viewer.
+// Service needs no role check: queries are limited to the user's projects, visible to a viewer
 type Service struct {
 	queries *store.Queries
 	now     func() time.Time
 }
 
-// NewService returns an overview reader.
 func NewService(queries *store.Queries, now func() time.Time) *Service {
 	return &Service{queries: queries, now: now}
 }
 
-// Get summarizes the user's projects.
 func (s *Service) Get(ctx context.Context, userID uuid.UUID) (Overview, error) {
 	now := s.now()
 	online, unreachable := servers.ConnectivityCutoffs(now)

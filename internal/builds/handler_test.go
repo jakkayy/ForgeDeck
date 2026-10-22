@@ -81,14 +81,12 @@ func TestTriggerBuildsBranchHead(t *testing.T) {
 		t.Fatalf("job %+v payload %+v", job, payload)
 	}
 
-	// Triggering again while it is queued returns the same build.
 	var again builds.Queued
 	f.trigger(f.owner, map[string]string{}).RequireStatus(http.StatusAccepted).Decode(&again)
 	if again.JobID != queued.JobID {
 		t.Fatalf("second trigger queued %s, want %s", again.JobID, queued.JobID)
 	}
 
-	// Once that build has ended, the same commit can be built again.
 	f.owner.Do(http.MethodPost, "/api/v1/jobs/"+queued.JobID.String()+"/cancel", nil).RequireStatus(http.StatusOK)
 	var rebuilt builds.Queued
 	f.trigger(f.owner, nil).RequireStatus(http.StatusAccepted).Decode(&rebuilt)

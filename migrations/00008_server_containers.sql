@@ -1,6 +1,5 @@
 -- +goose Up
--- Latest container state reported by each server's Agent. A cache for the
--- dashboard, replaced by every accepted snapshot; not a history table.
+-- Latest container snapshot per server (a cache, not a history table).
 CREATE TABLE server_containers (
     server_id    uuid NOT NULL REFERENCES servers (id) ON DELETE CASCADE,
     container_id text NOT NULL CHECK (container_id ~ '^[a-f0-9]{12,64}$'),

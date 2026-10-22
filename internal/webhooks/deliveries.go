@@ -13,7 +13,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// delivery identifies one webhook delivery from a provider.
 type delivery struct {
 	provider     string
 	id           string
@@ -21,13 +20,10 @@ type delivery struct {
 	connectionID *uuid.UUID
 }
 
-// process handles a verified, first-seen delivery and returns a short
-// description of what was done, stored with the event for troubleshooting.
+// process handles a verified, first-seen delivery and returns a short description for the event
 type process func(ctx context.Context) (string, error)
 
-// handleOnce records the delivery and runs fn only if the provider has not
-// sent it before. If fn fails, the record is removed so the provider's own
-// retry is processed instead of being dropped as a duplicate.
+// handleOnce runs fn only for first-seen deliveries; on failure the record is removed so retries run
 func (h *Handler) handleOnce(w http.ResponseWriter, r *http.Request, d delivery, fn process) error {
 	if d.id == "" {
 		return httpx.BadRequest("missing_delivery_id", "The delivery ID header is missing.")

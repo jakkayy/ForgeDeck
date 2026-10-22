@@ -15,7 +15,6 @@ export type ServiceConfig = {
   published_port: number | null;
   bind_address: "127.0.0.1" | "0.0.0.0";
   env: Record<string, string>;
-  /** Names of project secrets the service receives as environment variables. */
   secrets: string[];
   volumes: { name: string; path: string }[];
   restart: "unless-stopped" | "always" | "on-failure" | "no";
@@ -35,7 +34,6 @@ export type Environment = {
   updated_at: string;
 };
 
-/** What the create form sends; the server fills in the rest of the config. */
 export type NewEnvironment = {
   name: string;
   server_id: string;
@@ -106,7 +104,6 @@ export function deleteEnvironment(environmentId: string) {
   return api<void>(`/environments/${environmentId}`, { method: "DELETE" });
 }
 
-/** Deployments poll while one is in progress, so the stage view stays current. */
 export const DEPLOYMENT_POLL_MS = 3_000;
 
 export const isDeploymentActive = (d: Pick<Deployment, "status">) =>
@@ -134,7 +131,6 @@ export const deploymentListQuery = (environmentId: string) =>
   pagedQuery<Deployment>({
     key: ["environments", environmentId, "deployments"],
     path: `/environments/${environmentId}/deployments`,
-    // Loaded pages are refetched together, so an active deployment's stage stays current.
     refetchInterval: (data) =>
       data?.pages.some((page) => page.items.some(isDeploymentActive)) ? DEPLOYMENT_POLL_MS : false,
   });

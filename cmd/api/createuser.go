@@ -20,8 +20,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// createUser adds a user account. The password is read from the terminal
-// without echo, or from the first line of stdin when piped, never from args.
+// createUser adds a user; the password comes from the terminal or stdin, never args
 func createUser(ctx context.Context, args []string, cfg config.Config, logger *slog.Logger) error {
 	flags := flag.NewFlagSet("create-user", flag.ContinueOnError)
 	email := flags.String("email", "", "email address of the new user")

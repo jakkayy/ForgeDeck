@@ -10,9 +10,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// queueBuilds enqueues one build per application for the pushed commit and
-// describes the outcome. Builds are keyed by application and commit, so the
-// same commit pushed twice (or redelivered) is built once.
+// queueBuilds enqueues one build per application and commit; redeliveries build once
 func (h *Handler) queueBuilds(ctx context.Context, apps []store.Application, push Push) (string, error) {
 	if len(apps) == 0 {
 		return "ignored: no application builds branch " + push.Branch, nil

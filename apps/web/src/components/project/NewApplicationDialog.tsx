@@ -20,7 +20,6 @@ import { gitConnectionsQuery, repositoriesQuery } from "../../api/git";
 import { ApiForm } from "../ApiForm";
 import { ImageFields, type ImageValue } from "../application/ImageFields";
 
-/** Creates an application: connection → repository → branch, with build settings tucked away. */
 export function NewApplicationDialog({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const create = useMutation({
