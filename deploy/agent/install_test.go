@@ -183,9 +183,12 @@ func TestUnitIsValidAndHardened(t *testing.T) {
 	}
 	if _, err := exec.LookPath("systemd-analyze"); err == nil {
 		// Verification complains that the binary does not exist on this machine; nothing else may be reported.
+		// It also reads the host's own units and reports their problems (a newer systemd warns about
+		// options an older vendor unit still uses): those are not ours, so only lines about this unit count.
 		out, _ := exec.CommandContext(t.Context(), "systemd-analyze", "verify", "forgedeck-agent.service").CombinedOutput() //nolint:gosec // test
 		for _, line := range strings.Split(string(out), "\n") {
-			if line != "" && !strings.Contains(line, "is not executable") && !strings.Contains(line, "No such file") {
+			if line != "" && strings.Contains(line, "forgedeck-agent.service") &&
+				!strings.Contains(line, "is not executable") && !strings.Contains(line, "No such file") {
 				t.Errorf("systemd-analyze: %s", line)
 			}
 		}
