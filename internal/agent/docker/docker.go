@@ -1,6 +1,4 @@
-// Package docker is the Agent's narrow view of the local Docker Engine. It
-// exposes only the allowlisted operations; there is no pass-through to
-// arbitrary Docker API calls.
+// Package docker is the Agent's narrow view of the local Docker Engine
 package docker
 
 import (
@@ -19,12 +17,10 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 )
 
-// ErrContainerNotFound means the container no longer exists.
+// ErrContainerNotFound means the container no longer exists
 var ErrContainerNotFound = errors.New("container not found")
 
-// Only these labels leave the host: ForgeDeck's own (by prefix) and Compose's
-// project/service names (exact keys). Other labels may hold sensitive data,
-// such as host paths in com.docker.compose.project.working_dir.
+// Only these labels leave the host
 const forgedeckLabelPrefix = "forgedeck."
 
 var forwardedComposeLabels = map[string]bool{
@@ -32,13 +28,12 @@ var forwardedComposeLabels = map[string]bool{
 	"com.docker.compose.service": true,
 }
 
-// Engine wraps a Docker client configured from the standard DOCKER_* env.
+// Engine wraps a Docker client configured from the standard DOCKER_* env
 type Engine struct {
 	cli *client.Client
 }
 
-// New connects to the Docker Engine (DOCKER_HOST, default local socket),
-// negotiating the API version with the daemon.
+// New connects to the Docker Engine (DOCKER_HOST or the local socket)
 func New() (*Engine, error) {
 	cli, err := client.New(client.FromEnv)
 	if err != nil {
@@ -47,10 +42,10 @@ func New() (*Engine, error) {
 	return &Engine{cli: cli}, nil
 }
 
-// Close releases the client.
+// Close releases the client
 func (e *Engine) Close() error { return e.cli.Close() }
 
-// Status reports whether the Engine answers and its version.
+// Status reports whether the Engine answers and its version
 func (e *Engine) Status(ctx context.Context) agentproto.Docker {
 	version, err := e.cli.ServerVersion(ctx, client.ServerVersionOptions{})
 	if err != nil {
@@ -59,7 +54,7 @@ func (e *Engine) Status(ctx context.Context) agentproto.Docker {
 	return agentproto.Docker{Available: true, Version: version.Version}
 }
 
-// ListContainers returns every container, running or not.
+// ListContainers returns every container, running or not
 func (e *Engine) ListContainers(ctx context.Context) ([]agentproto.Container, error) {
 	result, err := e.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
@@ -79,33 +74,32 @@ func (e *Engine) ListContainers(ctx context.Context) ([]agentproto.Container, er
 	return containers, nil
 }
 
-// Start starts a container; starting a running container succeeds.
+// Start starts a container
 func (e *Engine) Start(ctx context.Context, id string) error {
 	_, err := e.cli.ContainerStart(ctx, id, client.ContainerStartOptions{})
 	return translate(err, "start")
 }
 
-// Stop stops a container with the Engine's default grace period.
+// Stop stops a container with the Engine's default grace period
 func (e *Engine) Stop(ctx context.Context, id string) error {
 	_, err := e.cli.ContainerStop(ctx, id, client.ContainerStopOptions{})
 	return translate(err, "stop")
 }
 
-// Restart restarts a container with the Engine's default grace period.
+// Restart restarts a container with the Engine's default grace period
 func (e *Engine) Restart(ctx context.Context, id string) error {
 	_, err := e.cli.ContainerRestart(ctx, id, client.ContainerRestartOptions{})
 	return translate(err, "restart")
 }
 
-// LogOptions selects past output to read.
+// LogOptions selects past output to read
 type LogOptions struct {
 	TailLines  int
 	Since      *time.Time
 	Timestamps bool
 }
 
-// Logs writes a container's past output to stdout and stderr. TTY containers
-// have a single combined stream, which goes to stdout.
+// Logs writes a container's past output to stdout and stderr
 func (e *Engine) Logs(ctx context.Context, id string, opts LogOptions, stdout, stderr io.Writer) error {
 	inspect, err := e.cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
@@ -148,7 +142,7 @@ func translate(err error, action string) error {
 	}
 }
 
-// containerName returns Docker's primary name without the leading slash.
+// containerName returns Docker's primary name without the leading slash
 func containerName(names []string) string {
 	if len(names) == 0 {
 		return ""

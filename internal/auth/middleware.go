@@ -10,8 +10,7 @@ import (
 
 type userKey struct{}
 
-// RequireUser rejects requests without a valid session cookie and stores the
-// authenticated User in the request context.
+// RequireUser rejects requests without a valid session and stores the User in the context
 func (h *Handler) RequireUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, ok := h.cookie.read(r)
@@ -35,14 +34,13 @@ func (h *Handler) RequireUser(next http.Handler) http.Handler {
 
 var errSignInRequired = httpx.Unauthorized("Sign in to continue.")
 
-// MaybeUserFrom returns the signed-in user, if RequireUser stored one.
+// MaybeUserFrom returns the signed-in user, if RequireUser stored one
 func MaybeUserFrom(ctx context.Context) (User, bool) {
 	user, ok := ctx.Value(userKey{}).(User)
 	return user, ok
 }
 
-// UserFrom returns the user stored by RequireUser. It panics when called on
-// a route that is not behind RequireUser, which is a programming error.
+// UserFrom returns the user stored by RequireUser
 func UserFrom(ctx context.Context) User {
 	user, ok := ctx.Value(userKey{}).(User)
 	if !ok {

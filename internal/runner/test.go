@@ -20,11 +20,7 @@ var DefaultTestLimits = TestLimits{CPUs: "2", Memory: "2g", PIDs: 512}
 
 const removeContainerTimeout = 30 * time.Second
 
-// runTests runs the application's test command inside the image just built,
-// never on the build host itself. The container has no network, no Linux
-// capabilities, and bounded CPU, memory, and processes. It is named so it
-// can be removed even when the job is cancelled mid-run, which only kills
-// the docker CLI.
+// runTests runs tests in the built image, never on the host: no network, no capabilities, bounded resources
 func runTests(ctx context.Context, exec *procexec.Executor, image, name, testCommand string, limits TestLimits) error {
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeContainerTimeout)

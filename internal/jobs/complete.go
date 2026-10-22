@@ -19,9 +19,7 @@ const maxErrorMessageBytes = 2000
 
 var validErrorCode = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
-// Complete records the outcome of an attempt the worker owns. If the same
-// outcome was already recorded for this attempt, it succeeds again so
-// workers can safely retry after a network failure.
+// Complete records an attempt's outcome; repeating the same outcome succeeds so workers can retry
 func (s *Service) Complete(ctx context.Context, lease Lease, req agentproto.CompleteRequest) error {
 	if err := validateCompletion(req); err != nil {
 		return err

@@ -40,7 +40,7 @@ func TestHealthcheckFailsForAnUnhealthyOrAbsentServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	addr := listener.Addr().String()
-	_ = listener.Close() // nothing listens here now
+	_ = listener.Close()
 	t.Setenv("FORGEDECK_HTTP_ADDR", addr)
 	if err := healthcheck(context.Background()); err == nil {
 		t.Fatal("a closed port passed")
@@ -48,7 +48,7 @@ func TestHealthcheckFailsForAnUnhealthyOrAbsentServer(t *testing.T) {
 }
 
 func TestHealthcheckAcceptsAWildcardListenAddress(t *testing.T) {
-	// The server listens on ":port"; the check must still find it on this machine.
+	// the server listens on ":port"; the check must still reach it on this machine.
 	addr := healthServer(t, http.StatusOK)
 	_, port, _ := net.SplitHostPort(addr)
 	t.Setenv("FORGEDECK_HTTP_ADDR", ":"+port)

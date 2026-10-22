@@ -12,20 +12,15 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// ErrInvalidAgentCredential means the credential is unknown or its server
-// was removed.
+// ErrInvalidAgentCredential means the credential is unknown or its server was removed
 var ErrInvalidAgentCredential = errors.New("invalid agent credential")
 
-// AgentIdentity is the authenticated Agent and the server it is bound to.
-// Every Agent request is authorized against these values, never against IDs
-// in the request body.
+// AgentIdentity is the authenticated Agent and its server; authorize against it, not request body IDs
 type AgentIdentity struct {
 	AgentID   uuid.UUID
 	ServerID  uuid.UUID
 	ProjectID uuid.UUID
-	// RotationDue says the Agent should replace its credential: an admin
-	// asked, it is older than AgentCredentialMaxAge, or it presented a
-	// credential that was already replaced.
+	// RotationDue says the Agent should replace its credential
 	RotationDue bool
 }
 

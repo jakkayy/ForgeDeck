@@ -11,6 +11,7 @@ Protect source credentials, application secrets, production hosts, deployment pe
 - Enforce HTTPS in production.
 - Apply CSRF protection consistent with the session design.
 - Rate-limit login and other sensitive endpoints.
+- **First account.** A new installation has no users. The sign-in page then offers to create the first account (`POST /auth/setup`), which becomes the owner; it closes for good once any account exists. **Threat:** until that account exists, anyone who can reach the Control Plane can take it over. **Mitigation:** the window ends at the first registration, so register straight after the first start; if the Control Plane is reachable from the internet before that (a public domain with ports open), set `FORGEDECK_DISABLE_WEB_SETUP=true` and create the account with `forgedeck-api create-user` instead, which needs access to the host. There is no setup token: on a home server or tailnet that only you can reach, the person who gets there first is you. After the first account the page cannot be used to add or replace one.
 - Provide session invalidation/logout and safe credential reset flows.
 - Do not log passwords, session tokens, or authorization headers.
 

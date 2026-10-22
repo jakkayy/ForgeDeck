@@ -150,8 +150,7 @@ JOIN projects ON projects.id = servers.project_id
 JOIN project_members ON project_members.project_id = servers.project_id
 WHERE project_members.user_id = $1
   AND ($2::text IS NULL OR servers.name ILIKE '%' || $2::text || '%')
-  -- Connectivity is derived from the heartbeat age (servers.ConnectivityStatus);
-  -- the caller passes the cutoffs so the windows live in one place.
+  -- connectivity derives from heartbeat age; the caller passes the cutoffs
   AND ($3::text IS NULL
        OR ($3::text = 'pending' AND servers.last_seen_at IS NULL)
        OR ($3::text = 'online' AND servers.last_seen_at >= $4::timestamptz)

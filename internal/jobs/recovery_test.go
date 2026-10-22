@@ -14,7 +14,7 @@ func TestRecoverExpiredLeases(t *testing.T) {
 	retryable := f.agentJob(f.serverID)
 	retryable.MaxAttempts = 2
 	first, _ := f.svc.Enqueue(ctx, retryable)
-	last, _ := f.svc.Enqueue(ctx, f.agentJob(f.serverID)) // one attempt only
+	last, _ := f.svc.Enqueue(ctx, f.agentJob(f.serverID))
 	fresh := f.agentJob(f.serverID)
 	fresh.MaxAttempts = 2
 
@@ -27,7 +27,6 @@ func TestRecoverExpiredLeases(t *testing.T) {
 	if _, err := f.svc.ClaimForAgent(ctx, f.serverID, "agent-a"); err != nil {
 		t.Fatal(err)
 	}
-	// The first two attempts' workers vanished; the third is still renewing.
 	if _, err := f.pool.Exec(ctx, "UPDATE jobs SET lease_expires_at = now() - interval '1 second' WHERE id = ANY($1)",
 		[]any{first.ID, last.ID}); err != nil {
 		t.Fatal(err)
@@ -42,12 +41,10 @@ func TestRecoverExpiredLeases(t *testing.T) {
 	assertJob(t, f, last.ID.String(), "failed", "lease_expired", "lost")
 	assertJob(t, f, healthy.ID.String(), "running", "", "running")
 
-	// The requeued job is claimable again as attempt 2.
 	again, err := f.svc.ClaimForAgent(ctx, f.serverID, "agent-b")
 	if err != nil || again == nil || again.ID != first.ID || again.Attempt != 2 {
 		t.Fatalf("reclaim: %+v %v", again, err)
 	}
-	// The vanished worker's late renewal is refused.
 	_, err = f.svc.RenewLease(ctx, jobs.Lease{JobID: first.ID, Attempt: 1, WorkerKind: jobs.WorkerAgent, ServerID: &f.serverID, WorkerID: "agent-a"})
 	if err == nil {
 		t.Fatal("stale attempt renewed its lease")

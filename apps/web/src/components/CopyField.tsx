@@ -3,7 +3,6 @@ import { useState } from "react";
 
 type Props = { label: string; value: string };
 
-/** A read-only monospace value with a copy button. */
 export function CopyField({ label, value }: Props) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {

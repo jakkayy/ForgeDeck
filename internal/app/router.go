@@ -1,4 +1,4 @@
-// Package app assembles the Control Plane: services, handlers, and routes.
+// Package app assembles the Control Plane
 package app
 
 import (
@@ -38,15 +38,17 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/webui"
 )
 
-// retentionInterval is how often old data is cleaned up.
+// retentionInterval is how often old data is cleaned up
 const retentionInterval = 6 * time.Hour
 
-// NewRouter wires every module and returns the root HTTP handler. It also
-// starts background work (job notifier, lease recovery) that stops when ctx
-// is cancelled.
+// NewRouter wires every module and returns the root HTTP handler
 func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.Handler {
 	authService := auth.NewService(store.New(pool), time.Now)
-	authHandler := auth.NewHandler(authService, cfg.CookieSecure)
+	var authOptions []auth.Option
+	if cfg.DisableWebSetup {
+		authOptions = append(authOptions, auth.WithoutWebSetup())
+	}
+	authHandler := auth.NewHandler(authService, cfg.CookieSecure, authOptions...)
 	authorizer := authz.New(store.New(pool))
 	projectHandler := projects.NewHandler(projects.NewService(pool, authorizer))
 	auditRecorder := audit.NewRecorder(store.New(pool), logger)
@@ -127,9 +129,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			builds.NewHandler(builds.NewService(store.New(pool), authorizer, gitService, jobService)).Routes(signedIn)
 		})
 	})
-	// The dashboard is compressed here, not only by a proxy: running the binary
-	// directly is a supported way to use it. API responses and event streams
-	// are left alone.
+	// the dashboard is compressed here, not only by a proxy
 	router.With(middleware.Compress(5, "text/html", "text/css", "text/javascript", "image/svg+xml", "application/manifest+json")).
 		Get("/*", webui.Handler(webui.FS()).ServeHTTP)
 	return router

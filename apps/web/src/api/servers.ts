@@ -61,7 +61,6 @@ export function requestContainerLogs(serverId: string, containerId: string, tail
   });
 }
 
-/** Asks the server's Agent to replace its credential at its next heartbeat. */
 export function requestCredentialRotation(serverId: string) {
   return api<void>(`/servers/${serverId}/credential-rotation`, { method: "POST" });
 }

@@ -4,7 +4,6 @@ import { useNavigate } from "@tanstack/react-router";
 import { deleteServer, serversQuery } from "../api/servers";
 import type { Server } from "../api/types";
 
-/** Removes a server, which revokes its Agent credential immediately. */
 export function RemoveServerDialog({ server }: { server: Server }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();

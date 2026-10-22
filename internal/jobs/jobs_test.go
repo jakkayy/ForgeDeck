@@ -15,8 +15,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
 )
 
-// fixture holds a project and a server to target jobs at, created with SQL
-// so job tests do not depend on the HTTP layer.
 type fixture struct {
 	pool      *pgxpool.Pool
 	svc       *jobs.Service

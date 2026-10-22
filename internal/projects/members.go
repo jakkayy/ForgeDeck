@@ -17,7 +17,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
 
-// Member is a user's membership in a project.
 type Member struct {
 	UserID  uuid.UUID  `json:"user_id"`
 	Email   string     `json:"email"`
@@ -33,7 +32,6 @@ var (
 	errUnknownMemberKey = validate.Errors{"email": "No ForgeDeck user has this email. Create the account first."}
 )
 
-// ListMembers returns the members of a project the user belongs to.
 func (s *Service) ListMembers(ctx context.Context, userID, projectID uuid.UUID, limit, offset int32) ([]Member, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ViewProject); err != nil {
 		return nil, err
@@ -51,7 +49,6 @@ func (s *Service) ListMembers(ctx context.Context, userID, projectID uuid.UUID, 
 	return members, nil
 }
 
-// AddMember gives an existing user a role in the project.
 func (s *Service) AddMember(ctx context.Context, actorID, projectID uuid.UUID, email, roleName string) (Member, error) {
 	actorRole, err := s.authz.Require(ctx, actorID, projectID, authz.ManageMembers)
 	if err != nil {
@@ -83,8 +80,7 @@ func (s *Service) AddMember(ctx context.Context, actorID, projectID uuid.UUID, e
 	return Member{UserID: user.ID, Email: user.Email, Role: role, AddedAt: addedAt}, nil
 }
 
-// RemoveMember revokes a user's access to the project. Members may always
-// remove themselves, except the last owner.
+// RemoveMember revokes access; members may remove themselves except the last owner
 func (s *Service) RemoveMember(ctx context.Context, actorID, projectID, memberID uuid.UUID) error {
 	var actorRole authz.Role
 	var err error
@@ -99,8 +95,7 @@ func (s *Service) RemoveMember(ctx context.Context, actorID, projectID, memberID
 
 	return database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.queries.WithTx(tx)
-		// Serialize membership changes per project so two concurrent removals
-		// cannot both pass the last-owner check.
+		// serialize membership changes per project so concurrent removals cannot both pass the last-owner check
 		if err := q.LockProject(ctx, projectID); err != nil {
 			return fmt.Errorf("lock project: %w", err)
 		}

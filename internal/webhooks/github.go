@@ -12,8 +12,7 @@ import (
 
 var errBadSignature = errors.New("webhook signature does not match")
 
-// verifyGitHubSignature checks X-Hub-Signature-256 ("sha256=<hex>") against
-// the App's webhook secret in constant time.
+// verifyGitHubSignature checks X-Hub-Signature-256 ("sha256=<hex>") against the App's webhook secret in constant time
 func verifyGitHubSignature(secret string, body []byte, header string) error {
 	given, ok := strings.CutPrefix(header, "sha256=")
 	if !ok {
@@ -46,8 +45,7 @@ type gitHubPushPayload struct {
 	} `json:"head_commit"`
 }
 
-// parseGitHubPush returns the push and the installation it came through.
-// ok is false for pushes that never build: tags, deleted branches.
+// parseGitHubPush returns the push and the installation it came through
 func parseGitHubPush(body []byte) (push Push, installationID int64, ok bool, err error) {
 	var p gitHubPushPayload
 	if err := json.Unmarshal(body, &p); err != nil {

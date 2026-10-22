@@ -14,7 +14,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// ContainerOperator performs container lifecycle actions.
+// ContainerOperator performs container lifecycle actions
 type ContainerOperator interface {
 	Start(ctx context.Context, id string) error
 	Stop(ctx context.Context, id string) error
@@ -28,8 +28,7 @@ var (
 	shortContainerID  = regexp.MustCompile(`^[a-f0-9]{12,64}$`)
 )
 
-// ContainerActionHandler starts, stops, or restarts a container. selfID is
-// the Agent's own container ID ("" when it runs outside a container).
+// ContainerActionHandler starts, stops, or restarts a container
 func ContainerActionHandler(engine ContainerOperator, selfID string) worker.Handler {
 	actions := map[string]func(context.Context, string) error{
 		agentproto.ActionStart:   engine.Start,
@@ -62,9 +61,7 @@ func ContainerActionHandler(engine ContainerOperator, selfID string) worker.Hand
 	}
 }
 
-// SelfContainerID returns the Agent's container ID when it runs in Docker:
-// FORGEDECK_AGENT_CONTAINER_ID if set, otherwise Docker's default hostname,
-// which is the short container ID.
+// SelfContainerID returns the Agent's container ID when it runs in Docker
 func SelfContainerID() string {
 	if id := os.Getenv("FORGEDECK_AGENT_CONTAINER_ID"); id != "" {
 		return id

@@ -10,7 +10,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/deployments"
 )
 
-// deployAndClaim queues a deployment of ref and has the server's Agent claim it.
 func (f fixture) deployAndClaim(t *testing.T, ref string) (deployments.Deployment, agentproto.Job) {
 	t.Helper()
 	result := goodResult()
@@ -78,7 +77,6 @@ func TestHealthyDeploymentBecomesTheCurrentRelease(t *testing.T) {
 		t.Fatalf("deployment %+v", done)
 	}
 
-	// A newer healthy deployment becomes current; the old release stays.
 	_, job = f.deployAndClaim(t, refOf(digestB))
 	f.agentComplete(t, job, agentproto.CompleteRequest{Outcome: agentproto.OutcomeSucceeded})
 	got = f.releases(t)

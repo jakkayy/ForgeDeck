@@ -8,9 +8,7 @@ Wants=network-online.target
 User=forgedeck-runner
 Group=forgedeck-runner
 EnvironmentFile=/etc/forgedeck-runner/runner.env
-# Rootless Docker for this user (see deploy/runner/README.md). If you use the
-# system daemon instead, remove this line: that gives the Runner root-equivalent
-# access to the build host.
+# Rootless Docker; with the system daemon, remove this line (it gives the Runner root-equivalent access)
 Environment=DOCKER_HOST=unix:///run/user/%U/docker.sock
 ExecStart=/usr/local/bin/forgedeck-runner run \
     --url ${FORGEDECK_URL} \
@@ -21,10 +19,8 @@ ExecStart=/usr/local/bin/forgedeck-runner run \
     --test-pids ${FORGEDECK_TEST_PIDS}
 Restart=on-failure
 RestartSec=5s
-# A build in progress is abandoned on stop; the Control Plane retries it.
 TimeoutStopSec=30s
 
-# Hardening. The Runner only needs its work directory and the network.
 StateDirectory=forgedeck-runner
 StateDirectoryMode=0700
 NoNewPrivileges=true

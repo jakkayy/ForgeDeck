@@ -1,7 +1,4 @@
-// Package servicecfg defines the service configuration of an environment and
-// validates it. Both the Control Plane (on input) and the Agent (before it
-// renders a Compose file) use it, so an unsafe option can never be expressed
-// and a tampered job payload is rejected at the point of use.
+// Package servicecfg defines and validates an environment's service configuration, shared by API and Agent
 package servicecfg
 
 import (
@@ -13,7 +10,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/validate"
 )
 
-// Limits on what a configuration may contain.
 const (
 	MinPublishedPort    = 1024
 	maxEnvVars          = 64
@@ -24,13 +20,11 @@ const (
 	maxHealthPathLength = 255
 )
 
-// Binding addresses. Services are not exposed to the network by default.
 const (
 	BindLoopback = "127.0.0.1"
 	BindAll      = "0.0.0.0"
 )
 
-// Restart policies.
 const (
 	RestartUnlessStopped = "unless-stopped"
 	RestartAlways        = "always"
@@ -38,15 +32,13 @@ const (
 	RestartNo            = "no"
 )
 
-// Health check types.
 const (
 	HealthHTTP   = "http"
 	HealthTCP    = "tcp"
 	HealthDocker = "docker"
 )
 
-// SecretName is the form of a project secret's name, which is also the name
-// of the environment variable the service receives it in.
+// SecretName is the form of a project secret name, also its environment variable name
 var SecretName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
 
 var (
@@ -61,8 +53,7 @@ type Config struct {
 	PublishedPort *int              `json:"published_port"`
 	BindAddress   string            `json:"bind_address"`
 	Env           map[string]string `json:"env"`
-	// Secrets names project secrets the service receives as environment
-	// variables of the same name. The values are never part of a release.
+	// Secrets names project secrets passed as same-named env variables; values are never in a release
 	Secrets     []string    `json:"secrets"`
 	Volumes     []Volume    `json:"volumes"`
 	Restart     string      `json:"restart"`
@@ -85,9 +76,7 @@ type HealthCheck struct {
 	IntervalSeconds int    `json:"interval_seconds"`
 }
 
-// Normalize returns c with defaults applied and fields cleaned, or the
-// validation errors keyed by field (nested fields use dots, such as
-// "health_check.path"). Only a normalized Config is stored or rendered.
+// Normalize applies defaults and returns field-keyed validation errors; only normalized Configs are stored
 func Normalize(c Config) (Config, error) {
 	errs := validate.Errors{}
 	c.Env = cloneEnv(c.Env)
@@ -242,9 +231,7 @@ func validContainerPath(p string) bool {
 		!strings.Contains(p, "..") && !strings.ContainsAny(p, ":\x00\\")
 }
 
-// validHealthPath accepts an absolute URL path with an optional query. It
-// rejects whitespace and control characters so the path cannot be used to
-// smuggle a different request line.
+// validHealthPath accepts an absolute URL path; rejects whitespace and control characters (request smuggling)
 func validHealthPath(p string) bool {
 	if !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || len(p) > maxHealthPathLength {
 		return false

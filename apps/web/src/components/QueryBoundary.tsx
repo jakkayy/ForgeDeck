@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { timeAgo } from "../lib/time";
 import { QueryError } from "./QueryError";
 
-/** The part of a TanStack query result the boundary reads (useQuery and useInfiniteQuery both fit). */
 type QueryLike<T> = {
   data: T | undefined;
   error: Error | null;
@@ -16,18 +15,12 @@ type QueryLike<T> = {
 
 type Props<T> = {
   query: QueryLike<T>;
-  /** What is loading, for screen readers: "applications". */
   label: string;
-  /** When it returns true, `empty` is shown instead of the children. */
   isEmpty?: (data: T) => boolean;
   empty?: ReactNode;
   children: (data: T) => ReactNode;
 };
 
-/**
- * For pages that return early: the loading or error screen while there is no
- * data yet, otherwise null.
- */
 export function waitingFor<T>(query: QueryLike<T>, label: string): ReactNode {
   if (query.data !== undefined) {
     return null;
@@ -38,11 +31,7 @@ export function waitingFor<T>(query: QueryLike<T>, label: string): ReactNode {
   return <Spinner aria-label={`Loading ${label}`} />;
 }
 
-/**
- * A notice for data that is on screen but old: a refresh failed or the browser
- * is offline. The last data stays visible; a network blip must not replace a
- * page with an error.
- */
+/** A notice for stale data on screen; a network blip must not replace a page with an error. */
 export function StaleNotice<T>({ query, label }: { query: QueryLike<T>; label: string }) {
   const offline = query.fetchStatus === "paused";
   if (query.data === undefined || !(query.isError || offline)) {
@@ -66,10 +55,6 @@ export function StaleNotice<T>({ query, label }: { query: QueryLike<T>; label: s
   );
 }
 
-/**
- * The states of loaded data in one place: loading, failed (nothing to show),
- * empty, and stale (see StaleNotice).
- */
 export function QueryBoundary<T>({ query, label, isEmpty, empty, children }: Props<T>) {
   const waiting = waitingFor(query, label);
   if (waiting || query.data === undefined) {

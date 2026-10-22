@@ -23,8 +23,6 @@ type gitLabProject struct {
 	secret string
 }
 
-// newGitLabProject creates a GitLab connection and an application on branch
-// main, and returns the webhook path and token GitLab would use.
 func newGitLabProject(t *testing.T) gitLabProject {
 	t.Helper()
 	fake := gitlabtest.New(t)
@@ -100,7 +98,7 @@ func TestGitLabPushIgnoresOtherBranchesAndRepeats(t *testing.T) {
 	}
 
 	p.push(t, "u-2", "main", commit).RequireStatus(http.StatusAccepted)
-	p.push(t, "u-2", "main", commit).RequireStatus(http.StatusOK) // redelivery
+	p.push(t, "u-2", "main", commit).RequireStatus(http.StatusOK)
 	p.push(t, "u-3", "main", commit).RequireStatus(http.StatusAccepted)
 	if n := len(buildJobs(t, p.env)); n != 1 {
 		t.Fatalf("same commit queued %d builds, want 1", n)
@@ -135,7 +133,7 @@ func TestPushBuildsAreAuditedOncePerBuild(t *testing.T) {
 	p := newGitLabProject(t)
 	commit := "0123456789abcdef0123456789abcdef01234567"
 	p.push(t, "d-1", "main", commit).RequireStatus(http.StatusAccepted)
-	p.push(t, "d-2", "main", commit).RequireStatus(http.StatusAccepted) // same commit again: no new build
+	p.push(t, "d-2", "main", commit).RequireStatus(http.StatusAccepted)
 
 	rows, err := p.env.Pool.Query(t.Context(), `SELECT actor, target_name, metadata FROM audit_logs WHERE action = 'build.queue'`)
 	if err != nil {

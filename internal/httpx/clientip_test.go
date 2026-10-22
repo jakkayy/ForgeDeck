@@ -35,7 +35,7 @@ func TestClientIPWithoutTrustedProxiesIsThePeer(t *testing.T) {
 }
 
 func TestForwardedForFromAnUntrustedPeerIsIgnored(t *testing.T) {
-	// Anyone can send the header; only a trusted proxy's word counts.
+	// anyone can send the header; only a trusted proxy's word counts.
 	if got := clientIP(t, []string{"10.0.0.0/8"}, "203.0.113.9:4444", "1.2.3.4"); got != "203.0.113.9" {
 		t.Fatalf("got %q", got)
 	}

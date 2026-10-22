@@ -52,7 +52,7 @@ func TestSecretsAreWriteOnlyAndVersioned(t *testing.T) {
 		t.Fatalf("list %+v", page.Items)
 	}
 
-	// At rest the value is ciphertext, and it decrypts only for the Control Plane's own use.
+	// at rest the value is ciphertext, decryptable only by the Control Plane.
 	var stored []byte
 	if err := env.Pool.QueryRow(context.Background(), `SELECT ciphertext FROM project_secrets`).Scan(&stored); err != nil {
 		t.Fatal(err)
@@ -106,7 +106,6 @@ func TestSecretAuthorization(t *testing.T) {
 	env.AddMember(projectID, viewerID, "viewer")
 	outsider, _ := env.NewUser("outsider@example.com")
 
-	// Members can see names; only admins change secrets.
 	viewer.Do(http.MethodGet, base, nil).RequireStatus(http.StatusOK)
 	put(developer, projectID, "API_KEY", "replaced-by-developer").RequireStatus(http.StatusForbidden)
 	put(viewer, projectID, "OTHER", value).RequireStatus(http.StatusForbidden)
@@ -116,7 +115,6 @@ func TestSecretAuthorization(t *testing.T) {
 	put(outsider, projectID, "OTHER", value).RequireStatus(http.StatusNotFound)
 	outsider.Do(http.MethodDelete, base+"/API_KEY", nil).RequireStatus(http.StatusNotFound)
 
-	// A secret of one project is not reachable through another's URL.
 	other := owner.CreateProject("Other")
 	owner.Do(http.MethodDelete, "/api/v1/projects/"+other.String()+"/secrets/API_KEY", nil).RequireStatus(http.StatusNotFound)
 }

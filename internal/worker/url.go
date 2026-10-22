@@ -6,8 +6,7 @@ import (
 	"net/url"
 )
 
-// ValidateControlPlaneURL requires HTTPS so the credential is never sent in
-// clear text, except to a loopback address or when allowInsecure is set.
+// ValidateControlPlaneURL requires HTTPS so the credential is never sent in clear text
 func ValidateControlPlaneURL(raw string, allowInsecure bool) error {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {

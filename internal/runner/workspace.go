@@ -8,18 +8,15 @@ import (
 
 const workspacePattern = "build-*"
 
-// workspace is a build job's private directory tree. Nothing in it outlives
-// the job: the checkout, the Docker client config holding registry
-// credentials, and the HOME the build commands see.
+// workspace is a build job's private directory tree; nothing in it outlives the job
 type workspace struct {
 	root         string
 	src          string // repository checkout
 	dockerConfig string // DOCKER_CONFIG for this job only
-	home         string // HOME for build commands, so they never read the Runner's
+	home         string // HOME for build commands
 }
 
-// newWorkspace creates a fresh workspace under parent, readable only by the
-// Runner's user.
+// newWorkspace creates a fresh workspace under parent, readable only by the Runner's user
 func newWorkspace(parent string) (*workspace, error) {
 	if err := os.MkdirAll(parent, 0o700); err != nil {
 		return nil, fmt.Errorf("create work directory: %w", err)
@@ -43,7 +40,6 @@ func newWorkspace(parent string) (*workspace, error) {
 	return ws, nil
 }
 
-// remove deletes the workspace and everything in it.
 func (w *workspace) remove() error {
 	if err := os.RemoveAll(w.root); err != nil {
 		return fmt.Errorf("remove workspace %s: %w", w.root, err)
@@ -51,8 +47,7 @@ func (w *workspace) remove() error {
 	return nil
 }
 
-// RemoveStaleWorkspaces deletes workspaces left under parent by a Runner
-// that stopped mid-build. Call it before claiming jobs.
+// RemoveStaleWorkspaces deletes workspaces left by a Runner that stopped mid-build
 func RemoveStaleWorkspaces(parent string) error {
 	stale, err := filepath.Glob(filepath.Join(parent, workspacePattern))
 	if err != nil {

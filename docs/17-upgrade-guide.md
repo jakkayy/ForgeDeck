@@ -135,6 +135,10 @@ If you ran ForgeDeck from the development branch before this release:
 
 There are no protocol changes: Agents and Runners from the development builds keep working.
 
+### First account on the web (after Phase 6)
+
+Migration `00022_setup_claim` adds one small table. An installation that already has an account is unaffected: it never shows the create-the-first-account page. A **new** installation shows it to whoever opens it first (see [07](07-security.md#2-authentication-and-sessions)); set `FORGEDECK_DISABLE_WEB_SETUP=true` before the first start if it is reachable from the internet.
+
 ### Template for future releases
 
 Each release adds a section here: the version, whether the Agent protocol changed (and the order to follow if it did), any migration that is slow or needs care, and every change that needs action.

@@ -50,7 +50,6 @@ func newFixture(t *testing.T) fixture {
 		jobs: jobs.NewService(env.Pool, authz.New(store.New(env.Pool)), time.Now)}
 }
 
-// build adds a build job of the application in the given state.
 func (f fixture) build(t *testing.T, appID uuid.UUID, status string, result any) uuid.UUID {
 	t.Helper()
 	job, err := f.jobs.Enqueue(t.Context(), jobs.NewJob{ProjectID: f.projectID, ApplicationID: &appID,
@@ -83,7 +82,7 @@ func TestDeployQueuesJobForTheEnvironmentsServer(t *testing.T) {
 		t.Fatalf("deployment %+v", d)
 	}
 
-	// The job targets the environment's server and carries the digest and config, not secrets.
+	// the job carries the digest and config, not secrets.
 	var job jobs.Job
 	f.owner.Do(http.MethodGet, "/api/v1/jobs/"+d.JobID.String(), nil).RequireStatus(http.StatusOK).Decode(&job)
 	var payload agentproto.DeployImagePayload
@@ -96,7 +95,6 @@ func TestDeployQueuesJobForTheEnvironmentsServer(t *testing.T) {
 		t.Fatalf("job %+v payload %+v", job, payload)
 	}
 
-	// The Agent of that server can claim it; an Agent of another server cannot.
 	other := f.env.EnrollAgent(f.owner, f.projectID, "prod-02")
 	wait := 0
 	other.Do(http.MethodPost, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).RequireStatus(http.StatusNoContent)
@@ -107,7 +105,6 @@ func TestDeployQueuesJobForTheEnvironmentsServer(t *testing.T) {
 		t.Fatalf("claimed %+v", claimed)
 	}
 
-	// The deployment follows its job.
 	var running deployments.Deployment
 	f.owner.Do(http.MethodGet, "/api/v1/deployments/"+d.ID.String(), nil).RequireStatus(http.StatusOK).Decode(&running)
 	if running.Status != "running" || running.StartedAt == nil {

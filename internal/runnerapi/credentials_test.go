@@ -84,7 +84,7 @@ func TestBuildClaimCarriesCloneCredentials(t *testing.T) {
 			t.Fatalf("build %s: %+v, want %s", id, failed, code)
 		}
 	}
-	// Credentials travel only in the claim response.
+	// credentials travel only in the claim response.
 	var stored jobs.Job
 	owner.Do(http.MethodGet, "/api/v1/jobs/"+good.String(), nil).RequireStatus(http.StatusOK).Decode(&stored)
 	if len(stored.Payload) == 0 || strings.Contains(string(stored.Payload), "glpat-good") || strings.Contains(string(stored.Payload), "ghp_push") {

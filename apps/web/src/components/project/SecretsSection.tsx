@@ -20,7 +20,6 @@ import { useHasRole } from "../../lib/useHasRole";
 import { ApiForm } from "../ApiForm";
 import { QueryBoundary } from "../QueryBoundary";
 
-/** Project secrets: named values that services receive at deployment. Values are write-only. */
 export function SecretsSection({ projectId }: { projectId: string }) {
   const secrets = useQuery(secretsQuery(projectId));
   const canManage = useHasRole(projectId, "admin");
@@ -75,7 +74,6 @@ export function SecretsSection({ projectId }: { projectId: string }) {
   );
 }
 
-/** Adds a secret, or replaces the value of an existing one. */
 function SecretDialog({ projectId, secret }: { projectId: string; secret?: Secret }) {
   const queryClient = useQueryClient();
   const save = useMutation({

@@ -11,8 +11,7 @@ import (
 
 const dockerStatusTimeout = 10 * time.Second
 
-// DockerStatus reports whether the docker CLI can reach its daemon. Builds
-// run through the CLI, so this is the check that matters.
+// DockerStatus reports whether the docker CLI can reach its daemon
 func DockerStatus(ctx context.Context) (agentproto.Docker, *agentproto.Resources) {
 	ctx, cancel := context.WithTimeout(ctx, dockerStatusTimeout)
 	defer cancel()

@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// testKey is a valid keyring spec; tests that are not about it include it.
 const testKey = "v1:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
 
 func envOf(vars map[string]string) LookupFunc {

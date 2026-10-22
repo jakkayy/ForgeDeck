@@ -117,7 +117,6 @@ func (f buildFixture) logs(t *testing.T, job jobs.Job) string {
 	return strings.Join(lines, "\n")
 }
 
-// registryHas reports whether the registry holds the repository.
 func registryHas(t *testing.T, host, repository string) bool {
 	t.Helper()
 	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+host+"/v2/"+repository+"/tags/list", nil)
@@ -129,9 +128,7 @@ func registryHas(t *testing.T, host, repository string) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// TestSampleRepositoryBuilds drives the whole path: API, Runner, git clone
-// over HTTP, build, test, and push to a registry. A repository whose tests
-// fail must fail the job and push nothing.
+// TestSampleRepositoryBuilds runs the full build path; failing tests must push nothing.
 func TestSampleRepositoryBuilds(t *testing.T) {
 	dockerfile := "FROM busybox:1.37\nCOPY app.sh /app.sh\nCMD [\"sh\", \"/app.sh\"]\n"
 	files := map[string]string{"Dockerfile": dockerfile, "app.sh": "echo hello\n"}

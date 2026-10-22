@@ -10,9 +10,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// Rotator replaces the Agent's credential when the Control Plane asks for it
-// (in a heartbeat response): the credential is old, an administrator
-// requested it, or the Agent is still using one that was already replaced.
+// Rotator replaces the Agent's credential when the Control Plane asks
 type Rotator struct {
 	client *worker.Client
 	state  *State
@@ -22,16 +20,12 @@ type Rotator struct {
 	identity Identity
 }
 
-// NewRotator returns a Rotator for an enrolled Agent.
+// NewRotator returns a Rotator for an enrolled Agent
 func NewRotator(client *worker.Client, state *State, identity Identity, logger *slog.Logger) *Rotator {
 	return &Rotator{client: client, state: state, identity: identity, logger: logger}
 }
 
-// Rotate asks for a new credential, saves it, and only then starts using it.
-// The old credential keeps working for a grace period on the Control Plane,
-// so a failure anywhere here, such as the response being lost or the disk
-// being full, is repaired by the next attempt: the Agent keeps the credential
-// it has, and the next heartbeat asks again.
+// Rotate asks for a new credential, saves it, and only then starts using it
 func (r *Rotator) Rotate(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

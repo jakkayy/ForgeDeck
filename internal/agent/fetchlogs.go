@@ -13,22 +13,21 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// LogReader reads a container's past output.
+// LogReader reads a container's past output
 type LogReader interface {
 	Logs(ctx context.Context, id string, opts docker.LogOptions, stdout, stderr io.Writer) error
 }
 
-// FetchLogsResult summarizes what was returned.
+// FetchLogsResult summarizes what was returned
 type FetchLogsResult struct {
 	Lines     int  `json:"lines"`
 	Truncated bool `json:"truncated"`
 }
 
-// errLogBudget stops reading once the byte budget is used up.
+// errLogBudget stops reading once the byte budget is used up
 var errLogBudget = errors.New("log byte budget exhausted")
 
-// FetchLogsHandler streams a bounded range of past container output as job
-// logs. Limits are enforced here regardless of what the payload asks for.
+// FetchLogsHandler streams a bounded range of past container output as job logs
 func FetchLogsHandler(engine LogReader) worker.Handler {
 	return func(ctx context.Context, job *agentproto.Job, log worker.Logger) (any, error) {
 		raw := job.Payload
@@ -62,14 +61,14 @@ func FetchLogsHandler(engine LogReader) worker.Handler {
 	}
 }
 
-// logBudget is shared by stdout and stderr so their total stays bounded.
+// logBudget is shared by stdout and stderr so their total stays bounded
 type logBudget struct {
 	remaining int
 	lines     int
 	exhausted bool
 }
 
-// lineWriter turns a byte stream into log lines.
+// lineWriter turns a byte stream into log lines
 type lineWriter struct {
 	stream  string
 	log     worker.Logger

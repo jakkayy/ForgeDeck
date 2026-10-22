@@ -3,8 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { LogLine } from "../api/types";
 
-// stderr is marked in the gutter rather than colored: many programs log
-// ordinary output there, and an all-red log reads as an outage.
+// stderr is marked in the gutter, not colored: many programs log ordinary output there
 const streamStyle: Record<LogLine["stream"], string> = {
   stdout: "border-transparent",
   stderr: "border-[var(--warning)]",
@@ -12,7 +11,6 @@ const streamStyle: Record<LogLine["stream"], string> = {
 };
 
 const ROW_HEIGHT_ESTIMATE = 20;
-/** How close to the end still counts as "at the bottom", in pixels. */
 const FOLLOW_SLACK = 24;
 
 /** Splits Docker's "2026-10-12T20:08:09.43Z message" prefix into a short time. */
@@ -21,16 +19,7 @@ function splitTimestamp(message: string): { time: string | null; text: string } 
   return match ? { time: match[2] ?? null, text: match[3] ?? "" } : { time: null, text: message };
 }
 
-/**
- * Monospace log output. Only the lines in view are in the DOM, so a log of
- * hundreds of thousands of lines scrolls as smoothly as a short one. It opens
- * at the newest line and follows new lines while the reader is at the bottom;
- * scrolling up pauses following until "Jump to latest". Lines are rendered as
- * text, never HTML.
- *
- * Browser text selection only spans the rows that are rendered, so "Copy all"
- * copies the whole log.
- */
+/** Virtualized monospace log that follows new lines at the bottom; text only, never HTML. */
 export function LogView({ lines }: { lines: LogLine[] }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [following, setFollowing] = useState(true);
@@ -54,9 +43,7 @@ export function LogView({ lines }: { lines: LogLine[] }) {
       await navigator.clipboard.writeText(lines.map((line) => line.message).join("\n"));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard access can be refused (permissions, insecure origin); nothing to recover.
-    }
+    } catch {}
   };
 
   return (

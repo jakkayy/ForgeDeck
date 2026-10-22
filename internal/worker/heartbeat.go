@@ -24,8 +24,7 @@ type Heartbeater struct {
 	rotate  func(ctx context.Context) error
 }
 
-// OnRotate sets what to do when the Control Plane asks for a new credential.
-// A failure is logged and retried at the next heartbeat.
+// OnRotate sets what to do on a credential rotation request; failures retry next heartbeat
 func (h *Heartbeater) OnRotate(rotate func(ctx context.Context) error) *Heartbeater {
 	h.rotate = rotate
 	return h
@@ -36,9 +35,7 @@ func NewHeartbeater(client *Client, version string, status StatusFunc, logger *s
 	return &Heartbeater{client: client, version: version, status: status, logger: logger}
 }
 
-// Run sends heartbeats until ctx ends. It returns ErrUnauthorized when the
-// credential is rejected, which means the server or Runner was removed. Other errors
-// are logged and retried on the next tick.
+// Run sends heartbeats until ctx ends; returns ErrUnauthorized when the credential is rejected
 func (h *Heartbeater) Run(ctx context.Context) error {
 	interval := defaultHeartbeatInterval
 	for {

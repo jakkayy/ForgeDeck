@@ -11,9 +11,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/apitest"
 )
 
-// TestAgentsOnlyReceiveTheirOwnServersJobs runs Agents of servers in two
-// different projects side by side and checks every job reaches the Agent of
-// the server it targets, and nothing else.
+// TestAgentsOnlyReceiveTheirOwnServersJobs checks jobs reach only the Agent of their server.
 func TestAgentsOnlyReceiveTheirOwnServersJobs(t *testing.T) {
 	f := newClaimFixture(t)
 	otherOwner, _ := f.env.NewUser("other@example.com")
@@ -24,7 +22,7 @@ func TestAgentsOnlyReceiveTheirOwnServersJobs(t *testing.T) {
 		f.env.EnrollAgent(otherOwner, otherProject, "their-prod"),
 	}
 
-	target := map[uuid.UUID]uuid.UUID{} // job -> server
+	target := map[uuid.UUID]uuid.UUID{}
 	for _, agent := range agents {
 		for range 5 {
 			target[enqueueFor(t, f, agent)] = agent.ServerID
@@ -33,7 +31,7 @@ func TestAgentsOnlyReceiveTheirOwnServersJobs(t *testing.T) {
 
 	var (
 		mu        sync.Mutex
-		claimedBy = map[uuid.UUID]uuid.UUID{} // job -> server whose Agent claimed it
+		claimedBy = map[uuid.UUID]uuid.UUID{}
 		wg        sync.WaitGroup
 	)
 	for _, agent := range agents {
@@ -63,7 +61,6 @@ func TestAgentsOnlyReceiveTheirOwnServersJobs(t *testing.T) {
 	}
 }
 
-// enqueueFor queues a job for agent's server in that server's own project.
 func enqueueFor(t *testing.T, f claimFixture, agent apitest.Agent) uuid.UUID {
 	t.Helper()
 	var projectID uuid.UUID

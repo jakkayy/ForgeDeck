@@ -9,10 +9,6 @@ const stageLabel = {
   health_check: "the health check",
 };
 
-/**
- * Why a deployment failed: what happened (the server's message says what state
- * the environment is in), likely causes, and the log to read next.
- */
 export function DeploymentFailure({ deployment }: { deployment: Deployment }) {
   if (deployment.status !== "failed" && deployment.status !== "cancelled") {
     return null;

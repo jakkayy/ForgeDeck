@@ -12,10 +12,7 @@ import (
 
 const healthcheckTimeout = 3 * time.Second
 
-// healthcheck asks the running server on this machine whether it is healthy,
-// for container health checks: the production image has no shell, curl or wget.
-// It needs no configuration beyond FORGEDECK_HTTP_ADDR, so it works even when
-// the rest of the configuration is wrong.
+// healthcheck probes the local server for container health checks (the image has no shell or curl)
 func healthcheck(ctx context.Context) error {
 	addr := os.Getenv("FORGEDECK_HTTP_ADDR")
 	if addr == "" {

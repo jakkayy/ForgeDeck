@@ -11,6 +11,36 @@ import (
 	"github.com/google/uuid"
 )
 
+const createFirstUser = `-- name: CreateFirstUser :one
+WITH claim AS (
+    INSERT INTO setup_claim DEFAULT VALUES ON CONFLICT DO NOTHING RETURNING singleton
+)
+INSERT INTO users (email, password_hash)
+SELECT $1::citext, $2::text
+FROM claim
+WHERE NOT EXISTS (SELECT 1 FROM users)
+RETURNING id, email, password_hash, created_at, updated_at
+`
+
+type CreateFirstUserParams struct {
+	Email        string
+	PasswordHash string
+}
+
+// Creates the user only if none exists and nobody else is registering; a race inserts nothing.
+func (q *Queries) CreateFirstUser(ctx context.Context, arg CreateFirstUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createFirstUser, arg.Email, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash)
 VALUES ($1, $2)
@@ -67,4 +97,15 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const hasUsers = `-- name: HasUsers :one
+SELECT EXISTS (SELECT 1 FROM users)
+`
+
+func (q *Queries) HasUsers(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, hasUsers)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }

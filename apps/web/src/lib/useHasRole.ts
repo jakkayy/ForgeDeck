@@ -4,7 +4,6 @@ import type { Role } from "../api/types";
 
 const rank: Record<Role, number> = { viewer: 1, developer: 2, admin: 3, owner: 4 };
 
-/** Whether the signed-in user's role in projectId is at least minimum. */
 export function useHasRole(projectId: string, minimum: Role): boolean {
   const project = useQuery(projectQuery(projectId));
   const role = project.data?.role;

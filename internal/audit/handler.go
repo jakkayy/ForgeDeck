@@ -9,17 +9,17 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
-// Handler serves the audit log endpoint behind auth.RequireUser.
+// Handler serves the audit log endpoint behind auth.RequireUser
 type Handler struct {
 	reader *Reader
 }
 
-// NewHandler returns the audit log endpoint.
+// NewHandler returns the audit log endpoint
 func NewHandler(reader *Reader) *Handler {
 	return &Handler{reader: reader}
 }
 
-// Routes mounts the endpoint on r.
+// Routes mounts the endpoint on r
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/projects/{projectID}/audit-logs", httpx.Handle(h.list))
 }

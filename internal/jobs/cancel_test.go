@@ -40,11 +40,9 @@ func TestCancelJob(t *testing.T) {
 	}
 	owner.Do(http.MethodPost, queued+"/cancel", nil).RequireStatus(http.StatusConflict)
 
-	// A cancelled job is never handed to a worker.
 	wait := 0
 	agent.Do(http.MethodPost, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).RequireStatus(http.StatusNoContent)
 
-	// A running job's worker is refused at its next renewal.
 	running := enqueue()
 	var claimed agentproto.Job
 	agent.Do(http.MethodPost, "/api/v1/agent/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).RequireStatus(http.StatusOK).Decode(&claimed)

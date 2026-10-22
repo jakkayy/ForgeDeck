@@ -6,8 +6,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 )
 
-// secretsOf lists the values of credentials that must never appear in a
-// build log, including the HTTP Basic forms git and docker send.
+// secretsOf lists credentials that must never appear in build logs, including HTTP Basic forms
 func secretsOf(c agentproto.BuildCredentials) []string {
 	return []string{
 		c.Git.Password,

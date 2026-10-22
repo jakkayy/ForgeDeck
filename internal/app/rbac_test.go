@@ -21,10 +21,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/testdb"
 )
 
-// Who may call each project-scoped route. min is the lowest role allowed;
-// the test proves both sides of that line: a role below it is refused (403),
-// the minimum role is not refused, a non-member sees 404 (so membership
-// cannot be probed), and a caller without a session gets 401.
+// min is the lowest allowed role: below it 403, non-member 404 (no probing), no session 401.
 type rbacRoute struct {
 	route string // "METHOD pattern", as chi reports it
 	min   authz.Role
@@ -92,8 +89,7 @@ var (
 	}
 )
 
-// Routes that are not scoped to one project, with why that is fine. Everything
-// else the router serves must be in projectRoutes.
+// Routes not scoped to one project, with why that is fine; all others must be in projectRoutes.
 var notProjectScoped = map[string]string{
 	"GET /api/v1/projects":         "lists only the caller's own projects",
 	"POST /api/v1/projects":        "any signed-in user may create a project; they become its owner",
@@ -102,14 +98,15 @@ var notProjectScoped = map[string]string{
 	"GET /api/v1/overview":         "summarizes only the caller's projects",
 	"GET /api/v1/auth/me":          "the caller's own user",
 	"POST /api/v1/auth/login":      "public by nature; rate limited",
+	"GET /api/v1/auth/setup":       "public: says only whether any account exists yet",
+	"POST /api/v1/auth/setup":      "public until the first account exists, then refused; rate limited",
 	"POST /api/v1/auth/logout":     "ends the caller's own session",
 	"GET /api/v1/git/github/setup": "GitHub's redirect; verified by a sealed state and OAuth",
 	"GET /healthz":                 "public liveness check",
 	"GET /*":                       "the embedded web UI",
 }
 
-// machinePrefixes are authenticated by their own credentials (Agent, Runner)
-// or by a signature (webhooks), not by a user session or a project role.
+// machinePrefixes authenticate by their own credentials or signature, not a user session.
 var machinePrefixes = []string{"/api/v1/agent/", "/api/v1/runner/", "/api/v1/webhooks/"}
 
 func TestEveryRouteIsClassifiedForAuthorization(t *testing.T) {
@@ -148,8 +145,6 @@ func TestEveryRouteIsClassifiedForAuthorization(t *testing.T) {
 	}
 }
 
-// world is a project with one member of each role, a non-member, and one of
-// every kind of resource a route can name.
 type world struct {
 	env                             *apitest.Env
 	owner, admin, developer, viewer *apitest.Client
@@ -201,7 +196,6 @@ func newWorld(t *testing.T) *world {
 	}).RequireStatus(http.StatusCreated).Decode(&environment)
 	environmentID = environment.ID
 
-	// A release (with its deployment) and a queued job.
 	config := `{"container_port":8080,"published_port":18080,"bind_address":"127.0.0.1","env":{},"secrets":[],"volumes":[],"restart":"unless-stopped","health_check":{"type":"tcp","timeout_seconds":60,"interval_seconds":2}}`
 	ref := "ghcr.io/acme/shop@sha256:" + strings.Repeat("a", 64)
 	var deploymentID, releaseID uuid.UUID
@@ -234,7 +228,7 @@ func (w *world) client(role authz.Role) *apitest.Client {
 	return map[authz.Role]*apitest.Client{viewer: w.viewer, developer: w.developer, admin: w.admin, owner: w.owner}[role]
 }
 
-// below is the highest role that is not allowed to call a route with minimum min.
+// below is the highest role not allowed to call a route with minimum min.
 func below(min authz.Role) (authz.Role, bool) {
 	switch min {
 	case developer:
@@ -250,7 +244,7 @@ func below(min authz.Role) (authz.Role, bool) {
 
 func (w *world) call(client *apitest.Client, method, path string, body any) int {
 	if method == http.MethodGet && strings.HasSuffix(path, "/events") {
-		// An event stream never ends; the status line is all that matters.
+		// an event stream never ends; only the status line matters.
 		resp := client.Stream(path, nil)
 		defer func() { _ = resp.Body.Close() }()
 		return resp.StatusCode
@@ -259,9 +253,7 @@ func (w *world) call(client *apitest.Client, method, path string, body any) int 
 }
 
 func TestRoleChecksOnEveryProjectRoute(t *testing.T) {
-	// Reads and idempotent probes share one world; routes that change or
-	// delete something get a fresh one, so one route cannot remove what the
-	// next one needs.
+	// mutating routes get a fresh world so they cannot remove what the next route needs.
 	shared := newWorld(t)
 	for _, r := range projectRoutes {
 		t.Run(r.route, func(t *testing.T) {

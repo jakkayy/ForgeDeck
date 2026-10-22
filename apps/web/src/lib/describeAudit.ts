@@ -1,6 +1,5 @@
 import type { AuditEntry } from "../api/audit";
 
-/** What each audited action says, as a verb phrase after the actor's name. */
 const phrases: Record<string, (e: AuditEntry) => string> = {
   "project.create": () => "created the project",
   "project.update": () => "changed the project",
@@ -45,5 +44,4 @@ export function describeAudit(entry: AuditEntry): string {
   return (phrases[entry.action]?.(entry) ?? `${entry.action} ${entry.target_name ?? ""}`).trim();
 }
 
-/** Actions offered in the filter, grouped as people think of them. */
 export const auditActions = Object.keys(phrases).sort();

@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 
 type Props = { title: string; description: string; action?: ReactNode };
 
-/** Explains an empty list and offers the next step. */
 export function EmptyState({ title, description, action }: Props) {
   return (
     <Card className="items-center gap-2 px-6 py-12 text-center">

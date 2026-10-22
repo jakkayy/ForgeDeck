@@ -7,7 +7,6 @@ const units: [Intl.RelativeTimeFormatUnit, number][] = [
   ["second", 1],
 ];
 
-/** "12 seconds ago", "3 hours ago"; "never" when there is no time. */
 export function timeAgo(iso: string | null, now = Date.now()): string {
   if (!iso) {
     return "never";

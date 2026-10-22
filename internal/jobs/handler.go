@@ -11,21 +11,17 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/httpx"
 )
 
-// Handler serves the user-facing /jobs endpoints. Routes must be mounted
-// behind auth.RequireUser.
+// Handler serves the /jobs endpoints; mount behind auth.RequireUser
 type Handler struct {
 	svc      *Service
 	notifier *Notifier
 	shutdown context.Context
 }
 
-// NewHandler returns job endpoints. Event streams end when shutdown is
-// cancelled so they do not hold up a graceful stop.
 func NewHandler(shutdown context.Context, svc *Service, notifier *Notifier) *Handler {
 	return &Handler{svc: svc, notifier: notifier, shutdown: shutdown}
 }
 
-// Routes mounts the job endpoints on r.
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/jobs", httpx.Handle(h.history))
 	r.Get("/jobs/{jobID}", httpx.Handle(h.get))
@@ -34,8 +30,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/jobs/{jobID}/events", h.events)
 }
 
-// events streams logs and status as SSE. Resume position comes from the
-// Last-Event-ID header (set by EventSource on reconnect) or ?after=.
+// events streams logs and status as SSE; resumes from Last-Event-ID or ?after=
 func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	jobID, err := httpx.UUIDParam(r, "jobID")
 	if err != nil {
@@ -60,7 +55,6 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	defer context.AfterFunc(h.shutdown, cancel)()
-	// Errors after the stream starts can only end it; the client reconnects.
 	_ = h.svc.Stream(ctx, userID, jobID, after, h.notifier, httpx.NewSSE(w))
 }
 
@@ -80,8 +74,7 @@ var validStatuses = map[Status]bool{
 	StatusQueued: true, StatusRunning: true, StatusSucceeded: true, StatusFailed: true, StatusCancelled: true,
 }
 
-// history lists jobs newest first, filtered by ?project_id=, ?application_id=,
-// ?server_id=, ?status=, ?type=, and paged with ?cursor=.
+// history lists jobs newest first with filters and ?cursor=
 func (h *Handler) history(w http.ResponseWriter, r *http.Request) error {
 	limit, err := httpx.ParseLimit(r)
 	if err != nil {
@@ -139,8 +132,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
 	return httpx.WriteJSON(w, http.StatusOK, job)
 }
 
-// logs pages through stored output with a keyset cursor ("<attempt>.<seq>"),
-// so new lines can be fetched as they arrive.
+// logs pages through stored output with a keyset cursor "<attempt>.<seq>"
 func (h *Handler) logs(w http.ResponseWriter, r *http.Request) error {
 	jobID, err := httpx.UUIDParam(r, "jobID")
 	if err != nil {

@@ -45,7 +45,7 @@ mv "$file.partial" "$file"
 (cd "$dir" && sha256sum "$(basename "$file")" >"$(basename "$file").sha256")
 
 if [ "$keep" -gt 0 ]; then
-  # Names sort by time. Delete everything but the newest $keep backups and their checksums.
+  # names sort by time
   find "$dir" -maxdepth 1 -name 'forgedeck-*.dump' | sort | head -n "-$keep" | while read -r old; do
     rm -f "$old" "$old.sha256"
   done

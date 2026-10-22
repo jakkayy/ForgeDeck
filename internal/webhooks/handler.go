@@ -25,8 +25,7 @@ type SecretSource interface {
 	GitLabWebhookSecret(ctx context.Context, connectionID uuid.UUID) (string, error)
 }
 
-// Handler serves provider webhooks. They are authenticated by signature or
-// secret token, never by session.
+// Handler serves provider webhooks
 type Handler struct {
 	gitHubSecret string // empty when the GitHub App is not configured
 	gitLab       SecretSource
@@ -35,7 +34,6 @@ type Handler struct {
 	audit        *audit.Recorder
 }
 
-// NewHandler returns webhook endpoints.
 func NewHandler(gitHubSecret string, gitLab SecretSource, queries *store.Queries, jobService *jobs.Service, recorder *audit.Recorder) *Handler {
 	return &Handler{gitHubSecret: gitHubSecret, gitLab: gitLab, queries: queries, jobs: jobService, audit: recorder}
 }
@@ -48,8 +46,7 @@ func (h *Handler) Routes(r chi.Router) {
 
 var errBadToken = httpx.Unauthorized("Webhook token is invalid.")
 
-// gitlab answers 401 for both unknown connections and wrong tokens, so the
-// endpoint cannot be used to discover connection IDs.
+// gitlab answers 401 for unknown connections and wrong tokens alike, so IDs cannot be discovered
 func (h *Handler) gitlab(w http.ResponseWriter, r *http.Request) error {
 	connectionID, err := uuid.Parse(chi.URLParam(r, "connectionID"))
 	if err != nil {
@@ -120,8 +117,7 @@ func (h *Handler) github(w http.ResponseWriter, r *http.Request) error {
 			if !ok {
 				return ignoredRef, nil
 			}
-			// One installation can be connected to several projects; all of
-			// their applications on this repository and branch build.
+			// one installation can serve several projects; all matching applications build
 			apps, err := h.queries.ApplicationsForGitHubPush(ctx, store.ApplicationsForGitHubPushParams{
 				InstallationID: &installationID, RepositoryID: push.RepositoryID, Branch: push.Branch,
 			})

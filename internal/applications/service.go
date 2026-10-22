@@ -1,4 +1,4 @@
-// Package applications manages deployable applications and their build settings.
+// Package applications manages deployable applications and their build settings
 package applications
 
 import (
@@ -26,27 +26,25 @@ var (
 	errNameTaken           = validate.Errors{"name": "Another application in this project already uses this name."}
 )
 
-// Application is the API view of an application.
+// Application is the API view of an application
 type Application struct {
-	ID                 uuid.UUID `json:"id"`
-	ProjectID          uuid.UUID `json:"project_id"`
-	Name               string    `json:"name"`
-	GitConnectionID    uuid.UUID `json:"git_connection_id"`
-	RepositoryID       string    `json:"repository_id"`
-	RepositoryFullName string    `json:"repository_full_name"`
-	Branch             string    `json:"branch"`
-	DockerfilePath     string    `json:"dockerfile_path"`
-	BuildContext       string    `json:"build_context"`
-	TestCommand        *string   `json:"test_command"`
-	// RegistryConnectionID and ImageRepository are both set or both nil;
-	// images are pushed to <registry host>/<image repository>.
+	ID                   uuid.UUID  `json:"id"`
+	ProjectID            uuid.UUID  `json:"project_id"`
+	Name                 string     `json:"name"`
+	GitConnectionID      uuid.UUID  `json:"git_connection_id"`
+	RepositoryID         string     `json:"repository_id"`
+	RepositoryFullName   string     `json:"repository_full_name"`
+	Branch               string     `json:"branch"`
+	DockerfilePath       string     `json:"dockerfile_path"`
+	BuildContext         string     `json:"build_context"`
+	TestCommand          *string    `json:"test_command"`
 	RegistryConnectionID *uuid.UUID `json:"registry_connection_id"`
 	ImageRepository      *string    `json:"image_repository"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
-// Service implements application operations.
+// Service implements application operations
 type Service struct {
 	queries    *store.Queries
 	authz      *authz.Authorizer
@@ -54,13 +52,12 @@ type Service struct {
 	registries *registries.Service
 }
 
-// NewService returns an application Service.
+// NewService returns an application Service
 func NewService(queries *store.Queries, authorizer *authz.Authorizer, git *gitconn.Service, registryService *registries.Service) *Service {
 	return &Service{queries: queries, authz: authorizer, git: git, registries: registryService}
 }
 
-// CreateInput describes a new application. Branch defaults to the
-// repository's default branch.
+// CreateInput describes a new application
 type CreateInput struct {
 	Name            string
 	GitConnectionID uuid.UUID
@@ -69,13 +66,12 @@ type CreateInput struct {
 	DockerfilePath  string
 	BuildContext    string
 	TestCommand     string
-	// Image is optional; without it the application cannot be built yet.
+	// without it the application cannot be built yet
 	RegistryConnectionID *uuid.UUID
 	ImageRepository      string
 }
 
-// Create stores an application after checking the repository is reachable
-// through the project's connection.
+// Create stores an application after checking its repository is reachable
 func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in CreateInput) (Application, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ManageApps); err != nil {
 		return Application{}, err
@@ -125,7 +121,7 @@ func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in Cr
 		CreatedBy:            &userID,
 	})
 	if err != nil {
-		// Do not leave a webhook behind for an application that does not exist.
+		// do not leave a webhook behind for an application that does not exist
 		_ = s.git.RemoveWebhook(context.WithoutCancel(ctx), in.GitConnectionID, repo.ID, hookID)
 	}
 	if database.IsUniqueViolation(err) {
@@ -137,7 +133,7 @@ func (s *Service) Create(ctx context.Context, userID, projectID uuid.UUID, in Cr
 	return toApplication(row), nil
 }
 
-// Get returns an application the user may view.
+// Get returns an application the user may view
 func (s *Service) Get(ctx context.Context, userID, applicationID uuid.UUID) (Application, error) {
 	row, err := s.authorize(ctx, userID, applicationID, authz.ViewProject)
 	if err != nil {
@@ -146,7 +142,7 @@ func (s *Service) Get(ctx context.Context, userID, applicationID uuid.UUID) (App
 	return toApplication(row), nil
 }
 
-// List returns a project's applications by name.
+// List returns a project's applications by name
 func (s *Service) List(ctx context.Context, userID, projectID uuid.UUID, search *string, limit, offset int32) ([]Application, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ViewProject); err != nil {
 		return nil, err
@@ -162,21 +158,18 @@ func (s *Service) List(ctx context.Context, userID, projectID uuid.UUID, search 
 	return apps, nil
 }
 
-// UpdateInput changes the non-nil fields. TestCommand set to "" clears it.
+// UpdateInput changes the non-nil fields
 type UpdateInput struct {
-	Name           *string
-	Branch         *string
-	DockerfilePath *string
-	BuildContext   *string
-	TestCommand    *string
-	// ImageRepository non-nil changes the image; "" removes it, together
-	// with the registry.
+	Name                 *string
+	Branch               *string
+	DockerfilePath       *string
+	BuildContext         *string
+	TestCommand          *string
 	RegistryConnectionID *uuid.UUID
 	ImageRepository      *string
 }
 
-// Update changes build settings. The repository is fixed; create a new
-// application to build from another one.
+// Update changes build settings
 func (s *Service) Update(ctx context.Context, userID, applicationID uuid.UUID, in UpdateInput) (Application, error) {
 	current, err := s.authorize(ctx, userID, applicationID, authz.ManageApps)
 	if err != nil {
@@ -231,9 +224,7 @@ func (s *Service) Update(ctx context.Context, userID, applicationID uuid.UUID, i
 	return toApplication(row), nil
 }
 
-// Delete removes an application and the provider webhook created for it.
-// A webhook that cannot be removed (token revoked, provider down) does not
-// block deletion; its deliveries will simply be rejected.
+// Delete removes an application and the provider webhook created for it
 func (s *Service) Delete(ctx context.Context, userID, applicationID uuid.UUID) error {
 	row, err := s.authorize(ctx, userID, applicationID, authz.ManageApps)
 	if err != nil {
@@ -263,7 +254,7 @@ func (s *Service) authorize(ctx context.Context, userID, applicationID uuid.UUID
 	return row, nil
 }
 
-// checkRegistry rejects a registry from another project, as if it did not exist.
+// checkRegistry rejects a registry from another project, as if it did not exist
 func (s *Service) checkRegistry(ctx context.Context, projectID uuid.UUID, registryID *uuid.UUID) error {
 	if registryID == nil {
 		return nil

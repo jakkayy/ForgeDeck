@@ -14,19 +14,13 @@ import (
 )
 
 const (
-	// AgentCredentialMaxAge is how long an Agent keeps a credential before the
-	// Control Plane asks it to replace it.
+	// AgentCredentialMaxAge is how long an Agent keeps a credential before the Control Plane asks it to replace it
 	AgentCredentialMaxAge = 90 * 24 * time.Hour
-	// CredentialGrace is how long a replaced credential keeps working. It
-	// covers an Agent that loses the rotation response or crashes before it
-	// has saved the new credential.
+	// CredentialGrace is how long a replaced credential keeps working, to survive a lost response
 	CredentialGrace = 15 * time.Minute
 )
 
-// RotateCredential issues the Agent a new credential. The one presented keeps
-// working for CredentialGrace. It is safe to call again with that old
-// credential, which is how an Agent that never received or saved the new one
-// recovers.
+// RotateCredential issues a new credential; the old one works for CredentialGrace and may retry
 func (s *Service) RotateCredential(ctx context.Context, identity AgentIdentity, presented string) (agentproto.RotateResponse, error) {
 	credential, hash := securetoken.New(agentproto.CredentialPrefix)
 	now := s.now()
@@ -43,8 +37,7 @@ func (s *Service) RotateCredential(ctx context.Context, identity AgentIdentity, 
 	return agentproto.RotateResponse{ServerID: identity.ServerID, Credential: credential}, nil
 }
 
-// RequestRotation asks a server's Agent to replace its credential. The Agent
-// does it at its next heartbeat, within about 20 seconds when it is online.
+// RequestRotation asks the Agent to replace its credential at its next heartbeat
 func (s *Service) RequestRotation(ctx context.Context, userID, serverID uuid.UUID) error {
 	if _, err := s.authorizeServer(ctx, userID, serverID, authz.ManageServers); err != nil {
 		return err

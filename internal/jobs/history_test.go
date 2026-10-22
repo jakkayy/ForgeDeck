@@ -77,8 +77,7 @@ func TestJobHistoryPagesFiltersAndScopes(t *testing.T) {
 	owner.Do(http.MethodGet, "/api/v1/jobs?cursor=%21%21", nil).RequireStatus(http.StatusBadRequest)
 }
 
-// A person in several projects sees one history, newest first, even though
-// each project is read separately: no job is skipped or repeated across pages.
+// one history across projects, newest first, with no job skipped or repeated across pages.
 func TestJobHistoryMergesProjectsAcrossPages(t *testing.T) {
 	env := apitest.New(t)
 	owner, _ := env.NewUser("owner@example.com")

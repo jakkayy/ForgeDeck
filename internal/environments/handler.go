@@ -11,17 +11,17 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/servicecfg"
 )
 
-// Handler serves the environment endpoints behind auth.RequireUser.
+// Handler serves the environment endpoints behind auth.RequireUser
 type Handler struct {
 	svc *Service
 }
 
-// NewHandler returns environment endpoints.
+// NewHandler returns environment endpoints
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// Routes mounts the environment endpoints on r.
+// Routes mounts the environment endpoints on r
 func (h *Handler) Routes(r chi.Router) {
 	r.Get("/applications/{applicationID}/environments", httpx.Handle(h.list))
 	r.Post("/applications/{applicationID}/environments", httpx.Handle(h.create))

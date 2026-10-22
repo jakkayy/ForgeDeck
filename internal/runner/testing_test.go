@@ -11,7 +11,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/agentproto"
 )
 
-// recordLog collects job output for assertions.
 type recordLog struct {
 	mu    sync.Mutex
 	lines []string
@@ -29,8 +28,6 @@ func (l *recordLog) String() string {
 	return strings.Join(l.lines, "\n")
 }
 
-// sourceRepo creates a git repository with files committed and returns its
-// file:// URL and the commit SHA.
 func sourceRepo(t *testing.T, files map[string]string) (string, string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {

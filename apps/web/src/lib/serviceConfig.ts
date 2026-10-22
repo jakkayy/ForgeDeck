@@ -1,6 +1,5 @@
 import type { ServiceConfig } from "../api/environments";
 
-/** "KEY=value" lines to a map. Blank lines and lines starting with # are ignored. */
 export function parseEnv(text: string): Record<string, string> {
   const env: Record<string, string> = {};
   for (const raw of text.split("\n")) {
@@ -25,7 +24,6 @@ export function envToText(env: Record<string, string>): string {
     .join("\n");
 }
 
-/** "name:/path" lines to volume mounts. */
 export function parseVolumes(text: string): ServiceConfig["volumes"] {
   return text
     .split("\n")
@@ -43,7 +41,6 @@ export function volumesToText(volumes: ServiceConfig["volumes"]): string {
   return volumes.map((v) => `${v.name}:${v.path}`).join("\n");
 }
 
-/** An empty field is "not set"; anything else is a number the server validates. */
 export function parseOptionalNumber(value: string): number | null {
   const trimmed = value.trim();
   return trimmed === "" ? null : Number(trimmed);

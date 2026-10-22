@@ -26,9 +26,10 @@ Record exact supported versions in the repository once the first working setup i
 cp .env.example .env            # set the database password and FORGEDECK_SECRET_KEYS
 make db-up                      # PostgreSQL
 make dev-api                    # Control Plane on :8080 (migrates on start)
-make create-user EMAIL=you@example.com
 make dev-web                    # dashboard with hot reload, proxying to :8080
 ```
+
+The first time the dashboard opens it offers to create the first account; `make create-user EMAIL=you@example.com` makes further ones (or the first, with `FORGEDECK_DISABLE_WEB_SETUP=true`).
 
 For a Runner: `make create-runner NAME=build-01`, then
 `FORGEDECK_RUNNER_CREDENTIAL=fdr_… make run-runner` (optional `URL=` and `WORK_DIR=`).

@@ -4,7 +4,6 @@ type Props = {
   query: { hasNextPage: boolean; isFetchingNextPage: boolean; fetchNextPage: () => unknown };
 };
 
-/** "Load more" under a paged list; renders nothing on the last page. */
 export function LoadMore({ query }: Props) {
   if (!query.hasNextPage) {
     return null;

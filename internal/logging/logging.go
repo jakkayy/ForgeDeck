@@ -7,8 +7,6 @@ import (
 	"log/slog"
 )
 
-// New returns a slog.Logger writing to w at the given level ("debug", "info",
-// "warn", "error") in the given format ("json" or "text").
 func New(w io.Writer, level, format string) (*slog.Logger, error) {
 	var lvl slog.Level
 	if err := lvl.UnmarshalText([]byte(level)); err != nil {

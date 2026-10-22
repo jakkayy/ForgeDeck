@@ -28,8 +28,7 @@ JOIN projects ON projects.id = servers.project_id
 JOIN project_members ON project_members.project_id = servers.project_id
 WHERE project_members.user_id = @user_id
   AND (sqlc.narg(search)::text IS NULL OR servers.name ILIKE '%' || sqlc.narg(search)::text || '%')
-  -- Connectivity is derived from the heartbeat age (servers.ConnectivityStatus);
-  -- the caller passes the cutoffs so the windows live in one place.
+  -- connectivity derives from heartbeat age; the caller passes the cutoffs
   AND (sqlc.narg(status)::text IS NULL
        OR (sqlc.narg(status)::text = 'pending' AND servers.last_seen_at IS NULL)
        OR (sqlc.narg(status)::text = 'online' AND servers.last_seen_at >= @online_after::timestamptz)

@@ -89,8 +89,7 @@ type GetDeploymentRow struct {
 	JobFinishedAt   *time.Time
 }
 
-// The job is the live source of status while it exists; the deployment's own
-// columns keep the outcome after the job is pruned.
+// The job is the live source of status while it exists; the deployment keeps the outcome.
 func (q *Queries) GetDeployment(ctx context.Context, id uuid.UUID) (GetDeploymentRow, error) {
 	row := q.db.QueryRow(ctx, getDeployment, id)
 	var i GetDeploymentRow
@@ -162,8 +161,7 @@ type HasNewerDeploymentParams struct {
 	BuildCreatedAt time.Time
 }
 
-// Whether the environment already deploys, or has queued, a build created
-// after the given time. A slower, older build must not replace a newer one.
+// Whether a build created after the given time is already queued or deployed (older must not win).
 func (q *Queries) HasNewerDeployment(ctx context.Context, arg HasNewerDeploymentParams) (bool, error) {
 	row := q.db.QueryRow(ctx, hasNewerDeployment, arg.EnvironmentID, arg.BuildCreatedAt)
 	var exists bool

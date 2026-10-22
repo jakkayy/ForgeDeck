@@ -13,9 +13,7 @@ import (
 
 var validDigest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
-// pushImage logs in to the registry, pushes localTag as image:tag, and
-// returns the pushed manifest's digest. The password goes to docker on
-// stdin and is stored only in the job's own DOCKER_CONFIG.
+// pushImage pushes localTag as image:tag and returns its digest; the password goes via stdin
 func pushImage(ctx context.Context, exec *procexec.Executor, registry agentproto.RegistryCredentials, localTag, image, tag string) (string, error) {
 	login := procexec.Command{
 		Name:  "docker",
@@ -39,9 +37,7 @@ func pushImage(ctx context.Context, exec *procexec.Executor, registry agentproto
 	return digestFor(out, image)
 }
 
-// digestFor picks image's digest from docker's RepoDigests JSON. Docker
-// shortens Docker Hub names ("docker.io/library/x" becomes "x"), so names
-// are compared in that short form.
+// digestFor picks image's digest from RepoDigests; docker shortens Docker Hub names
 func digestFor(repoDigestsJSON, image string) (string, error) {
 	var repoDigests []string
 	if err := json.Unmarshal([]byte(repoDigestsJSON), &repoDigests); err != nil {

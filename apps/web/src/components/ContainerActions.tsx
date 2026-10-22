@@ -12,11 +12,7 @@ const progress: Record<ContainerAction, string> = {
 
 type Props = { serverId: string; container: Container; isDisabled?: boolean };
 
-/**
- * Start/Stop/Restart for one container. Stop and Restart interrupt service,
- * so they ask for confirmation. Success is reported only after the Agent
- * finishes the job, never when the request is merely accepted.
- */
+/** Start/Stop/Restart for one container; success is reported only after the Agent finishes the job. */
 export function ContainerActions({ serverId, container, isDisabled = false }: Props) {
   const queryClient = useQueryClient();
   const run = useMutation({

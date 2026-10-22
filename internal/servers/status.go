@@ -21,8 +21,7 @@ const (
 	unreachableWindow = 5 * time.Minute
 )
 
-// ConnectivityStatus classifies a server by the age of its last heartbeat.
-// Status is computed on read rather than stored, so it never goes stale.
+// ConnectivityStatus classifies a server by last heartbeat age; computed on read, never stored
 func ConnectivityStatus(lastSeen *time.Time, now time.Time) Status {
 	if lastSeen == nil {
 		return StatusPending
@@ -37,9 +36,7 @@ func ConnectivityStatus(lastSeen *time.Time, now time.Time) Status {
 	}
 }
 
-// ConnectivityCutoffs returns the oldest last-seen time that still counts as
-// online and as unreachable at now: the same windows as ConnectivityStatus,
-// for queries that classify many servers at once.
+// ConnectivityCutoffs returns the last-seen cutoffs for online and unreachable, for bulk queries
 func ConnectivityCutoffs(now time.Time) (online, unreachable time.Time) {
 	return now.Add(-onlineWindow), now.Add(-unreachableWindow)
 }

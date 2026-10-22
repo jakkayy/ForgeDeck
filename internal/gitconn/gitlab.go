@@ -26,8 +26,7 @@ type GitLabInput struct {
 	Token   string
 }
 
-// ConnectGitLab verifies the token with GitLab and stores it encrypted,
-// together with a generated secret for the webhooks ForgeDeck registers.
+// ConnectGitLab verifies the token with GitLab and stores it encrypted
 func (s *Service) ConnectGitLab(ctx context.Context, userID, projectID uuid.UUID, in GitLabInput) (Connection, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ManageGit); err != nil {
 		return Connection{}, err
@@ -90,8 +89,7 @@ func (s *Service) verifyGitLabToken(ctx context.Context, baseURL, token string) 
 	return user.Username, nil
 }
 
-// normalizeGitLabURL accepts an https origin. Plain http is allowed only
-// when private hosts are allowed, for internal GitLab without TLS.
+// normalizeGitLabURL accepts an https origin; http only when private hosts are allowed
 func (s *Service) normalizeGitLabURL(raw string) (string, error) {
 	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
 	if raw == "" {

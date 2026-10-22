@@ -28,8 +28,7 @@ type QueuedJob struct {
 	Status jobs.Status `json:"status"`
 }
 
-// RequestContainerAction queues a start/stop/restart for a container the
-// server last reported. The Agent applies it asynchronously.
+// RequestContainerAction queues a start/stop/restart for a container the server last reported
 func (s *Service) RequestContainerAction(ctx context.Context, userID, serverID uuid.UUID, containerID, action string) (QueuedJob, error) {
 	if !containerActions[action] {
 		return QueuedJob{}, validate.Errors{"action": "Action must be start, stop or restart."}
@@ -38,8 +37,7 @@ func (s *Service) RequestContainerAction(ctx context.Context, userID, serverID u
 	return s.enqueueContainerJob(ctx, userID, serverID, containerID, authz.OperateContainer, agentproto.JobContainerAction, payload)
 }
 
-// enqueueContainerJob authorizes the user, checks that the container is in
-// the server's latest snapshot, and queues an Agent job for it.
+// enqueueContainerJob authorizes the user, checks the snapshot, and queues an Agent job
 func (s *Service) enqueueContainerJob(ctx context.Context, userID, serverID uuid.UUID, containerID string,
 	permission authz.Permission, jobType string, payload any,
 ) (QueuedJob, error) {
@@ -76,8 +74,7 @@ type LogRequest struct {
 	Timestamps bool
 }
 
-// RequestContainerLogs queues a bounded log fetch. The output arrives as job
-// logs, readable through the job endpoints.
+// RequestContainerLogs queues a bounded log fetch
 func (s *Service) RequestContainerLogs(ctx context.Context, userID, serverID uuid.UUID, containerID string, req LogRequest) (QueuedJob, error) {
 	tail := agentproto.DefaultTailLines
 	if req.TailLines != nil {

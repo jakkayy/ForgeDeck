@@ -11,8 +11,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/procexec"
 )
 
-// buildImage builds the application's Dockerfile with BuildKit and tags the
-// result as tag. BuildKit runs RUN steps in containers without host mounts.
+// buildImage builds the application's Dockerfile with BuildKit and tags it tag
 func buildImage(ctx context.Context, exec *procexec.Executor, src, dockerfile, buildContext, commit, tag string) error {
 	dockerfilePath, err := resolveInside(src, dockerfile)
 	if err != nil {
@@ -37,9 +36,7 @@ func buildImage(ctx context.Context, exec *procexec.Executor, src, dockerfile, b
 
 var errOutsideCheckout = errors.New("path leaves the repository checkout")
 
-// resolveInside resolves a repository-relative path, following symlinks,
-// and refuses results outside root. The Control Plane validates paths too,
-// but a symlink committed to the repository is only visible here.
+// resolveInside follows symlinks and refuses paths outside root (a committed symlink is only visible here)
 func resolveInside(root, rel string) (string, error) {
 	realRoot, err := filepath.EvalSymlinks(root)
 	if err != nil {

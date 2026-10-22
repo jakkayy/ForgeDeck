@@ -1,4 +1,4 @@
-// Package agentapi serves the machine-to-machine endpoints used by Agents.
+// Package agentapi serves the machine-to-machine endpoints used by Agents
 package agentapi
 
 import (
@@ -19,7 +19,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 )
 
-// Handler serves /agent endpoints.
+// Handler serves /agent endpoints
 type Handler struct {
 	shutdown context.Context
 	servers  *servers.Service
@@ -29,23 +29,20 @@ type Handler struct {
 	logger   *slog.Logger
 }
 
-// DeployContextMinter builds what an Agent needs, beyond the payload, to run
-// one claimed deploy_image job (registry credentials, previous release).
+// DeployContextMinter builds the extra context an Agent needs to run a claimed deploy_image job
 type DeployContextMinter interface {
 	Mint(ctx context.Context, payload json.RawMessage) (*agentproto.DeployContext, error)
 }
 
-// Option configures a Handler.
+// Option configures a Handler
 type Option func(*Handler)
 
-// WithDeployContext makes claims of deploy_image jobs carry a DeployContext.
-// A claim that cannot be given one fails the attempt at once.
+// WithDeployContext makes claims of deploy_image jobs carry a DeployContext
 func WithDeployContext(minter DeployContextMinter, logger *slog.Logger) Option {
 	return func(h *Handler) { h.deploy, h.logger = minter, logger }
 }
 
-// NewHandler returns Agent endpoints. Long-poll requests end when shutdown
-// is cancelled so they do not hold up graceful shutdown.
+// NewHandler returns Agent endpoints
 func NewHandler(shutdown context.Context, serverService *servers.Service, jobService *jobs.Service, notifier *jobs.Notifier, options ...Option) *Handler {
 	h := &Handler{shutdown: shutdown, servers: serverService, jobs: jobService, notifier: notifier}
 	for _, option := range options {
@@ -54,7 +51,7 @@ func NewHandler(shutdown context.Context, serverService *servers.Service, jobSer
 	return h
 }
 
-// Routes mounts the Agent endpoints on r.
+// Routes mounts the Agent endpoints on r
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/agent/enroll", httpx.Handle(h.enroll))
 	r.Group(func(agent chi.Router) {
@@ -106,8 +103,7 @@ func (h *Handler) heartbeat(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// rotateCredential gives the Agent a new credential. The response is the only
-// time it is shown, so it is not cacheable.
+// rotateCredential gives the Agent a new credential
 func (h *Handler) rotateCredential(w http.ResponseWriter, r *http.Request) error {
 	resp, err := h.servers.RotateCredential(r.Context(), IdentityFrom(r.Context()), bearerCredential(r))
 	if errors.Is(err, servers.ErrInvalidAgentCredential) {
@@ -180,10 +176,7 @@ func (h *Handler) claim(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// claimWithContext claims the next job for the Agent and, for a deploy_image
-// job, mints its DeployContext. An attempt that cannot start fails at once,
-// so the Agent is never handed a deployment it cannot run; the next job is
-// tried instead.
+// claimWithContext claims the next job and mints its DeployContext for deploy_image jobs
 func (h *Handler) claimWithContext(ctx context.Context, identity servers.AgentIdentity) (*jobs.Claimed, *agentproto.DeployContext, error) {
 	for {
 		job, err := h.jobs.ClaimForAgent(ctx, identity.ServerID, identity.AgentID.String())
@@ -257,8 +250,7 @@ func (h *Handler) complete(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// agentLease identifies the attempt named in the URL as held by the
-// authenticated Agent, so the job queries can verify ownership.
+// agentLease identifies the URL's attempt as held by the authenticated Agent
 func agentLease(r *http.Request, attempt int32) (jobs.Lease, error) {
 	jobID, err := httpx.UUIDParam(r, "jobID")
 	if err != nil {

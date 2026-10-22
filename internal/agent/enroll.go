@@ -9,9 +9,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// Enroll registers this host with the Control Plane and stores the identity.
-// It refuses to replace an existing identity: remove the server in the
-// dashboard and delete the state directory to re-enroll.
+// Enroll registers this host with the Control Plane and stores the identity
 func Enroll(ctx context.Context, state *State, controlPlaneURL, token, version string) (Identity, error) {
 	if _, err := state.Load(); err == nil {
 		return Identity{}, errors.New("agent is already enrolled; delete the state directory to enroll again")

@@ -23,8 +23,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// pushImage builds an image from dockerfile, pushes it to the registry at
-// host, and returns its digest reference.
 func pushImage(t *testing.T, host, name, dockerfile string) string {
 	t.Helper()
 	tag := host + "/e2e/" + name + ":1"
@@ -44,7 +42,6 @@ func pushImage(t *testing.T, host, name, dockerfile string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// webServer answers "deployed" on port 8080; silentServer runs but never listens.
 const (
 	webServer    = "FROM busybox:1.37\nRUN mkdir /www && echo deployed > /www/index.html\nCMD [\"httpd\", \"-f\", \"-p\", \"8080\", \"-h\", \"/www\"]\n"
 	silentServer = "FROM busybox:1.37\nCMD [\"sleep\", \"3600\"]\n"
@@ -115,7 +112,6 @@ func TestDeployWithRealDockerCompose(t *testing.T) {
 		t.Fatalf("labels %q, %v", labels, err)
 	}
 
-	// The service receives the secret, and no file ForgeDeck wrote holds it.
 	inspected, err := exec.CommandContext(t.Context(), "docker", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", first.ContainerID).Output() //nolint:gosec // test
 	if err != nil || !strings.Contains(string(inspected), "API_TOKEN=tok-9f8e7d6c5b4a") {
 		t.Fatalf("container environment %q, %v", inspected, err)
@@ -124,11 +120,9 @@ func TestDeployWithRealDockerCompose(t *testing.T) {
 		t.Fatalf("the secret was written to disk:\n%s", out)
 	}
 
-	// Applying the same deployment again changes nothing.
 	if again := deploy(map[string]string{"A": "1"}); again.ContainerID != first.ContainerID {
 		t.Fatalf("redeploy replaced the container: %s -> %s", first.ContainerID, again.ContainerID)
 	}
-	// A changed configuration recreates the service.
 	if changed := deploy(map[string]string{"A": "2"}); changed.ContainerID == first.ContainerID {
 		t.Fatal("changed configuration kept the old container")
 	}

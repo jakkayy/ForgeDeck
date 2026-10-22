@@ -1,6 +1,4 @@
-// Package compose_test checks the production Compose file with `docker
-// compose config`, which needs Docker but starts nothing. It runs only when
-// FORGEDECK_TEST_DOCKER=1.
+// Package compose_test checks the production Compose file via `docker compose config`.
 package compose_test
 
 import (
@@ -115,8 +113,7 @@ func TestControlPlaneRunsHardened(t *testing.T) {
 	}
 }
 
-// The API believes X-Forwarded-For only from the proxy, so the proxy's address
-// must be fixed and be exactly the trusted one.
+// the API trusts X-Forwarded-For only from the proxy, so its address must be fixed.
 func TestTrustedProxyIsTheProxysFixedAddress(t *testing.T) {
 	dockertest.Require(t)
 	cfg, _, err := render(t, valid)

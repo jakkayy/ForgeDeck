@@ -14,8 +14,7 @@ const checkTimeout = 2 * time.Second
 // Check reports whether a dependency is usable.
 type Check func(ctx context.Context) error
 
-// Handler returns 200 when every named check passes and 503 otherwise.
-// Check errors are not exposed; only pass/fail per name.
+// Handler returns 200 when every check passes, else 503; errors are not exposed
 func Handler(checks map[string]Check) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), checkTimeout)

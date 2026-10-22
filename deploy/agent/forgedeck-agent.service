@@ -5,9 +5,7 @@ After=network-online.target docker.service
 Wants=network-online.target docker.service
 
 [Service]
-# A dedicated user in the docker group. Access to the Docker socket is
-# root-equivalent on this host: that is the Agent's job, so the host should
-# hold only what you are willing to let ForgeDeck manage.
+# docker group access is root-equivalent on this host
 User=forgedeck-agent
 Group=forgedeck-agent
 SupplementaryGroups=docker
@@ -15,15 +13,12 @@ SupplementaryGroups=docker
 ExecStart=/usr/local/bin/forgedeck-agent run --state-dir /var/lib/forgedeck-agent
 Restart=always
 RestartSec=5s
-# A job in progress when the service stops is retried by the Control Plane.
 TimeoutStopSec=30s
 
-# The Agent keeps its credential and its deployment files here, and nowhere else.
 StateDirectory=forgedeck-agent
 StateDirectoryMode=0700
 
-# Hardening. These limit what a flaw in the Agent could reach on the host;
-# they do not limit what it can do through the Docker socket.
+# Hardening; does not limit what the Agent can do through the Docker socket
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

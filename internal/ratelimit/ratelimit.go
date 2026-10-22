@@ -1,5 +1,4 @@
-// Package ratelimit provides an in-memory, per-key token bucket limiter for
-// a single Control Plane process.
+// Package ratelimit provides an in-memory per-key token bucket limiter for one process.
 package ratelimit
 
 import (
@@ -9,10 +8,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// idleEviction removes keys that have been quiet long enough to be full again.
 const idleEviction = 15 * time.Minute
 
-// Limiter tracks a token bucket per key (an IP address, an email, ...).
 type Limiter struct {
 	every time.Duration
 	burst int
@@ -28,13 +25,11 @@ type bucket struct {
 	lastSeen time.Time
 }
 
-// New allows burst events at once, then one event per every.
 func New(every time.Duration, burst int, now func() time.Time) *Limiter {
 	return &Limiter{every: every, burst: burst, now: now, buckets: map[string]*bucket{}}
 }
 
-// Allow consumes a token for key. When none is left it returns false and how
-// long the caller should wait before retrying.
+// Allow consumes a token for key, or returns false and how long to wait
 func (l *Limiter) Allow(key string) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -57,9 +52,7 @@ func (l *Limiter) Allow(key string) (bool, time.Duration) {
 	return true, 0
 }
 
-// Blocked reports whether key has used up its tokens, without using one, and
-// if so how long until it has one again. It is for limits on failures: check
-// Blocked before doing the work, call Fail when the work failed.
+// Blocked reports whether key is out of tokens without using one; for failure limits (Blocked, then Fail)
 func (l *Limiter) Blocked(key string) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -76,8 +69,7 @@ func (l *Limiter) Blocked(key string) (bool, time.Duration) {
 	return true, time.Duration((1 - tokens) * float64(l.every))
 }
 
-// Fail uses a token of key. Unlike Allow it never refuses: the failure
-// happened, and the bucket simply stays empty.
+// Fail uses a token of key and never refuses
 func (l *Limiter) Fail(key string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()

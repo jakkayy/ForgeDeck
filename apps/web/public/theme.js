@@ -1,6 +1,4 @@
-// Follow the OS light/dark setting before first paint to avoid a flash.
-// This is a separate file, not an inline script, so the Content-Security-Policy
-// can forbid inline scripts altogether.
+// Follow the OS light/dark setting before first paint; a file so the CSP can forbid inline scripts.
 (() => {
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   const apply = () => {

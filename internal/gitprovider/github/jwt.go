@@ -35,8 +35,7 @@ func ParsePrivateKey(pemData []byte) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-// appJWT signs the short-lived RS256 token that authenticates as the App.
-// iat is backdated a minute to tolerate clock drift, as GitHub recommends.
+// appJWT signs the short-lived RS256 App token; iat is backdated a minute for clock drift
 func appJWT(appID int64, key *rsa.PrivateKey, now time.Time) (string, error) {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","typ":"JWT"}`))
 	claims, err := json.Marshal(map[string]any{

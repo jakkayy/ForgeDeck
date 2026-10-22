@@ -37,6 +37,7 @@ This document describes the initial logical schema, not a final migration. Colum
 | `project_secrets` | Encrypted secret values and metadata |
 | `webhook_events` | Provider delivery IDs for deduplication |
 | `audit_logs` | Important security and operational actions |
+| `setup_claim` | At most one row: taken by the first account registered from the web |
 
 ## 3. Relationships
 
@@ -69,6 +70,13 @@ projects ──< audit_logs
 - `password_hash TEXT NOT NULL`
 - `created_at TIMESTAMPTZ NOT NULL`
 - `updated_at TIMESTAMPTZ NOT NULL`
+
+### `setup_claim`
+
+- `singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK (singleton)`
+- `claimed_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+
+The first-account page inserts its row and the user in one statement, and only when `users` is empty. Two registrations at the same moment race for the single row, so only one wins. An installation that already has users never offers the page, whether or not this row exists.
 
 ### `sessions`
 

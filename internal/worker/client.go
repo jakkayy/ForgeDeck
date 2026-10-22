@@ -1,5 +1,4 @@
-// Package worker is the client side of the job protocol shared by Agents and
-// Runners: the Control Plane client, the heartbeat loop, and the job loop.
+// Package worker is the shared client side of the job protocol for Agents and Runners
 package worker
 
 import (
@@ -22,8 +21,7 @@ import (
 const requestTimeout = 30 * time.Second
 
 var (
-	// ErrUnauthorized means the credential was rejected: the server or
-	// Runner was removed from ForgeDeck. The worker must stop.
+	// ErrUnauthorized means the credential was rejected; the worker must stop
 	ErrUnauthorized = errors.New("control plane rejected the credential")
 	// ErrLeaseLost means a job attempt no longer belongs to this worker.
 	ErrLeaseLost = errors.New("job lease lost")
@@ -55,8 +53,7 @@ type Client struct {
 	credential string
 }
 
-// NewClient returns a client for the API at controlPlaneURL+api. credential
-// may be empty before enrollment.
+// NewClient returns a client for the API at controlPlaneURL+api
 func NewClient(controlPlaneURL, api, credential string) *Client {
 	return &Client{
 		baseURL:    strings.TrimRight(controlPlaneURL, "/") + api,
@@ -65,9 +62,7 @@ func NewClient(controlPlaneURL, api, credential string) *Client {
 	}
 }
 
-// SetCredential replaces the credential used from now on. Agents do this when
-// the Control Plane rotates it; requests already in flight finish with the
-// old one, which stays valid for a grace period.
+// SetCredential replaces the credential for later requests (Agents do this on rotation)
 func (c *Client) SetCredential(credential string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -80,14 +75,12 @@ func (c *Client) bearer() string {
 	return c.credential
 }
 
-// Post sends body to an endpoint below the client's API, such as "/enroll",
-// and decodes the JSON response into out when non-nil.
+// Post sends body to an endpoint below the client's API, such as "/enroll", and decodes the JSON response into out when non-nil
 func (c *Client) Post(ctx context.Context, path string, body, out any) error {
 	return c.do(ctx, requestTimeout, path, body, out)
 }
 
-// do POSTs body as JSON and decodes a JSON response into out when non-nil.
-// A response without a body (204) leaves out unchanged.
+// do POSTs body as JSON and decodes a JSON response into out when non-nil
 func (c *Client) do(ctx context.Context, timeout time.Duration, path string, body, out any) error {
 	encoded, err := json.Marshal(body)
 	if err != nil {
@@ -151,8 +144,7 @@ func (c *Client) Heartbeat(ctx context.Context, req agentproto.HeartbeatRequest)
 	return resp, err
 }
 
-// Claim waits up to wait for the next job; it returns (nil, nil) when none
-// arrived.
+// Claim waits up to wait for the next job; returns (nil, nil) when none arrived
 func (c *Client) Claim(ctx context.Context, wait time.Duration) (*agentproto.Job, error) {
 	seconds := int(wait / time.Second)
 	var job agentproto.Job

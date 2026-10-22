@@ -14,8 +14,7 @@ type identityKey struct{}
 
 var errAgentUnauthorized = httpx.Unauthorized("Agent credential is invalid or the server was removed. Re-enroll the Agent.")
 
-// RequireAgent authenticates the Authorization: Bearer <credential> header
-// and stores the Agent identity in the request context.
+// RequireAgent authenticates the Bearer credential and stores the Agent in the context
 func (h *Handler) RequireAgent(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		credential := bearerCredential(r)
@@ -36,8 +35,7 @@ func (h *Handler) RequireAgent(next http.Handler) http.Handler {
 	})
 }
 
-// IdentityFrom returns the Agent stored by RequireAgent. It panics on routes
-// without RequireAgent, which is a programming error.
+// IdentityFrom returns the Agent stored by RequireAgent
 func IdentityFrom(ctx context.Context) servers.AgentIdentity {
 	identity, ok := ctx.Value(identityKey{}).(servers.AgentIdentity)
 	if !ok {
@@ -46,8 +44,7 @@ func IdentityFrom(ctx context.Context) servers.AgentIdentity {
 	return identity
 }
 
-// bearerCredential returns the token from "Authorization: Bearer <token>",
-// or "" when the header is missing or uses another scheme.
+// bearerCredential returns the Bearer token from the Authorization header
 func bearerCredential(r *http.Request) string {
 	credential, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok {

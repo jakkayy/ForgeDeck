@@ -6,9 +6,7 @@ import (
 	"testing"
 )
 
-// TestConcurrentRedeliveriesBuildOnce sends the same delivery several times
-// at once, as overlapping provider retries do, and expects exactly one
-// recorded event and one build.
+// TestConcurrentRedeliveriesBuildOnce expects one event and one build from overlapping retries.
 func TestConcurrentRedeliveriesBuildOnce(t *testing.T) {
 	p := newGitLabProject(t)
 	const commit = "da1560886d4f094c3e6c9ef40349f7d38b5d27d7"

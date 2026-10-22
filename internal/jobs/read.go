@@ -18,11 +18,9 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// errJobNotFound is also returned for jobs in projects the user does not
-// belong to.
+// errJobNotFound also covers jobs in projects the user is not in
 var errJobNotFound = apperr.NotFound("Job not found.")
 
-// Job is the user-facing view of a job.
 type Job struct {
 	ID             uuid.UUID       `json:"id"`
 	ProjectID      uuid.UUID       `json:"project_id"`
@@ -37,17 +35,14 @@ type Job struct {
 	CreatedAt      time.Time       `json:"created_at"`
 	StartedAt      *time.Time      `json:"started_at"`
 	FinishedAt     *time.Time      `json:"finished_at"`
-	// LogsExpired says the job's output was removed by the retention job.
-	LogsExpired bool `json:"logs_expired"`
+	LogsExpired    bool            `json:"logs_expired"`
 }
 
-// JobError explains why a job failed.
 type JobError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
-// LogLine is one stored line of job output.
 type LogLine struct {
 	Attempt   int32     `json:"attempt"`
 	Sequence  int64     `json:"sequence"`
@@ -56,7 +51,6 @@ type LogLine struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Get returns a job in a project the user belongs to.
 func (s *Service) Get(ctx context.Context, userID, jobID uuid.UUID) (Job, error) {
 	job, err := s.authorizeJob(ctx, userID, jobID)
 	if err != nil {
@@ -65,13 +59,11 @@ func (s *Service) Get(ctx context.Context, userID, jobID uuid.UUID) (Job, error)
 	return toJob(job), nil
 }
 
-// LogCursor is the position after which logs are listed: "<attempt>.<sequence>".
 type LogCursor struct {
 	Attempt  int32
 	Sequence int64
 }
 
-// ParseLogCursor reads a cursor; an empty string starts from the beginning.
 func ParseLogCursor(raw string) (LogCursor, bool) {
 	if raw == "" {
 		return LogCursor{Attempt: 0, Sequence: -1}, true
@@ -87,7 +79,6 @@ func ParseLogCursor(raw string) (LogCursor, bool) {
 
 func (c LogCursor) String() string { return fmt.Sprintf("%d.%d", c.Attempt, c.Sequence) }
 
-// Logs returns up to limit log lines after cursor, in order.
 func (s *Service) Logs(ctx context.Context, userID, jobID uuid.UUID, after LogCursor, limit int32) ([]LogLine, error) {
 	if err := s.authorizeJobOutput(ctx, userID, jobID); err != nil {
 		return nil, err
@@ -105,10 +96,7 @@ func (s *Service) Logs(ctx context.Context, userID, jobID uuid.UUID, after LogCu
 	return lines, nil
 }
 
-// authorizeJobOutput is authorizeJob for reading a job's log lines. The lines
-// of a fetch_logs job are a container's output, which can hold sensitive
-// data, so reading them takes the same role as fetching them; the output of
-// builds and deployments is for every member.
+// authorizeJobOutput: fetch_logs output can hold sensitive data, so it needs the fetch role
 func (s *Service) authorizeJobOutput(ctx context.Context, userID, jobID uuid.UUID) error {
 	job, err := s.authorizeJob(ctx, userID, jobID)
 	if err != nil {

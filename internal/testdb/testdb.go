@@ -1,5 +1,4 @@
-// Package testdb gives integration tests an isolated, migrated PostgreSQL
-// database. Tests are skipped when FORGEDECK_TEST_DATABASE_URL is not set.
+// Package testdb gives integration tests an isolated, migrated PostgreSQL database
 package testdb
 
 import (
@@ -21,8 +20,7 @@ import (
 // EnvVar names the admin connection URL used to create test databases.
 const EnvVar = "FORGEDECK_TEST_DATABASE_URL"
 
-// New creates a fresh database, applies all migrations, and returns a pool.
-// The database is dropped when the test finishes.
+// New creates a fresh database, applies all migrations, and returns a pool
 func New(t testing.TB) *pgxpool.Pool {
 	t.Helper()
 	dbURL := Create(t)

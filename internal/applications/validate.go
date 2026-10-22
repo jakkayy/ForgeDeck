@@ -19,11 +19,10 @@ const (
 	maxImageLength       = 255
 )
 
-// validImageRepository is the path part of a Docker image reference:
-// lowercase components separated by "/", without host or tag.
+// validImageRepository is the path part of a Docker image reference
 var validImageRepository = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`)
 
-// validBranch is a conservative subset of git-check-ref-format.
+// validBranch is a conservative subset of git-check-ref-format
 var validBranch = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$`)
 
 func checkName(errs validate.Errors, name string) {
@@ -39,8 +38,7 @@ func checkBranch(errs validate.Errors, branch string) {
 	}
 }
 
-// checkRepoPath accepts a path inside the repository. The Runner resolves it
-// against its checkout, so it must not be able to point outside it.
+// checkRepoPath accepts a path inside the repository
 func checkRepoPath(errs validate.Errors, field, value string) {
 	cleaned := path.Clean(value)
 	if value == "" || len(value) > maxPathLength || path.IsAbs(value) ||
@@ -55,8 +53,7 @@ func checkTestCommand(errs validate.Errors, command string) {
 	}
 }
 
-// checkImage validates a registry and image repository given together and
-// returns the repository to store (nil when both are absent).
+// checkImage validates a registry and image repository given together
 func checkImage(errs validate.Errors, registryID *uuid.UUID, repository string) *string {
 	repository = strings.TrimSpace(repository)
 	switch {

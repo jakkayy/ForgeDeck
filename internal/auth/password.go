@@ -1,5 +1,4 @@
-// Package auth handles user authentication: passwords, sessions, and the
-// HTTP endpoints and middleware built on them.
+// Package auth handles user authentication
 package auth
 
 import (
@@ -13,8 +12,7 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// argon2id parameters follow the OWASP Password Storage Cheat Sheet minimum
-// (19 MiB, 2 iterations, 1 lane), which keeps login cheap on small hosts.
+// argon2id parameters follow the OWASP minimum (19 MiB, 2 iterations, 1 lane)
 const (
 	argonMemoryKiB = 19 * 1024
 	argonTime      = 2
@@ -22,7 +20,6 @@ const (
 	argonKeyLen    = 32
 	argonSaltLen   = 16
 
-	// MinPasswordLength is enforced wherever users choose a password.
 	MinPasswordLength = 12
 )
 
@@ -30,8 +27,7 @@ var errMalformedHash = errors.New("malformed password hash")
 
 var b64 = base64.RawStdEncoding
 
-// HashPassword returns an encoded argon2id hash in the PHC string format:
-// $argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>
+// HashPassword returns an encoded argon2id hash in the PHC string format
 func HashPassword(password string) (string, error) {
 	salt := make([]byte, argonSaltLen)
 	if _, err := rand.Read(salt); err != nil {
@@ -42,8 +38,7 @@ func HashPassword(password string) (string, error) {
 		argon2.Version, argonMemoryKiB, argonTime, argonThreads, b64.EncodeToString(salt), b64.EncodeToString(key)), nil
 }
 
-// VerifyPassword reports whether password matches encoded. It uses the
-// parameters stored in the hash, so hashes stay valid if defaults change.
+// VerifyPassword reports whether password matches encoded
 func VerifyPassword(password, encoded string) (bool, error) {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 6 || parts[1] != "argon2id" {

@@ -1,5 +1,4 @@
-// Package httpx holds HTTP helpers shared by Control Plane modules:
-// middleware and JSON response/error writing.
+// Package httpx holds HTTP helpers shared by Control Plane modules.
 package httpx
 
 import (
@@ -15,12 +14,10 @@ const RequestIDHeader = "X-Request-ID"
 
 type requestIDKey struct{}
 
-// validRequestID accepts IDs from a trusted proxy while rejecting values that
-// could pollute logs.
+// validRequestID rejects values that could pollute logs
 var validRequestID = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
-// RequestID assigns each request an ID, reusing a well-formed incoming
-// X-Request-ID, and echoes it in the response.
+// RequestID assigns each request an ID, reusing a well-formed X-Request-ID
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get(RequestIDHeader)

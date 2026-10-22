@@ -44,7 +44,6 @@ function JobsPage() {
     queryFn: ({ pageParam, signal }) => listJobs({ status, type, cursor: pageParam }, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
-    // Only this page polls, and only the first page while it is open.
     refetchInterval: 10_000,
   });
 

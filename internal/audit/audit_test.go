@@ -96,7 +96,6 @@ func TestListPaginatesAndFilters(t *testing.T) {
 		}
 		cursor = *page.NextCursor
 	}
-	// 5 recorded plus the project's own creation, if it is audited.
 	if len(seen) < 5 {
 		t.Fatalf("saw %d events", len(seen))
 	}

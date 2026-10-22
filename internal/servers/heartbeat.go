@@ -15,8 +15,7 @@ const HeartbeatInterval = 20 * time.Second
 
 const maxVersionLength = 64
 
-// RecordHeartbeat stores the Agent's latest status. last_seen_at uses the
-// Control Plane clock, so Agent clock skew cannot keep a server "online".
+// RecordHeartbeat stores the Agent's status; last_seen_at uses the Control Plane clock
 func (s *Service) RecordHeartbeat(ctx context.Context, identity AgentIdentity, hb agentproto.HeartbeatRequest) error {
 	if err := validateHeartbeat(hb); err != nil {
 		return err

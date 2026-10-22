@@ -148,8 +148,7 @@ type MarkExpiredJobLogsParams struct {
 	Batch  int32
 }
 
-// Finished jobs whose output is older than the cutoff, marked in one step so
-// each job is handled once. Their rows stay; only the log lines go.
+// Marks finished jobs older than the cutoff in one step so each is handled once; only logs go.
 func (q *Queries) MarkExpiredJobLogs(ctx context.Context, arg MarkExpiredJobLogsParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, markExpiredJobLogs, arg.Now, arg.Cutoff, arg.Batch)
 	if err != nil {

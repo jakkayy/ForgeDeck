@@ -11,27 +11,19 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/ratelimit"
 )
 
-// The limits are per process, in memory (ForgeDeck runs as one Control Plane
-// process). They stop abuse; they are not quotas.
+// The limits are per process, in memory (ForgeDeck runs as one Control Plane process)
 const (
-	// A user who changes something may do it 60 times in a burst, then once a second.
 	userMutationBurst    = 60
 	userMutationInterval = time.Second
 
-	// Bad credentials from one address: 20 in a burst, then one every 6 seconds.
 	failureBurst    = 20
 	failureInterval = 6 * time.Second
 
-	// Agent enrollment from one address: 10 in a burst, then one every 6 seconds.
 	enrollBurst    = 10
 	enrollInterval = 6 * time.Second
 )
 
-// strictUserLimits tighten the per-user limit on routes that are worth
-// guessing at or that make the Control Plane call something else: a member
-// lookup reveals whether an email has an account, a Git connection makes an
-// outbound request to a user-supplied address, a build calls the Git
-// provider, and enrollment tokens and secrets are credentials.
+// strictUserLimits tighten per-user limits on guessable or outbound-calling routes
 var strictUserLimits = map[string]struct {
 	burst    int
 	interval time.Duration
@@ -45,7 +37,7 @@ var strictUserLimits = map[string]struct {
 	"PUT " + "/api/v1/projects/{projectID}/secrets/{name}":             {30, 2 * time.Second},
 }
 
-// limiters holds the rate limiters of one router.
+// limiters holds the rate limiters of one router
 type limiters struct {
 	mutations *ratelimit.Limiter
 	strict    map[string]*ratelimit.Limiter
@@ -66,8 +58,7 @@ func newLimiters(now func() time.Time) *limiters {
 	return l
 }
 
-// userMutations limits how fast a signed-in user may change things. Reads are
-// not limited. It must run behind auth.RequireUser.
+// userMutations limits how fast a signed-in user may change things
 func (l *limiters) userMutations(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
@@ -94,7 +85,7 @@ func (l *limiters) userMutations(next http.Handler) http.Handler {
 	})
 }
 
-// enrollment limits how fast one address may try enrollment tokens.
+// enrollment limits how fast one address may try enrollment tokens
 func (l *limiters) enrollment(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && chi.RouteContext(r.Context()).RoutePattern() == "/api/v1/agent/enroll" {

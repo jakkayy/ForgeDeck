@@ -107,7 +107,6 @@ func TestDeleteServerRevokesAgent(t *testing.T) {
 	owner.Do(http.MethodGet, path, nil).RequireStatus(http.StatusNotFound)
 	agent.Do(http.MethodPost, "/api/v1/agent/heartbeat", hb).RequireStatus(http.StatusUnauthorized)
 
-	// The name is free again, so the same host can be re-enrolled.
 	env.EnrollAgent(owner, projectID, "prod-01")
 }
 
@@ -122,7 +121,7 @@ func TestServerListFiltersByNameAndConnectivity(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	env.EnrollAgent(owner, projectID, "web-new") // never reported: pending
+	env.EnrollAgent(owner, projectID, "web-new")
 
 	names := func(query string) string {
 		var list httpx.List[servers.Server]

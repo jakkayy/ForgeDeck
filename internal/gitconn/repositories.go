@@ -17,8 +17,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// Repository is a repository a connection can read, in a provider-neutral
-// shape. ID is the provider's own repository ID.
+// Repository is a repository a connection can read, in a provider-neutral shape
 type Repository struct {
 	ID            string `json:"id"`
 	FullName      string `json:"full_name"`
@@ -91,8 +90,7 @@ func (s *Service) gitLabClient(row store.GitConnection) (*gitlab.Client, error) 
 // ErrRepositoryNotFound means the connection cannot read the repository.
 var ErrRepositoryNotFound = apperr.NotFound("The connection cannot access this repository.")
 
-// FindRepository returns one repository the connection can read, checking
-// that the connection belongs to projectID.
+// FindRepository returns one repository the connection can read in projectID
 func (s *Service) FindRepository(ctx context.Context, userID, projectID, connectionID uuid.UUID, repositoryID string) (Repository, error) {
 	row, err := s.authorize(ctx, userID, connectionID, authz.ManageGit)
 	if err != nil {
@@ -113,9 +111,7 @@ func (s *Service) FindRepository(ctx context.Context, userID, projectID, connect
 	return Repository{}, ErrRepositoryNotFound
 }
 
-// CloneCredentials returns an HTTPS clone URL and a short-lived (GitHub) or
-// stored (GitLab) credential that can read one repository. It does no user
-// authorization; it is for handing a build to a Runner.
+// CloneCredentials returns an HTTPS clone URL and credential for one repository; no user authorization
 func (s *Service) CloneCredentials(ctx context.Context, connectionID uuid.UUID, repositoryID, fullName string) (agentproto.GitCredentials, error) {
 	row, err := s.queries.GetGitConnection(ctx, connectionID)
 	if err != nil {
@@ -156,9 +152,7 @@ type Commit struct {
 // ErrCommitNotFound means the branch or commit does not exist in the repository.
 var ErrCommitNotFound = apperr.NotFound("The branch or commit was not found in the repository.")
 
-// ResolveCommit looks up ref (a branch or commit SHA) through the provider.
-// It does no user authorization; callers authorize access to the
-// application that uses the connection.
+// ResolveCommit looks up ref through the provider; callers authorize access
 func (s *Service) ResolveCommit(ctx context.Context, connectionID uuid.UUID, repositoryID, fullName, ref string) (Commit, error) {
 	row, err := s.queries.GetGitConnection(ctx, connectionID)
 	if err != nil {

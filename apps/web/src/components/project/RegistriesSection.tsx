@@ -25,7 +25,6 @@ import { useHasRole } from "../../lib/useHasRole";
 import { ApiForm } from "../ApiForm";
 import { QueryBoundary } from "../QueryBoundary";
 
-/** Container registries the project's builds push images to. */
 export function RegistriesSection({ projectId }: { projectId: string }) {
   const registries = useQuery(registriesQuery(projectId));
   const canManage = useHasRole(projectId, "admin");

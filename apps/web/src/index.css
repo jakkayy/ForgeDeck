@@ -6,10 +6,7 @@
 @import "@heroui/styles/variants";
 @import "@heroui/styles/themes/default" layer(theme);
 
-/*
- * Only the components the dashboard uses, to keep the CSS small.
- * Add a line here when a page starts using a new HeroUI component.
- */
+/* only the HeroUI components in use, to keep the CSS small */
 @import "@heroui/styles/components/button.css" layer(components);
 @import "@heroui/styles/components/card.css" layer(components);
 @import "@heroui/styles/components/chip.css" layer(components);
@@ -37,12 +34,7 @@
 @import "@heroui/styles/components/textarea.css" layer(components);
 @import "@heroui/styles/components/search-field.css" layer(components);
 
-/*
- * ForgeDeck design tokens on top of the HeroUI theme (unlayered, so they
- * override HeroUI and Tailwind defaults such as font-sans / font-mono). Keep the palette
- * restrained: neutral surfaces, one accent, and status colors that carry
- * meaning (online, failed, stale) rather than decoration.
- */
+/* ForgeDeck tokens, unlayered so they override HeroUI/Tailwind defaults like font-sans */
 :root {
   --radius: 0.625rem;
 
@@ -51,12 +43,7 @@
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
-/*
- * Contrast fixes for the HeroUI defaults, which miss WCAG AA (4.5:1 for text):
- * muted text on light surfaces, white on the accent and danger fills, and the
- * soft success chip. Ratios were measured; keep them when changing a value.
- * --link is accent as *text*: the fill color is too dark to read on a dark page.
- */
+/* contrast fixes: HeroUI defaults miss WCAG AA 4.5:1; --link is accent as text on dark pages */
 [data-theme="light"] {
   --muted: oklch(0.48 0.0138 285.94);
   --danger: oklch(0.56 0.23 26);
@@ -73,10 +60,7 @@
   --accent: oklch(0.54 0.19 253.83);
 }
 
-/*
- * People who ask their system for less motion get no pulsing or sliding.
- * Unlayered, so it beats the layered component and utility styles without !important.
- */
+/* reduced motion: unlayered so it beats layered styles without !important */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -95,11 +79,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/*
- * react-aria adds this same rule in an inline <style> at run time. The
- * Content-Security-Policy allows that one inline text by hash, and this copy
- * keeps the behavior if an upgrade changes the text and the hash stops matching.
- */
+/* copy of react-aria's inline rule, in case an upgrade changes its CSP hash */
 @layer base {
   [data-react-aria-pressable] {
     touch-action: pan-x pan-y pinch-zoom;

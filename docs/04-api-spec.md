@@ -36,6 +36,10 @@ Do not expose stack traces, credentials, or internal host details in user-facing
 | POST | `/auth/login` | Start a session |
 | POST | `/auth/logout` | End a session |
 | GET | `/auth/me` | Return current user |
+| GET | `/auth/setup` | Public. `{"required": true}` while no account exists, so the sign-in page can offer creating the first one |
+| POST | `/auth/setup` | Public, only while no account exists: `{email, password}` creates the first account, starts its session (`201`, same body as login). `409 setup_done` once any account exists, however it was made; `404` if `FORGEDECK_DISABLE_WEB_SETUP=true`; rate limited per address like login |
+
+The first account is the only one the web can create: whoever reaches a new installation first becomes its owner, and the endpoint closes for good with that account (two simultaneous requests cannot both succeed: they race for a single `setup_claim` row inside one statement). Further users are made with `forgedeck-api create-user`, and added to projects with the members endpoints. See [07](07-security.md#2-authentication-and-sessions) for the exposure window and how to remove it.
 
 Use CSRF protection appropriate to the chosen cookie/session approach. Cookies should be `HttpOnly`, `Secure` in HTTPS deployments, and use an appropriate `SameSite` policy.
 

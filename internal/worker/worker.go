@@ -27,14 +27,12 @@ type JobError struct {
 
 func (e *JobError) Error() string { return e.Code + ": " + e.Message }
 
-// Logger receives a job's output lines. Lines are sent to the Control Plane
-// in batches.
+// Logger receives a job's output lines
 type Logger interface {
 	Log(stream, message string)
 }
 
-// Handler runs one job type. A nil error with a non-nil result reports
-// success with that result; errors are reported as failures.
+// Handler runs one job type
 type Handler func(ctx context.Context, job *agentproto.Job, log Logger) (result any, err error)
 
 // Worker claims jobs and runs them one at a time.
@@ -51,8 +49,7 @@ func NewWorker(client *Client, handlers map[string]Handler, afterJob func(), log
 	return &Worker{client: client, handlers: handlers, afterJob: afterJob, logger: logger}
 }
 
-// Run claims and executes jobs until ctx ends. It returns ErrUnauthorized
-// when the credential is rejected; other errors back off and retry.
+// Run claims and executes jobs until ctx ends; returns ErrUnauthorized when rejected
 func (w *Worker) Run(ctx context.Context) error {
 	backoff := time.Second
 	for ctx.Err() == nil {
@@ -81,9 +78,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	return nil
 }
 
-// execute runs one attempt while keeping its lease alive, then reports the
-// outcome. If the lease is lost the handler's context is cancelled and the
-// outcome is discarded: another attempt owns the job now.
+// execute runs one attempt and keeps its lease alive; a lost lease cancels the handler and drops the outcome
 func (w *Worker) execute(ctx context.Context, job *agentproto.Job) {
 	logger := w.logger.With("job_id", job.ID, "job_type", job.Type, "attempt", job.Attempt)
 	logger.Info("job started")

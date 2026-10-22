@@ -1,4 +1,4 @@
-// Package authz decides what a project member may do, based on their role.
+// Package authz decides what a project member may do, based on their role
 package authz
 
 import (
@@ -13,7 +13,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// Role is a project member's role.
+// Role is a project member's role
 type Role string
 
 const (
@@ -25,14 +25,14 @@ const (
 
 var roleRank = map[Role]int{RoleViewer: 1, RoleDeveloper: 2, RoleAdmin: 3, RoleOwner: 4}
 
-// ParseRole validates a role name.
+// ParseRole validates a role name
 func ParseRole(s string) (Role, bool) {
 	role := Role(s)
 	_, ok := roleRank[role]
 	return role, ok
 }
 
-// Permission is an action on a project or its resources.
+// Permission is an action on a project or its resources
 type Permission string
 
 const (
@@ -50,8 +50,7 @@ const (
 	DeleteProject    Permission = "project.delete"
 )
 
-// minimumRole lists the lowest role granted each permission; higher roles
-// inherit everything below them.
+// minimumRole lists the lowest role granted each permission
 var minimumRole = map[Permission]Role{
 	ViewProject:      RoleViewer,
 	OperateContainer: RoleDeveloper,
@@ -67,30 +66,29 @@ var minimumRole = map[Permission]Role{
 	DeleteProject:    RoleOwner,
 }
 
-// Can reports whether role grants permission.
+// Can reports whether role grants permission
 func (r Role) Can(p Permission) bool {
 	minimum, ok := minimumRole[p]
 	return ok && roleRank[r] >= roleRank[minimum]
 }
 
-// Outranks reports whether r is strictly higher than other.
+// Outranks reports whether r is strictly higher than other
 func (r Role) Outranks(other Role) bool { return roleRank[r] > roleRank[other] }
 
-// ErrProjectNotFound is returned for unknown projects and for projects the
-// user is not a member of, so membership cannot be probed.
+// ErrProjectNotFound covers unknown and non-member projects so membership cannot be probed
 var ErrProjectNotFound = apperr.NotFound("Project not found.")
 
-// Authorizer checks a user's permission in a project.
+// Authorizer checks a user's permission in a project
 type Authorizer struct {
 	queries *store.Queries
 }
 
-// New returns an Authorizer.
+// New returns an Authorizer
 func New(queries *store.Queries) *Authorizer {
 	return &Authorizer{queries: queries}
 }
 
-// Require returns the user's role when it grants permission in projectID.
+// Require returns the user's role when it grants permission in projectID
 func (a *Authorizer) Require(ctx context.Context, userID, projectID uuid.UUID, p Permission) (Role, error) {
 	value, err := a.queries.GetMemberRole(ctx, store.GetMemberRoleParams{ProjectID: projectID, UserID: userID})
 	if errors.Is(err, pgx.ErrNoRows) {

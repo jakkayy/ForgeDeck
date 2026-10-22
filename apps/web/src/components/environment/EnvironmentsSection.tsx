@@ -23,11 +23,9 @@ import { EnvironmentDialog } from "./EnvironmentDialog";
 
 type Props = { applicationId: string; projectId: string };
 
-/** The application's environments: what each runs now and the means to change it. */
 export function EnvironmentsSection({ applicationId, projectId }: Props) {
   const environments = useQuery(environmentsQuery(applicationId));
   const canManage = useHasRole(projectId, "admin");
-  // The newest successful build is what "Deploy" ships.
   const latestBuild = useQuery({
     queryKey: [
       "jobs",

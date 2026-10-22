@@ -7,8 +7,7 @@ INSERT INTO deployments (
 RETURNING *;
 
 -- name: GetDeployment :one
--- The job is the live source of status while it exists; the deployment's own
--- columns keep the outcome after the job is pruned.
+-- The job is the live source of status while it exists; the deployment keeps the outcome.
 SELECT sqlc.embed(deployments),
        jobs.status        AS job_status,
        jobs.error_code    AS job_error_code,
@@ -33,8 +32,7 @@ ORDER BY deployments.created_at DESC, deployments.id DESC
 LIMIT @page_limit OFFSET @page_offset;
 
 -- name: HasNewerDeployment :one
--- Whether the environment already deploys, or has queued, a build created
--- after the given time. A slower, older build must not replace a newer one.
+-- Whether a build created after the given time is already queued or deployed (older must not win).
 SELECT EXISTS (
     SELECT 1 FROM deployments
     JOIN jobs ON jobs.id = deployments.source_build_job_id

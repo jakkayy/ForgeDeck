@@ -1,5 +1,4 @@
-// Package deployments starts deployments of built images into environments
-// and reports their state.
+// Package deployments starts deployments of built images into environments and reports their state
 package deployments
 
 import (
@@ -33,7 +32,7 @@ var (
 	imageRef = regexp.MustCompile(`^[^\s@]+@sha256:[0-9a-f]{64}$`)
 )
 
-// Deployment is the API view of a deployment.
+// Deployment is the API view of a deployment
 type Deployment struct {
 	ID               uuid.UUID  `json:"id"`
 	EnvironmentID    uuid.UUID  `json:"environment_id"`
@@ -48,17 +47,16 @@ type Deployment struct {
 	CreatedAt        time.Time  `json:"created_at"`
 	StartedAt        *time.Time `json:"started_at"`
 	FinishedAt       *time.Time `json:"finished_at"`
-	// ReleaseID is set once the deployment became healthy.
-	ReleaseID *uuid.UUID `json:"release_id"`
+	ReleaseID        *uuid.UUID `json:"release_id"`
 }
 
-// Error says why a deployment failed.
+// Error says why a deployment failed
 type Error struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
-// Service implements deployment operations.
+// Service implements deployment operations
 type Service struct {
 	pool    *pgxpool.Pool
 	queries *store.Queries
@@ -67,13 +65,12 @@ type Service struct {
 	audit   *audit.Recorder
 }
 
-// NewService returns a deployment Service.
+// NewService returns a deployment Service
 func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, jobService *jobs.Service, recorder *audit.Recorder) *Service {
 	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, jobs: jobService, audit: recorder}
 }
 
-// Deploy queues a deployment of a succeeded build's image into an
-// environment, using the environment's current configuration.
+// Deploy queues a deployment of a succeeded build's image into an environment
 func (s *Service) Deploy(ctx context.Context, userID, environmentID, buildJobID uuid.UUID) (Deployment, error) {
 	env, app, err := s.authorizeEnvironment(ctx, userID, environmentID, authz.Deploy)
 	if err != nil {
@@ -100,7 +97,7 @@ func (s *Service) Deploy(ctx context.Context, userID, environmentID, buildJobID 
 	})
 }
 
-// source is what a deployment puts into an environment.
+// source is what a deployment puts into an environment
 type source struct {
 	BuildJobID *uuid.UUID
 	ReleaseID  *uuid.UUID
@@ -109,8 +106,7 @@ type source struct {
 	Config     servicecfg.Config
 }
 
-// start records the deployment and queues its job in one transaction, so a
-// deployment never exists without its job or the reverse.
+// start records the deployment and queues its job in one transaction
 func (s *Service) start(ctx context.Context, userID *uuid.UUID, env store.Environment, app store.Application, src source) (Deployment, error) {
 	var created store.Deployment
 	err := database.InTx(ctx, s.pool, func(tx pgx.Tx) error {
@@ -124,7 +120,7 @@ func (s *Service) start(ctx context.Context, userID *uuid.UUID, env store.Enviro
 	return toDeployment(created, liveJob{}), nil
 }
 
-// startIn does the work of start inside the caller's transaction.
+// startIn does the work of start inside the caller's transaction
 func (s *Service) startIn(ctx context.Context, tx pgx.Tx, userID *uuid.UUID, env store.Environment, app store.Application, src source) (store.Deployment, error) {
 	config, err := servicecfg.Normalize(src.Config)
 	if err != nil {
@@ -158,7 +154,7 @@ func (s *Service) startIn(ctx context.Context, tx pgx.Tx, userID *uuid.UUID, env
 	})
 }
 
-// Get returns a deployment the user may view.
+// Get returns a deployment the user may view
 func (s *Service) Get(ctx context.Context, userID, deploymentID uuid.UUID) (Deployment, error) {
 	row, err := s.queries.GetDeployment(ctx, deploymentID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -179,8 +175,7 @@ func (s *Service) Get(ctx context.Context, userID, deploymentID uuid.UUID) (Depl
 	}), nil
 }
 
-// describe builds the API view of a deployment, adding what is not stored on
-// the row: the live stage and the release it produced.
+// describe builds the API view of a deployment, adding what is not stored on the row
 func (s *Service) describe(ctx context.Context, row store.Deployment, job liveJob) Deployment {
 	d := toDeployment(row, job)
 	d.Stage = s.stageOf(ctx, d)
@@ -190,7 +185,7 @@ func (s *Service) describe(ctx context.Context, row store.Deployment, job liveJo
 	return d
 }
 
-// List returns an environment's deployments, newest first.
+// List returns an environment's deployments, newest first
 func (s *Service) List(ctx context.Context, userID, environmentID uuid.UUID, limit, offset int32) ([]Deployment, error) {
 	if _, _, err := s.authorizeEnvironment(ctx, userID, environmentID, authz.ViewProject); err != nil {
 		return nil, err
@@ -232,7 +227,7 @@ func (s *Service) authorizeEnvironment(ctx context.Context, userID, environmentI
 	return env, app, nil
 }
 
-// buildResult returns the image a succeeded build of applicationID pushed.
+// buildResult returns the image a succeeded build of applicationID pushed
 func buildResult(job store.Job, applicationID uuid.UUID) (agentproto.BuildResult, bool) {
 	if job.Type != agentproto.JobBuild || job.Status != string(jobs.StatusSucceeded) ||
 		job.ApplicationID == nil || *job.ApplicationID != applicationID {
@@ -257,7 +252,7 @@ func decodeConfig(raw json.RawMessage) (servicecfg.Config, error) {
 	return config, nil
 }
 
-// liveJob is the state of a deployment's job, when it still exists.
+// liveJob is the state of a deployment's job, when it still exists
 type liveJob struct {
 	Status       *string
 	ErrorCode    *string
@@ -266,8 +261,7 @@ type liveJob struct {
 	FinishedAt   *time.Time
 }
 
-// toDeployment prefers the job's live state; the deployment's own columns
-// answer once the job is gone.
+// toDeployment prefers the job's live state
 func toDeployment(row store.Deployment, job liveJob) Deployment {
 	d := Deployment{
 		ID: row.ID, EnvironmentID: row.EnvironmentID, JobID: row.JobID,

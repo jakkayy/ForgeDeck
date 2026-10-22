@@ -1,11 +1,9 @@
 package audit
 
-// Kind says how to find the project an event belongs to from the URL.
+// Kind says how to find the project an event belongs to from the URL
 type Kind int
 
 const (
-	// KindNone: the project is not known from the URL (a create route; the
-	// response names it, or the event is installation-level).
 	KindNone Kind = iota
 	KindProject
 	KindApplication
@@ -17,35 +15,25 @@ const (
 	KindServer
 )
 
-// Rule describes how one route is audited. Rules are resolved before the
-// handler runs, so a delete can still be given the name of what it deleted.
+// Rule describes how one route is audited
 type Rule struct {
-	Action     string
-	TargetType string
-	// Kind and Param find the project: Param is the URL parameter holding
-	// the ID of the Kind of resource.
-	Kind  Kind
-	Param string
-	// TargetIDParam and TargetNameParam name URL parameters used as the
-	// event's target ID and name, when the URL carries them.
+	Action          string
+	TargetType      string
+	Kind            Kind
+	Param           string
 	TargetIDParam   string
 	TargetNameParam string
-	// Actor names a non-human actor for routes that are not session routes.
-	Actor string
-	// ResponseServer says the response names the server as "server_id": the
-	// route is used by an Agent, so the event is the Agent's own.
+	Actor           string
+	// the route is used by an Agent, so the event is the Agent's own
 	ResponseServer bool
-	// FromResponse takes the target (and, for KindNone, the project) from the
-	// JSON response: used by routes that create something.
-	FromResponse bool
-	// RequestFields are the request body fields copied into the metadata.
-	// List only fields that are never sensitive.
+	FromResponse   bool
+	// list only fields that are never sensitive
 	RequestFields []string
 }
 
 const api = "/api/v1"
 
-// Rules lists every audited route: "METHOD pattern" as chi reports it.
+// Rules lists every audited route
 var Rules = map[string]Rule{
 	"POST " + api + "/projects":                                {Action: "project.create", TargetType: "project", FromResponse: true},
 	"PATCH " + api + "/projects/{projectID}":                   {Action: "project.update", TargetType: "project", Kind: KindProject, Param: "projectID", RequestFields: []string{"name", "slug"}},
@@ -89,19 +77,16 @@ var Rules = map[string]Rule{
 	"POST " + api + "/releases/{releaseID}/rollback": {Action: "release.rollback", TargetType: "release", Kind: KindRelease, Param: "releaseID", TargetIDParam: "releaseID"},
 	"POST " + api + "/jobs/{jobID}/cancel":           {Action: "job.cancel", TargetType: "job", Kind: KindJob, Param: "jobID", TargetIDParam: "jobID"},
 
-	// An Agent replacing its credential: the server is named in the response.
 	"POST " + api + "/agent/rotate-credential": {Action: "server.credential_rotate", TargetType: "server", Actor: ActorAgent, ResponseServer: true},
 
-	// An Agent exchanging its enrollment token: the server is named in the response.
 	"POST " + api + "/agent/enroll": {Action: "server.enroll", TargetType: "server", Actor: ActorAgent, ResponseServer: true},
 
-	// Sign-in is audited from its response: the session does not exist yet.
 	"POST " + api + "/auth/login": {Action: "user.login", TargetType: "user", FromResponse: true},
+
+	"POST " + api + "/auth/setup": {Action: "user.setup", TargetType: "user", FromResponse: true},
 }
 
-// Exempt lists mutating routes that are deliberately not audited, with the
-// reason. A route in neither Rules nor Exempt fails the test that walks the
-// router, so a new endpoint cannot be added without deciding.
+// Exempt lists mutating routes that are deliberately not audited, with the reason
 var Exempt = map[string]string{
 	"POST " + api + "/auth/logout": "signing out is not a security-relevant change and the session is already gone",
 

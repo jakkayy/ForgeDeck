@@ -15,8 +15,7 @@ var validStreams = map[string]bool{
 	agentproto.StreamStdout: true, agentproto.StreamStderr: true, agentproto.StreamSystem: true,
 }
 
-// AppendLogs stores a batch of log events for an attempt the worker still
-// owns. Events already stored (same sequence) are skipped.
+// AppendLogs stores log events for an attempt the worker owns; duplicates are skipped
 func (s *Service) AppendLogs(ctx context.Context, lease Lease, events []agentproto.LogEvent) error {
 	if err := validateEvents(events); err != nil {
 		return err
@@ -45,9 +44,7 @@ func (s *Service) AppendLogs(ctx context.Context, lease Lease, events []agentpro
 	return notifyJob(ctx, s.queries, lease.JobID)
 }
 
-// logRedaction returns the masking function for a job's project. It fails
-// closed: if the project's secrets cannot be read, the batch is not stored
-// unmasked (the worker drops or retries it).
+// logRedaction fails closed: if secrets cannot be read, the batch is not stored unmasked
 func (s *Service) logRedaction(ctx context.Context, jobID uuid.UUID) (func(string) string, error) {
 	if s.redactor == nil {
 		return func(message string) string { return message }, nil

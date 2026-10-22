@@ -103,7 +103,6 @@ type ContainersProps = {
   list: ContainerList;
   serverId: string;
   projectId: string;
-  /** Jobs only run while the Agent is connected, so actions wait for it. */
   isOnline: boolean;
 };
 

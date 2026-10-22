@@ -100,7 +100,6 @@ func TestPublishedPortIsUniquePerServer(t *testing.T) {
 	f.create(f.owner, map[string]any{"name": "production", "config": port}).RequireStatus(http.StatusCreated)
 	f.create(f.owner, map[string]any{"name": "staging", "config": port}).RequireStatus(http.StatusUnprocessableEntity)
 
-	// The same port on another server is fine.
 	other := f.env.EnrollAgent(f.owner, f.projectID, "prod-02")
 	f.create(f.owner, map[string]any{"name": "staging", "server_id": other.ServerID, "config": port}).
 		RequireStatus(http.StatusCreated)
@@ -131,7 +130,6 @@ func TestUpdateAndDeleteEnvironment(t *testing.T) {
 	if updated.Config.PublishedPort != nil || updated.Config.Env["LOG_LEVEL"] != "debug" || !updated.AutoDeploy {
 		t.Fatalf("config replace %+v", updated)
 	}
-	// Dropping the published port frees it for another environment.
 	f.create(f.owner, map[string]any{"name": "staging", "config": map[string]any{"container_port": 80, "published_port": 18080}}).
 		RequireStatus(http.StatusCreated)
 
@@ -176,11 +174,9 @@ func TestEnvironmentsOnlyListSecretsTheProjectHas(t *testing.T) {
 		t.Fatalf("created %+v", created.Config)
 	}
 
-	// An update cannot list an unknown secret either.
 	f.owner.Do(http.MethodPatch, "/api/v1/environments/"+created.ID.String(),
 		map[string]any{"config": map[string]any{"secrets": []string{"NOT_A_SECRET"}}}).RequireStatus(http.StatusUnprocessableEntity)
 
-	// A secret an environment lists cannot be deleted until it is removed there.
 	secretPath := "/api/v1/projects/" + f.projectID.String() + "/secrets/DATABASE_PASSWORD"
 	resp := f.owner.Do(http.MethodDelete, secretPath, nil).RequireStatus(http.StatusConflict)
 	if resp.ErrorCode() != "secret_in_use" || !strings.Contains(string(resp.Body), "production") {

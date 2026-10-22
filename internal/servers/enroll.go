@@ -15,16 +15,14 @@ import (
 )
 
 var (
-	// ErrInvalidEnrollmentToken covers unknown, expired, and already used
-	// tokens alike so the response does not reveal which.
+	// ErrInvalidEnrollmentToken covers unknown, expired and used tokens alike so the cause is not revealed
 	ErrInvalidEnrollmentToken = errors.New("invalid enrollment token")
 
 	errServerNameTaken = apperr.Conflict("server_name_taken",
 		"A server with this name already exists in the project. Remove it or issue a token with another name.")
 )
 
-// Enroll consumes an enrollment token and registers a server and its Agent.
-// Everything happens in one transaction, so a failure leaves the token usable.
+// Enroll consumes an enrollment token and registers a server and Agent in one transaction
 func (s *Service) Enroll(ctx context.Context, token, agentVersion string) (agentproto.EnrollResponse, error) {
 	credential, credentialHash := securetoken.New(agentproto.CredentialPrefix)
 	var resp agentproto.EnrollResponse

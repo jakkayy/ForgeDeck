@@ -12,11 +12,7 @@ const steps: { id: StepId; label: string }[] = [
 
 type StepState = "done" | "active" | "failed" | "pending";
 
-/**
- * Where a deployment is in `Queued → Pulling → Starting → Health check →
- * Healthy`. A failed deployment marks the stage it failed at, so an
- * in-progress state, a failure and a healthy release look different.
- */
+/** Where a deployment is in its stages; a failure marks the stage it failed at. */
 export function stepStates(d: Pick<Deployment, "status" | "stage">): StepState[] {
   const stageIndex = (stage: DeploymentStage | null) =>
     steps.findIndex((s) => s.id === (stage ?? "pull"));

@@ -60,7 +60,6 @@ type BuildPayload = {
   commit_message?: string;
 };
 
-/** What a build is building and, once pushed, the exact image to deploy. */
 function BuildSummary({ job }: { job: Job }) {
   const payload = job.payload as BuildPayload;
   const result = job.status === "succeeded" ? (job.result as BuildResult | undefined) : undefined;
@@ -86,7 +85,6 @@ function BuildSummary({ job }: { job: Job }) {
 
 type DeployPayload = { environment_id: string; commit_sha: string; image_ref: string };
 
-/** What a deployment ships and where, with a way back to its environment. */
 function DeploySummary({ job }: { job: Job }) {
   const payload = job.payload as DeployPayload;
   return (

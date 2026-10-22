@@ -14,7 +14,6 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
 
-// echoJob is a Runner job type without credentials, for protocol tests.
 const echoJob = "echo"
 
 func TestRunnerClaimsOnlyRunnerJobsAndCompletesThem(t *testing.T) {
@@ -46,7 +45,6 @@ func TestRunnerClaimsOnlyRunnerJobsAndCompletesThem(t *testing.T) {
 	}
 	runner.Do(http.MethodPost, "/api/v1/runner/jobs/claim", agentproto.ClaimRequest{WaitSeconds: &wait}).RequireStatus(http.StatusNoContent)
 
-	// Another Runner, and the Agent endpoints, cannot act on this attempt.
 	base := "/api/v1/runner/jobs/" + job.ID.String()
 	if resp := other.Do(http.MethodPost, base+"/heartbeat", agentproto.LeaseRequest{Attempt: job.Attempt}); resp.Status != http.StatusConflict {
 		t.Fatalf("other runner renewed: %d", resp.Status)

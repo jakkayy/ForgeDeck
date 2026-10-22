@@ -123,8 +123,7 @@ ORDER BY attempt_number, sequence_number
 LIMIT @page_limit;
 
 -- name: RecoverExpiredLeases :many
--- Requeues running jobs whose worker stopped renewing the lease, or fails
--- them when no attempts are left, and marks the abandoned attempt as lost.
+-- Requeues running jobs whose lease lapsed, or fails them when out of attempts.
 WITH expired AS (
     SELECT stale.id FROM jobs AS stale
     WHERE stale.status = 'running' AND stale.lease_expires_at < @now::timestamptz
@@ -170,11 +169,7 @@ WITH target AS (
 SELECT status FROM target;
 
 -- name: ListJobsForUser :many
--- Newest first, only in projects the user belongs to. The cursor is the
--- (created_at, id) of the last job on the previous page. Each project offers
--- its newest page_limit matching jobs from jobs_project_history_idx, and the
--- newest of those are the page: the cost follows the page size, not the number
--- of jobs there are.
+-- Newest first within the user's projects; cursor is (created_at, id) of the last row.
 SELECT jobs.* FROM jobs
 WHERE jobs.id IN (
     SELECT offered.id
@@ -199,8 +194,7 @@ WHERE jobs.id IN (
 ORDER BY jobs.created_at DESC, jobs.id DESC;
 
 -- name: FindActiveBuild :one
--- A queued or running build of one commit, so a repeated manual trigger
--- returns it instead of building the same commit twice at once.
+-- A queued or running build of one commit, so a repeated trigger does not build it twice.
 SELECT * FROM jobs
 WHERE application_id = @application_id
   AND type = 'build'

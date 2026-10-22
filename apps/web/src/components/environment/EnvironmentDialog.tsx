@@ -42,7 +42,6 @@ import { ApiForm } from "../ApiForm";
 type Props = {
   applicationId: string;
   projectId: string;
-  /** Editing this environment; creating a new one when absent. */
   environment?: Environment;
 };
 
@@ -53,7 +52,6 @@ const healthTypes = [
   { id: "docker", label: "Image HEALTHCHECK" },
 ] as const;
 
-/** Creates or edits an environment: a server plus how its one service runs. */
 export function EnvironmentDialog({ applicationId, projectId, environment }: Props) {
   const queryClient = useQueryClient();
   const save = useMutation({

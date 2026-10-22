@@ -8,7 +8,6 @@ import { registriesQuery } from "../../api/registries";
 import { serversQuery } from "../../api/servers";
 import { useHasRole } from "../../lib/useHasRole";
 
-/** How many applications are inspected to see whether anything is deployed. */
 const INSPECTED_APPLICATIONS = 5;
 
 type StepStatus = "done" | "next" | "todo";
@@ -17,7 +16,6 @@ type Step = {
   title: string;
   detail: string;
   done: boolean;
-  /** Where to go to do it. */
   action: { label: string; to: Destination };
 };
 
@@ -26,12 +24,7 @@ type Destination =
   | { kind: "servers" }
   | { kind: "application"; id: string };
 
-/**
- * The route from an empty project to a healthy deployment, with each step
- * checked against what exists: the first one not done is the next thing to do.
- * It disappears once a release is running, and for people who cannot do the
- * steps (only admins set a project up).
- */
+/** Checklist from an empty project to a healthy deployment; hidden once a release runs or for non-admins. */
 export function SetupGuide({ projectId }: { projectId: string }) {
   const canSetUp = useHasRole(projectId, "admin");
   const git = useQuery(gitConnectionsQuery(projectId));

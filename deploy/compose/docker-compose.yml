@@ -1,18 +1,4 @@
-# ForgeDeck for production: the Control Plane behind a reverse proxy that
-# terminates TLS, with PostgreSQL that nothing outside this stack can reach.
-#
-#   cd deploy/compose
-#   cp .env.example .env     # then fill it in; see README.md
-#   docker compose up -d --build
-#
-# Only the proxy publishes ports. The Control Plane and the database are
-# reachable from inside the stack only.
-#
-# The project name is "forgedeck-prod", not "forgedeck": the repository's
-# development docker-compose.yml is "forgedeck", and two stacks sharing a
-# name would share containers and volumes (a production password would then
-# be run against the development database, and `down --volumes` of one would
-# delete the other's data).
+# the name must differ from the dev stack ("forgedeck"): shared names share containers and volumes
 name: forgedeck-prod
 
 services:
@@ -47,19 +33,18 @@ services:
     environment:
       FORGEDECK_HTTP_ADDR: ":8080"
       FORGEDECK_DATABASE_URL: postgres://forgedeck:${POSTGRES_PASSWORD}@postgres:5432/forgedeck?sslmode=disable
-      # Encrypts stored Git tokens, registry passwords and project secrets. It is
-      # NOT in the database or in backups: keep it safely (docs/16-backup-restore.md).
+      # not in the database or backups: keep it safe (docs/16-backup-restore.md)
       FORGEDECK_SECRET_KEYS: ${FORGEDECK_SECRET_KEYS:?set FORGEDECK_SECRET_KEYS in .env (openssl rand -base64 32, as v1:<key>)}
       FORGEDECK_PUBLIC_URL: ${FORGEDECK_PUBLIC_URL:-https://${FORGEDECK_DOMAIN:?set FORGEDECK_DOMAIN in .env}}
-      # Served over HTTPS: secure cookies and HSTS.
+      # HTTPS: secure cookies and HSTS
       FORGEDECK_COOKIE_SECURE: "true"
-      # The proxy's fixed address on the "web" network: its X-Forwarded-For is
-      # believed, anyone else's is not (rate limits see real client addresses).
+      # proxy address: only its X-Forwarded-For is trusted (real client IPs for rate limits)
       FORGEDECK_TRUSTED_PROXIES: 172.30.0.2
       FORGEDECK_LOG_FORMAT: json
-      # Optional, passed through from .env when set.
+      # optional, from .env when set
       FORGEDECK_LOG_LEVEL:
       FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS:
+      FORGEDECK_DISABLE_WEB_SETUP:
       FORGEDECK_GITHUB_APP_ID:
       FORGEDECK_GITHUB_APP_SLUG:
       FORGEDECK_GITHUB_CLIENT_ID:
@@ -76,7 +61,7 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     healthcheck:
-      # The image has no shell or curl; the binary checks itself.
+      # no shell or curl in the image
       test: ["CMD", "/forgedeck-api", "healthcheck"]
       interval: 10s
       timeout: 5s
@@ -97,7 +82,7 @@ services:
       - "${FORGEDECK_HTTPS_PORT:-443}:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # Certificates and the ACME account: losing them means asking for new ones.
+      # losing these means requesting new certificates
       - caddy-data:/data
       - caddy-config:/config
     networks:
@@ -106,14 +91,13 @@ services:
     security_opt: [no-new-privileges:true]
 
 networks:
-  # The database network has no route out of the stack.
+  # no route out of the stack
   db:
     internal: true
   web:
     ipam:
       config:
-        # Containers without a fixed address are given one from the upper
-        # half only, so the proxy's fixed 172.30.0.2 can never be taken first.
+        # dynamic addresses come from the upper half so the proxy's 172.30.0.2 is never taken
         - subnet: 172.30.0.0/24
           ip_range: 172.30.0.128/25
 

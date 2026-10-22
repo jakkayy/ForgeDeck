@@ -12,11 +12,7 @@ import (
 
 var validCommit = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
 
-// checkout fetches exactly commit into dir, which must be empty. Only that
-// commit is downloaded (no history, tags, or submodules). The credential
-// reaches git as an HTTP header through GIT_CONFIG_* variables, never as a
-// command argument or in the remote URL, so it does not appear in process
-// listings or .git/config.
+// checkout fetches only commit into dir; the credential goes via GIT_CONFIG_* header, never argv or URL
 func checkout(ctx context.Context, exec *procexec.Executor, dir string, git agentproto.GitCredentials, commit, protocols string) error {
 	basic := base64.StdEncoding.EncodeToString([]byte(git.Username + ":" + git.Password))
 	env := []string{

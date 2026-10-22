@@ -13,9 +13,7 @@ import (
 var errPublicURLRequired = apperr.Conflict("public_url_required",
 	"GitLab needs to reach ForgeDeck to send pushes. Set FORGEDECK_PUBLIC_URL and try again.")
 
-// EnsureWebhook makes the provider send pushes for a repository. GitHub App
-// webhooks already cover every repository, so only GitLab needs a hook; its
-// ID is returned so it can be removed later.
+// EnsureWebhook registers a push hook (GitLab only; GitHub App webhooks cover all) and returns its ID
 func (s *Service) EnsureWebhook(ctx context.Context, connectionID uuid.UUID, repositoryID string) (*string, error) {
 	row, err := s.queries.GetGitConnection(ctx, connectionID)
 	if err != nil {

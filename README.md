@@ -40,9 +40,10 @@ ForgeDeck จัดการ Application, Docker server, Git repository แล�
 cp .env.example .env     # ตั้ง POSTGRES_PASSWORD, FORGEDECK_DATABASE_URL, FORGEDECK_SECRET_KEYS
 make db-up               # PostgreSQL
 make dev-api             # Control Plane ที่ :8080 (migrate database ให้อัตโนมัติ)
-make create-user EMAIL=you@example.com
 make dev-web             # UI ที่ http://localhost:5173 (hot reload)
 ```
+
+เปิด UI ครั้งแรกจะเจอหน้า **สร้างบัญชีแรก** (ใส่อีเมลกับรหัสผ่าน) ผู้ที่สร้างเป็นเจ้าของระบบ และหน้านี้ปิดถาวรทันทีที่มีบัญชีแล้ว (คนอื่นเพิ่มด้วย `make create-user EMAIL=...` แล้วเพิ่มเข้า Project ที่แท็บ Members) ถ้าเซิร์ฟเวอร์เปิดสู่อินเทอร์เน็ตก่อนที่คุณจะสร้างบัญชี ให้ตั้ง `FORGEDECK_DISABLE_WEB_SETUP=true` แล้วสร้างด้วย `create-user` แทน
 
 สร้าง key เข้ารหัส secret ด้วย `openssl rand -base64 32` แล้วใส่เป็น `FORGEDECK_SECRET_KEYS=v1:<ค่าที่ได้>` **เก็บ key นี้ไว้นอก database และสำรองไว้** ถ้าหาย จะอ่าน Git token ที่เก็บไว้ไม่ได้อีก
 

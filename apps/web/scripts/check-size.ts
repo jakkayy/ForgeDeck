@@ -1,12 +1,11 @@
 // Fails the build when the dashboard grows past its gzip budget.
-// Run after `vite build`: `bun scripts/check-size.ts`.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const KB = 1024;
 const budget = {
   initialJs: 130 * KB, // everything loaded before the first route renders
-  // Grows about 1–2 KB per HeroUI component in use; see docs/08 before raising.
+  // grows about 1-2 KB per HeroUI component; see docs/08 before raising
   css: 22 * KB,
   routeChunk: 60 * KB, // any lazily loaded chunk
 };

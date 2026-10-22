@@ -131,7 +131,6 @@ function Stat({
     <Card className="relative h-full gap-1 p-4">
       <dt className="text-xs text-[var(--muted)]">
         {to ? (
-          // Stretched over the whole card, so the card is the click target.
           <Link to={to} className="after:absolute after:inset-0 after:content-['']">
             {label}
           </Link>

@@ -7,10 +7,7 @@ import (
 	"strings"
 )
 
-// Handler serves the dashboard from fsys. Hashed files under /assets are
-// cached for a year; index.html is revalidated on every load so a new
-// deploy takes effect immediately. Paths without a file extension fall back
-// to index.html so client-side routes survive a reload.
+// Handler serves the dashboard; hashed assets are cached, index.html is revalidated, SPA routes fall back
 func Handler(fsys fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {

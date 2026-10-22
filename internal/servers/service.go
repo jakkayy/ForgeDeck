@@ -33,21 +33,19 @@ type Service struct {
 	now     func() time.Time
 }
 
-// NewService returns a server Service; now is time.Now outside tests.
+// NewService returns a server Service; now is time.Now outside tests
 func NewService(pool *pgxpool.Pool, authorizer *authz.Authorizer, jobService *jobs.Service, now func() time.Time) *Service {
 	return &Service{pool: pool, queries: store.New(pool), authz: authorizer, jobs: jobService, now: now}
 }
 
-// EnrollmentToken is a newly issued token. Token is shown once and only its
-// hash is stored.
+// EnrollmentToken is a newly issued token
 type EnrollmentToken struct {
 	Token      string    `json:"token"`
 	ServerName string    `json:"server_name"`
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 
-// CreateEnrollmentToken issues a single-use token that registers a server
-// named serverName in projectID when an Agent enrolls with it.
+// CreateEnrollmentToken issues a single-use token that registers a server in projectID
 func (s *Service) CreateEnrollmentToken(ctx context.Context, userID, projectID uuid.UUID, serverName string) (EnrollmentToken, error) {
 	if _, err := s.authz.Require(ctx, userID, projectID, authz.ManageServers); err != nil {
 		return EnrollmentToken{}, err

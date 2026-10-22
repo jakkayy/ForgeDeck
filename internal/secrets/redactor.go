@@ -10,14 +10,10 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/redact"
 )
 
-// redactorTTL bounds how long a masking function is reused. Setting or
-// deleting a secret through this process refreshes it at once; the TTL only
-// matters when another process changes secrets.
+// redactorTTL bounds how long a masking function is reused; matters for changes from other processes
 const redactorTTL = 15 * time.Second
 
-// Redactor masks a project's secret values in text. It keeps one decrypted
-// masking function per project for a short time, because log batches arrive
-// often and decrypting every secret for each would be wasteful.
+// Redactor masks a project's secret values in text, caching the masking function per project
 type Redactor struct {
 	svc *Service
 	now func() time.Time

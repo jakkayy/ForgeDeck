@@ -43,7 +43,6 @@ func TestAgentRotatesItsCredentialWhenAskedAndKeepsWorking(t *testing.T) {
 		done <- worker.NewHeartbeater(client, "0.5.0", dockerUp, slog.New(slog.DiscardHandler)).OnRotate(rotator.Rotate).Run(ctx)
 	}()
 
-	// The first heartbeat carries the request, the Agent rotates and saves.
 	var saved agent.Identity
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -64,13 +63,11 @@ func TestAgentRotatesItsCredentialWhenAskedAndKeepsWorking(t *testing.T) {
 		t.Fatalf("saved identity %+v", saved)
 	}
 
-	// The credential file stays private and whole.
 	info, err := os.Stat(filepath.Join(dir, "identity.json"))
 	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("identity file: %v, %v", info, err)
 	}
 
-	// The client now uses the new credential: it still works after the old one is dead.
 	if _, err := env.Pool.Exec(context.Background(), `UPDATE agents SET previous_expires_at = now() - interval '1 minute'`); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +91,7 @@ func TestFailedSaveKeepsTheCurrentCredentialAndRecoversAtTheNextAttempt(t *testi
 	client := worker.NewClient(env.Server.URL, worker.AgentAPI, enrolled.Credential)
 	rotator := agent.NewRotator(client, state, identity, slog.New(slog.DiscardHandler))
 
-	// The disk refuses the write: the Agent must not switch to a credential it could not save.
+	// the disk refuses the write: the Agent must not switch to a credential it could not save.
 	if err := os.Chmod(dir, 0o500); err != nil { //nolint:gosec // simulating a read-only state directory
 		t.Fatal(err)
 	}
@@ -108,7 +105,6 @@ func TestFailedSaveKeepsTheCurrentCredentialAndRecoversAtTheNextAttempt(t *testi
 		t.Fatalf("the Agent no longer works with the credential it kept: %v", err)
 	}
 
-	// The disk is back: the next attempt, made with the old credential, succeeds.
 	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // directories need the execute bit
 		t.Fatal(err)
 	}

@@ -1,6 +1,5 @@
 -- name: MarkExpiredJobLogs :many
--- Finished jobs whose output is older than the cutoff, marked in one step so
--- each job is handled once. Their rows stay; only the log lines go.
+-- Marks finished jobs older than the cutoff in one step so each is handled once; only logs go.
 WITH due AS (
     SELECT id FROM jobs
     WHERE finished_at < @cutoff::timestamptz

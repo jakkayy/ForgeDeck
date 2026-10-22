@@ -1,6 +1,4 @@
-// Package gittest serves real git repositories over HTTP behind the fake
-// GitLab API, so tests can clone and fetch commits like a Runner does. It
-// needs git and git-http-backend; tests are skipped when they are missing.
+// Package gittest serves real git repositories behind the fake GitLab API; tests skip without git-http-backend.
 package gittest
 
 import (
@@ -18,15 +16,12 @@ import (
 
 const backend = "/usr/lib/git-core/git-http-backend"
 
-// Server is one URL that answers both the GitLab API (from the fake) and git
-// clones. Clones need the token, like a private repository.
+// Server answers both the GitLab API (fake) and git clones, which need the token
 type Server struct {
 	URL  string
 	root string
 }
 
-// New starts a Server in front of fake. Requests to a repository need
-// token as the HTTP Basic password; everything else goes to the fake API.
 func New(t testing.TB, fake *gitlabtest.Server, token string) *Server {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -54,9 +49,7 @@ func New(t testing.TB, fake *gitlabtest.Server, token string) *Server {
 	return s
 }
 
-// AddRepo creates the repository path (such as "acme/shop") with files in
-// one initial commit and returns the commit's SHA. It is served at
-// <URL>/<path>.git.
+// AddRepo creates a repository with files in one commit and returns its SHA
 func (s *Server) AddRepo(t testing.TB, path string, files map[string]string) string {
 	t.Helper()
 	dir := filepath.Join(s.root, path+".git")
@@ -67,8 +60,7 @@ func (s *Server) AddRepo(t testing.TB, path string, files map[string]string) str
 	return s.Commit(t, path, files, "Initial commit")
 }
 
-// Commit writes files into the repository (replacing same-named files) and
-// commits them, returning the new SHA.
+// Commit writes files and commits them, returning the new SHA
 func (s *Server) Commit(t testing.TB, path string, files map[string]string, message string) string {
 	t.Helper()
 	dir := filepath.Join(s.root, path+".git")

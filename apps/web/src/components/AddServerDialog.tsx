@@ -141,7 +141,6 @@ function ServerForm({ onSubmit, onCancel, isPending, error, onClearError }: Serv
 type InstallStepsProps = { token: EnrollmentToken; projectId: string; onDone: () => void };
 
 function InstallSteps({ token, projectId, onDone }: InstallStepsProps) {
-  // Poll quickly only while this dialog waits for the new server.
   const servers = useQuery({ ...serversQuery, refetchInterval: 3_000 });
   const server = servers.data?.items.find(
     (s) => s.project_id === projectId && s.name === token.server_name,

@@ -8,8 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-// AccessLog logs one structured line per request after it completes.
-// The query string is omitted because it may carry sensitive values.
+// AccessLog logs one line per request; the query string is omitted as it may be sensitive
 func AccessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

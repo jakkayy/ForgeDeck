@@ -5,9 +5,7 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/worker"
 )
 
-// newExecutor runs a build's commands inside its workspace: HOME and
-// DOCKER_CONFIG point into it, and nothing of the Runner's own environment
-// (which holds its credential) is inherited.
+// newExecutor runs build commands with HOME and DOCKER_CONFIG in the workspace and no Runner env
 func newExecutor(ws *workspace, log worker.Logger) *procexec.Executor {
 	return procexec.New(procexec.BaseEnv(ws.home, ws.dockerConfig), log)
 }

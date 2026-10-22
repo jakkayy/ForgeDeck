@@ -1,7 +1,4 @@
-// Package compose renders the Compose file of an environment's service. The
-// Agent builds it from a validated configuration, never from user-supplied
-// YAML, so options such as privileged mode, host networking, or host mounts
-// cannot appear in it.
+// Package compose renders the Compose file of an environment's service
 package compose
 
 import (
@@ -16,10 +13,10 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/servicecfg"
 )
 
-// ServiceName is the name of the single service of every environment.
+// ServiceName is the name of the single service of every environment
 const ServiceName = "app"
 
-// Labels the Agent puts on the service's containers.
+// Labels the Agent puts on the service's containers
 const (
 	LabelManaged     = "forgedeck.managed"
 	LabelEnvironment = "forgedeck.environment"
@@ -27,22 +24,19 @@ const (
 
 var imageRef = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._:/-]*@sha256:[0-9a-f]{64}$`)
 
-// Spec is one service to run.
+// Spec is one service to run
 type Spec struct {
 	EnvironmentID uuid.UUID
 	ImageRef      string // registry/repo@sha256:…
 	Config        servicecfg.Config
 }
 
-// ProjectName is the Compose project of an environment.
+// ProjectName is the Compose project of an environment
 func ProjectName(environmentID uuid.UUID) string {
 	return "forgedeck-" + environmentID.String()
 }
 
-// Render returns the Compose file for spec. It is JSON, which is valid YAML
-// and which Compose reads, so every value is quoted by the encoder and no
-// user-supplied text can break out of its string. The configuration is
-// validated again here: a tampered job payload is refused.
+// Render returns the Compose file for spec
 func Render(spec Spec) ([]byte, error) {
 	config, err := servicecfg.Normalize(spec.Config)
 	if err != nil {
@@ -58,9 +52,6 @@ func Render(spec Spec) ([]byte, error) {
 		"labels": map[string]string{
 			LabelManaged:     "true",
 			LabelEnvironment: spec.EnvironmentID.String(),
-			// No per-deployment label: Compose recreates a container whose
-			// configuration changed, and a label that differs on every
-			// deployment would restart an unchanged service each time.
 		},
 	}
 	if config.ContainerPort != nil && config.PublishedPort != nil {
@@ -71,9 +62,7 @@ func Render(spec Spec) ([]byte, error) {
 		for name, value := range config.Env {
 			env[name] = escapeInterpolation(value)
 		}
-		// A secret's value is not in the file: Compose reads it from the
-		// environment of the `docker compose` process, so nothing secret is
-		// written to disk.
+		// A secret's value is not in the file
 		for _, name := range config.Secrets {
 			env[name] = "${" + name + "}"
 		}
@@ -105,8 +94,7 @@ func Render(spec Spec) ([]byte, error) {
 	return json.MarshalIndent(file, "", "  ")
 }
 
-// escapeInterpolation protects a value from Compose's own variable
-// interpolation: "$" would otherwise start a substitution.
+// escapeInterpolation protects a value from Compose's own variable interpolation
 func escapeInterpolation(value string) string {
 	return strings.ReplaceAll(value, "$", "$$")
 }

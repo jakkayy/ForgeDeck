@@ -32,7 +32,6 @@ export type NewApplication = {
   image_repository?: string;
 };
 
-/** Fields an update may change; image_repository "" removes the image. */
 export type ApplicationUpdate = {
   registry_connection_id?: string | null;
   image_repository?: string;
@@ -40,7 +39,6 @@ export type ApplicationUpdate = {
 
 export type QueuedBuild = { job_id: string; status: JobStatus; commit_sha: string };
 
-/** What a succeeded build job reports. */
 export type BuildResult = {
   commit_sha: string;
   image: string;
@@ -73,7 +71,6 @@ export function updateApplication(applicationId: string, input: ApplicationUpdat
   return api<Application>(`/applications/${applicationId}`, { method: "PATCH", body: input });
 }
 
-/** Builds commitSha, or the head of the application's branch when omitted. */
 export function triggerBuild(applicationId: string, commitSha?: string) {
   return api<QueuedBuild>(`/applications/${applicationId}/builds`, {
     method: "POST",

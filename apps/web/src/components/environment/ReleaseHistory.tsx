@@ -10,7 +10,6 @@ import { QueryBoundary } from "../QueryBoundary";
 
 type Props = { environmentId: string; projectId: string };
 
-/** Every release of an environment, newest first, each one a point to roll back to. */
 export function ReleaseHistory({ environmentId, projectId }: Props) {
   const releases = useInfiniteQuery(releaseListQuery(environmentId));
   const canDeploy = useHasRole(projectId, "developer");

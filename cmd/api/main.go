@@ -1,14 +1,4 @@
-// Command api runs the ForgeDeck Control Plane.
-//
-// Usage:
-//
-//	forgedeck-api [serve]             run the server (applies pending migrations first)
-//	forgedeck-api migrate up|down|status
-//	forgedeck-api create-user --email <address>   (password from terminal or stdin)
-//	forgedeck-api create-runner --name <name>     (prints the Runner credential once)
-//	forgedeck-api delete-runner --name <name>
-//	forgedeck-api healthcheck         exit 0 if the server on this machine is healthy (for containers)
-//	forgedeck-api version             print the version
+// Command api runs the ForgeDeck Control Plane
 package main
 
 import (

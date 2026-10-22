@@ -1,13 +1,4 @@
--- Seeds the "small production" benchmark profile (docs/12-measurements.md).
--- Run against a freshly migrated, otherwise empty database, after creating the
--- owner with `forgedeck-api create-user --email bench@forgedeck.local`:
---
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/bench/seed.sql
---
--- Profile: 10 projects, 50 servers (each with an Agent whose credential is
--- fda_bench_<n>), 100 applications, 200 environments, 8,000 deployments with
--- 7,000 releases, 20,000 jobs (1,000 of them with 300 log lines), 50,000 audit
--- events. Everything is owned by bench@forgedeck.local.
+-- Benchmark seed (docs/12-measurements.md): run on a fresh database after create-user --email bench@forgedeck.local.
 
 BEGIN;
 
@@ -32,7 +23,6 @@ SELECT ('00000000-0000-4000-8001-0000000000' || lpad(row_number() OVER (ORDER BY
        id, 'gitlab', 'GitLab', 'https://gitlab.example.com', '\x00', 'v1', '\x00', 'v1', (SELECT id FROM bench_owner)
 FROM projects;
 
--- 5 servers per project; 40 fresh, 10 not heard from for an hour.
 INSERT INTO servers (id, project_id, name, last_seen_at, agent_version, docker_available, docker_version, cpu_percent, memory_percent, disk_percent)
 SELECT ('00000000-0000-4000-8002-' || lpad(n::text, 12, '0'))::uuid,
        ('00000000-0000-4000-8000-0000000000' || lpad(((n - 1) / 5 + 1)::text, 2, '0'))::uuid,
@@ -52,7 +42,6 @@ SELECT ('00000000-0000-4000-8003-' || lpad(n::text, 12, '0'))::uuid,
        n::text, 'acme/app-' || lpad(n::text, 3, '0'), 'main', 'Dockerfile', '.', (SELECT id FROM bench_owner)
 FROM generate_series(1, 100) n;
 
--- Two environments per application, on servers of the same project.
 INSERT INTO environments (id, application_id, name, server_id, auto_deploy, config, published_port, created_by)
 SELECT ('00000000-0000-4000-8004-' || lpad(n::text, 12, '0'))::uuid,
        a.id, CASE WHEN n % 2 = 0 THEN 'production' ELSE 'staging' END,
@@ -63,7 +52,6 @@ SELECT ('00000000-0000-4000-8004-' || lpad(n::text, 12, '0'))::uuid,
 FROM (SELECT id, row_number() OVER (ORDER BY name) AS ord FROM applications) a
 JOIN LATERAL generate_series((a.ord - 1) * 2 + 1, a.ord * 2) n ON true;
 
--- 20,000 build jobs spread over 90 days, newest last.
 INSERT INTO jobs (id, project_id, type, worker_kind, status, payload, result, application_id, attempt_count, created_at, started_at, finished_at)
 SELECT ('00000000-0000-4000-8005-' || lpad(n::text, 12, '0'))::uuid,
        a.project_id, 'build', 'runner',
@@ -83,13 +71,11 @@ JOIN (SELECT id, project_id, name, repository_full_name, row_number() OVER (ORDE
 
 UPDATE jobs SET error_code = 'build_failed', error_message = 'The build failed.' WHERE status = 'failed';
 
--- 300 log lines on the newest 1,000 jobs.
 INSERT INTO job_log_chunks (job_id, attempt_number, sequence_number, stream, content)
 SELECT j.id, 1, s, CASE WHEN s % 40 = 0 THEN 'stderr' ELSE 'stdout' END,
        'Step ' || s || '/300 : RUN make target-' || s || ' && echo done'
 FROM (SELECT id FROM jobs ORDER BY created_at DESC LIMIT 1000) j, generate_series(1, 300) s;
 
--- Deployments: 40 per environment, the newest of each is what runs now.
 INSERT INTO deployments (id, environment_id, source_build_job_id, commit_sha, image_ref, config, status, error_code, created_by, created_at, started_at, finished_at)
 SELECT ('00000000-0000-4000-8006-' || lpad(n::text, 12, '0'))::uuid,
        e.id, j.id, j.payload->>'commit_sha',

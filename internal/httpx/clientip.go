@@ -9,17 +9,7 @@ import (
 
 type clientIPKey struct{}
 
-// TrustedProxies makes ClientIP report the real client when ForgeDeck runs
-// behind a reverse proxy. Without it every request would appear to come from
-// the proxy, and any limit per client address would be one shared bucket that
-// a single caller can empty for everybody.
-//
-// The X-Forwarded-For header is believed only when the TCP peer is in
-// proxies, because anyone else can send it with any value. Then the header is
-// read from the right, the way proxies append to it: the first address that
-// is not itself a trusted proxy is the client. Addresses further left were
-// supplied by the client and are ignored. With no trusted proxies this
-// middleware changes nothing.
+// TrustedProxies makes ClientIP honor X-Forwarded-For (read from the right) only from trusted peers
 func TrustedProxies(proxies []netip.Prefix) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if len(proxies) == 0 {
@@ -50,8 +40,7 @@ func trusted(proxies []netip.Prefix, address string) bool {
 	return false
 }
 
-// fromForwardedFor returns the right-most address in the header that is not a
-// trusted proxy, or fallback when the header is missing or has no such address.
+// fromForwardedFor returns the right-most address that is not a trusted proxy, else fallback
 func fromForwardedFor(proxies []netip.Prefix, values []string, fallback string) string {
 	var hops []string
 	for _, value := range values {
