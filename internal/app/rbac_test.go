@@ -102,6 +102,8 @@ var notProjectScoped = map[string]string{
 	"GET /api/v1/overview":         "summarizes only the caller's projects",
 	"GET /api/v1/auth/me":          "the caller's own user",
 	"POST /api/v1/auth/login":      "public by nature; rate limited",
+	"GET /api/v1/auth/setup":       "public: says only whether any account exists yet",
+	"POST /api/v1/auth/setup":      "public until the first account exists, then refused; rate limited",
 	"POST /api/v1/auth/logout":     "ends the caller's own session",
 	"GET /api/v1/git/github/setup": "GitHub's redirect; verified by a sealed state and OAuth",
 	"GET /healthz":                 "public liveness check",

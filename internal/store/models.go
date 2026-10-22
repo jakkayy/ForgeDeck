@@ -257,6 +257,11 @@ type Session struct {
 	ExpiresAt  time.Time
 }
 
+type SetupClaim struct {
+	Singleton bool
+	ClaimedAt time.Time
+}
+
 type User struct {
 	ID           uuid.UUID
 	Email        string

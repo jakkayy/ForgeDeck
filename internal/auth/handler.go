@@ -27,22 +27,37 @@ type Handler struct {
 	cookie       cookieConfig
 	loginByIP    *ratelimit.Limiter
 	loginByEmail *ratelimit.Limiter
+	webSetup     bool
 }
+
+// Option changes how a Handler behaves.
+type Option func(*Handler)
+
+// WithoutWebSetup turns off registering the first account from the web: the
+// first account must then be created with `forgedeck-api create-user`.
+func WithoutWebSetup() Option { return func(h *Handler) { h.webSetup = false } }
 
 // NewHandler returns auth endpoints. secureCookies must be true when the
 // Control Plane is served over HTTPS.
-func NewHandler(svc *Service, secureCookies bool) *Handler {
-	return &Handler{
+func NewHandler(svc *Service, secureCookies bool, options ...Option) *Handler {
+	h := &Handler{
 		svc:          svc,
 		cookie:       newCookieConfig(secureCookies),
 		loginByIP:    ratelimit.New(loginRefillPerIP, loginBurstPerIP, time.Now),
 		loginByEmail: ratelimit.New(loginRefillPerEmail, loginBurstPerEmail, time.Now),
+		webSetup:     true,
 	}
+	for _, option := range options {
+		option(h)
+	}
+	return h
 }
 
 // Routes mounts the auth endpoints on r.
 func (h *Handler) Routes(r chi.Router) {
 	r.Post("/auth/login", httpx.Handle(h.login))
+	r.Get("/auth/setup", httpx.Handle(h.setupStatus))
+	r.Post("/auth/setup", httpx.Handle(h.setup))
 	r.Post("/auth/logout", httpx.Handle(h.logout))
 	r.With(h.RequireUser).Get("/auth/me", httpx.Handle(h.me))
 }
@@ -73,6 +88,43 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) error {
 	return httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"user": user,
 	})
+}
+
+// setupStatus tells the sign-in page whether to offer creating the first
+// account. It reveals only that no account exists yet.
+func (h *Handler) setupStatus(w http.ResponseWriter, r *http.Request) error {
+	required := false
+	if h.webSetup {
+		var err error
+		if required, err = h.svc.SetupRequired(r.Context()); err != nil {
+			return err
+		}
+	}
+	return httpx.WriteJSON(w, http.StatusOK, map[string]bool{"required": required})
+}
+
+// setup registers the first account, signs it in, and closes itself: the
+// person who reaches a new installation first is its owner. Later calls get 409.
+func (h *Handler) setup(w http.ResponseWriter, r *http.Request) error {
+	if !h.webSetup {
+		return httpx.NotFound("Creating the first account from the web is turned off; use forgedeck-api create-user.")
+	}
+	var req loginRequest
+	if err := httpx.DecodeJSON(w, r, &req); err != nil {
+		return err
+	}
+	if ok, retry := h.loginByIP.Allow(httpx.ClientIP(r)); !ok {
+		return httpx.TooManyRequests(w, retry)
+	}
+	user, session, err := h.svc.RegisterFirstUser(r.Context(), req.Email, req.Password)
+	if errors.Is(err, ErrSetupDone) {
+		return httpx.Conflict("setup_done", "An account already exists. Sign in instead.")
+	}
+	if err != nil {
+		return err
+	}
+	h.cookie.set(w, session.Token)
+	return httpx.WriteJSON(w, http.StatusCreated, map[string]any{"user": user})
 }
 
 func (h *Handler) limitLogin(w http.ResponseWriter, r *http.Request, email string) error {

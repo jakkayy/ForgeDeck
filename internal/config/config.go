@@ -24,6 +24,9 @@ type Config struct {
 	LogLevel     string
 	LogFormat    string
 	CookieSecure bool
+	// DisableWebSetup stops the sign-in page from offering to create the first
+	// account; it is then created with `forgedeck-api create-user`.
+	DisableWebSetup bool
 	// Keyring encrypts stored credentials; parsed from FORGEDECK_SECRET_KEYS.
 	Keyring *keyring.Keyring
 	// PublicURL is where users and Git providers reach ForgeDeck, used for
@@ -50,11 +53,12 @@ type LookupFunc func(key string) (string, bool)
 func Load(lookup LookupFunc) (Config, error) {
 	env := reader{lookup: lookup}
 	cfg := Config{
-		HTTPAddr:     env.string("FORGEDECK_HTTP_ADDR", ":8080"),
-		DatabaseURL:  env.string("FORGEDECK_DATABASE_URL", ""),
-		LogLevel:     env.string("FORGEDECK_LOG_LEVEL", "info"),
-		LogFormat:    env.string("FORGEDECK_LOG_FORMAT", "json"),
-		CookieSecure: env.bool("FORGEDECK_COOKIE_SECURE", true),
+		HTTPAddr:        env.string("FORGEDECK_HTTP_ADDR", ":8080"),
+		DatabaseURL:     env.string("FORGEDECK_DATABASE_URL", ""),
+		LogLevel:        env.string("FORGEDECK_LOG_LEVEL", "info"),
+		LogFormat:       env.string("FORGEDECK_LOG_FORMAT", "json"),
+		CookieSecure:    env.bool("FORGEDECK_COOKIE_SECURE", true),
+		DisableWebSetup: env.bool("FORGEDECK_DISABLE_WEB_SETUP", false),
 	}
 	keys, err := keyring.Parse(env.string("FORGEDECK_SECRET_KEYS", ""))
 	if err != nil {

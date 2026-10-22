@@ -97,6 +97,9 @@ var Rules = map[string]Rule{
 
 	// Sign-in is audited from its response: the session does not exist yet.
 	"POST " + api + "/auth/login": {Action: "user.login", TargetType: "user", FromResponse: true},
+
+	// The first account, registered from the web: audited from its response like a sign-in.
+	"POST " + api + "/auth/setup": {Action: "user.setup", TargetType: "user", FromResponse: true},
 }
 
 // Exempt lists mutating routes that are deliberately not audited, with the

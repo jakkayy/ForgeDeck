@@ -60,6 +60,7 @@ services:
       # Optional, passed through from .env when set.
       FORGEDECK_LOG_LEVEL:
       FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS:
+      FORGEDECK_DISABLE_WEB_SETUP:
       FORGEDECK_GITHUB_APP_ID:
       FORGEDECK_GITHUB_APP_SLUG:
       FORGEDECK_GITHUB_CLIENT_ID:

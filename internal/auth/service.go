@@ -28,8 +28,8 @@ func NewService(queries *store.Queries, now func() time.Time) *Service {
 	return &Service{queries: queries, now: now}
 }
 
-// CreateUser validates the input, hashes the password, and stores the user.
-func (s *Service) CreateUser(ctx context.Context, email, password string) (store.User, error) {
+// newCredentials validates an email and password and hashes the password.
+func newCredentials(email, password string) (cleanEmail, hash string, err error) {
 	email = strings.TrimSpace(email)
 	errs := validate.Errors{}
 	if !isEmail(email) {
@@ -39,10 +39,18 @@ func (s *Service) CreateUser(ctx context.Context, email, password string) (store
 		errs.Add("password", fmt.Sprintf("Password must be at least %d characters.", MinPasswordLength))
 	}
 	if err := errs.Err(); err != nil {
-		return store.User{}, err
+		return "", "", err
 	}
+	hash, err = HashPassword(password)
+	if err != nil {
+		return "", "", err
+	}
+	return email, hash, nil
+}
 
-	hash, err := HashPassword(password)
+// CreateUser validates the input, hashes the password, and stores the user.
+func (s *Service) CreateUser(ctx context.Context, email, password string) (store.User, error) {
+	email, hash, err := newCredentials(email, password)
 	if err != nil {
 		return store.User{}, err
 	}

@@ -46,7 +46,11 @@ const retentionInterval = 6 * time.Hour
 // is cancelled.
 func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.Handler {
 	authService := auth.NewService(store.New(pool), time.Now)
-	authHandler := auth.NewHandler(authService, cfg.CookieSecure)
+	var authOptions []auth.Option
+	if cfg.DisableWebSetup {
+		authOptions = append(authOptions, auth.WithoutWebSetup())
+	}
+	authHandler := auth.NewHandler(authService, cfg.CookieSecure, authOptions...)
 	authorizer := authz.New(store.New(pool))
 	projectHandler := projects.NewHandler(projects.NewService(pool, authorizer))
 	auditRecorder := audit.NewRecorder(store.New(pool), logger)

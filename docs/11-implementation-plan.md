@@ -25,7 +25,7 @@
 | Frontend | Vite + React SPA embed ใน Go binary | ไม่มี JavaScript runtime ตอนรันจริง, origin เดียว, ติดตั้ง binary เดียว ([08](08-frontend-ux.md#2-stack)) |
 | Package manager / build | Bun (ใช้ตอน build เท่านั้น) | ติดตั้ง dependency และรัน script เร็ว, ใช้รัน Vite ได้ |
 | CI | GitHub Actions | remote อยู่บน GitHub |
-| ผู้ใช้คนแรก | CLI `forgedeck-api create-user` ใน MVP (ไม่มี global admin, สิทธิ์อยู่ระดับ project), Setup Wizard ไว้ Phase 5 | ปิด open decision ใน [01](01-product-spec.md#10-open-product-decisions) แบบง่ายที่สุดก่อน |
+| ผู้ใช้คนแรก | CLI `forgedeck-api create-user` ใน MVP (ไม่มี global admin, สิทธิ์อยู่ระดับ project); หลัง Phase 6 เพิ่มหน้าสร้างบัญชีแรกบนเว็บ (ใช้ได้ครั้งเดียว ปิดด้วย `FORGEDECK_DISABLE_WEB_SETUP`) | ปิด open decision ใน [01](01-product-spec.md#10-open-product-decisions) แบบง่ายที่สุดก่อน |
 
 ---
 

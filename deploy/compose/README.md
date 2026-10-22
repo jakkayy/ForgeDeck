@@ -40,13 +40,15 @@ docker compose up -d --build        # builds the image from this repository, sta
 docker compose ps                   # wait for api and postgres to be "healthy"
 ```
 
-Create the first user (it asks for the password twice):
+Open `https://<your domain>`: a new installation shows **Create the first account**. Register there, straight away; that account owns the installation and the page closes for good once it exists. The first start also applies the database migrations.
+
+**Until you register, whoever reaches the page first takes the installation.** If the host is reachable from the internet (a public domain), set `FORGEDECK_DISABLE_WEB_SETUP=true` in `.env` first and create the account on the host instead (it asks for the password twice):
 
 ```sh
 docker compose exec api /forgedeck-api create-user --email you@example.com
 ```
 
-Open `https://<your domain>` and sign in. The first start also applies the database migrations.
+More users are made with that command, and added to projects under *Members*.
 
 ## What is configured for you
 
