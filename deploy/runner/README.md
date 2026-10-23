@@ -11,36 +11,44 @@ Sign in as the installation's **administrator** (the first account) and open **R
 
 ## 2. Install on the build host
 
-Requirements: Linux with systemd, Docker Engine with BuildKit, and `git`.
+Requirements: Linux with systemd, `git`, and Debian or Ubuntu with [Docker's apt repository](https://docs.docker.com/engine/install/ubuntu/) (the installer adds rootless Docker from it). Use the command the dashboard shows after **Add Runner**; it has the credential in it:
 
 ```sh
 curl -fsSL https://github.com/jakkayy/ForgeDeck/releases/latest/download/install-runner.sh -o install-runner.sh
-sudo bash install-runner.sh --url https://forgedeck.example.com
+sudo FORGEDECK_RUNNER_CREDENTIAL=fdr_... bash install-runner.sh --url https://forgedeck.example.com
 ```
 
-The installer downloads the Runner for this CPU (amd64 or arm64) from the same release and checks it against the release's `SHA256SUMS` (that catches a corrupted download, not a compromised release), asks for the credential at a hidden prompt (or reads `FORGEDECK_RUNNER_CREDENTIAL`), and writes `/etc/forgedeck-runner/runner.env` readable only by root and the Runner. It also creates the `forgedeck-runner` user and installs the systemd unit, then prints the Docker setup steps below. `--version v0.1.0` picks a release, `--binary PATH` installs a binary you built (`make build-runner`), and running it again upgrades the binary and keeps `runner.env`. `--dry-run` shows what it would do; `--uninstall` removes the service and binary.
+That is the whole installation. The installer:
 
-## 3. Give the Runner its own Docker daemon
+- downloads the Runner for this CPU (amd64 or arm64) from the same release and checks it against the release's `SHA256SUMS` (that catches a corrupted download, not a compromised release);
+- creates the `forgedeck-runner` user and writes `/etc/forgedeck-runner/runner.env`, readable only by root and the Runner;
+- installs **rootless Docker** for that user (`docker-ce-rootless-extras` and `uidmap` from apt, a non-overlapping `subuid`/`subgid` range, `loginctl enable-linger`), see below;
+- installs and starts the systemd unit, then checks that it stays up and tells you if it does not.
+
+Installing those packages upgrades the Docker packages the host already has, which can restart its Docker daemon, so use a host built for this. The credential is not shown in `ps`, but the command puts it in your shell history: delete the Runner in the dashboard to revoke it. Without `FORGEDECK_RUNNER_CREDENTIAL` the installer asks for it at a hidden prompt. Giving it a credential again replaces the stored one, which is how you recover from a wrong or revoked credential. `--version v0.1.0` picks a release, `--binary PATH` installs a binary you built (`make build-runner`), `--no-docker-setup` leaves Docker to you, and running it again upgrades the binary and keeps `runner.env`. `--dry-run` shows what it would do; `--uninstall` removes the service and binary.
+
+## 3. Why the Runner gets its own Docker daemon
 
 The Runner drives Docker through the `docker` CLI. Adding its user to the
 `docker` group would give anything that escapes a build root on the host.
-Prefer **rootless Docker** for the `forgedeck-runner` user: container root maps
+**Rootless Docker** for the `forgedeck-runner` user means container root maps
 to an unprivileged user, so even a breakout from a build step stays unprivileged.
 The unit points `DOCKER_HOST` at that user's socket. Rootless mode cannot
 publish privileged ports, which builds do not need.
 
-If you must use the system daemon, remove the `DOCKER_HOST` line from the unit
-and understand that the Runner then has root-equivalent access to the host.
+If the installer cannot set it up (a distribution without Docker's apt repository), install
+rootless Docker for the user by hand (`dockerd-rootless-setuptool.sh install` with `loginctl enable-linger`)
+and run `sudo systemctl enable --now forgedeck-runner`. If you must use the system daemon, remove
+the `DOCKER_HOST` line from the unit and understand that the Runner then has root-equivalent access to the host.
 
-## 4. Start and check
+## 4. Check
 
 ```sh
-sudo systemctl enable --now forgedeck-runner
 journalctl -u forgedeck-runner -f
 ```
 
 Look for `runner started`. The Control Plane marks the Runner seen on its first
-heartbeat. Then press **Build** on an application with a registry and image.
+heartbeat. A `401` means the credential is wrong or the Runner was deleted: add a new Runner and run the command again. Then press **Build** on an application with a registry and image.
 
 ## Tuning
 

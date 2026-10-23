@@ -16,16 +16,36 @@ import (
 	"github.com/jakkayy/ForgeDeck/internal/dockertest"
 )
 
+// stubs stand in for what a real host provides; apt-get "installs" the rootless Docker tools.
 const stubs = `
 mkdir -p /stub
-printf '#!/bin/sh\necho "systemctl $*" >> /tmp/systemctl.log\nexit 0\n' > /stub/systemctl
-chmod +x /stub/systemctl
+touch /tmp/stub.log; chmod 666 /tmp/stub.log
+cat > /stub/systemctl <<'EOS'
+#!/bin/sh
+echo "systemctl $*" >> /tmp/stub.log
+[ "$1" = is-active ] && [ -n "$FAIL_ACTIVE" ] && exit 3
+exit 0
+EOS
+cat > /stub/loginctl <<'EOS'
+#!/bin/sh
+echo "loginctl $*" >> /tmp/stub.log
+mkdir -p "/run/user/$(id -u "$2")"
+EOS
+cat > /stub/apt-get <<'EOS'
+#!/bin/sh
+echo "apt-get $*" >> /tmp/stub.log
+[ -z "$APT_FAIL" ] || exit 100
+printf '#!/bin/sh\necho "setuptool as $(id -un) in $XDG_RUNTIME_DIR: $*" >> /tmp/stub.log\nmkdir -p "$HOME/.config/systemd/user"\ntouch "$HOME/.config/systemd/user/docker.service"\n' > /stub/dockerd-rootless-setuptool.sh
+printf '#!/bin/sh\n' > /stub/newuidmap
+chmod +x /stub/dockerd-rootless-setuptool.sh /stub/newuidmap
+EOS
+chmod +x /stub/systemctl /stub/loginctl /stub/apt-get
 export PATH=/stub:$PATH
 `
 
 // curlSetup copies the installer to a lone directory (as a download would) and adds curl to the image.
 const curlSetup = `
-apt-get update -qq >/dev/null && apt-get install -y -qq curl ca-certificates >/dev/null
+/usr/bin/apt-get update -qq >/dev/null && /usr/bin/apt-get install -y -qq curl ca-certificates >/dev/null
 mkdir /solo && cp /installer/install.sh /solo/install.sh
 `
 
@@ -69,9 +89,14 @@ echo "--- env file:"; stat -c '%a %U:%G' /etc/forgedeck-runner/runner.env
 grep -c '^FORGEDECK_URL=https://forgedeck.example.com$' /etc/forgedeck-runner/runner.env
 grep -c '^FORGEDECK_RUNNER_CREDENTIAL=` + credential + `$' /etc/forgedeck-runner/runner.env
 echo "--- binary and unit:"; stat -c '%a' /usr/local/bin/forgedeck-runner /etc/systemd/system/forgedeck-runner.service
-echo "--- second run keeps the file (a different credential must not replace it):"
-FORGEDECK_RUNNER_CREDENTIAL=fdr_other bash /installer/install.sh --binary /runner
+echo "--- second run without a credential keeps the file:"
+env -u FORGEDECK_RUNNER_CREDENTIAL bash /installer/install.sh --binary /runner
 grep -c '^FORGEDECK_RUNNER_CREDENTIAL=` + credential + `$' /etc/forgedeck-runner/runner.env
+grep -c '^FORGEDECK_URL=https://forgedeck.example.com$' /etc/forgedeck-runner/runner.env
+echo "--- a new credential replaces the stored one and keeps the URL:"
+FORGEDECK_RUNNER_CREDENTIAL=fdr_replacement bash /installer/install.sh --binary /runner
+grep -c '^FORGEDECK_RUNNER_CREDENTIAL=fdr_replacement$' /etc/forgedeck-runner/runner.env
+grep -c '^FORGEDECK_URL=https://forgedeck.example.com$' /etc/forgedeck-runner/runner.env
 echo "--- uninstall keeps the configuration:"
 bash /installer/install.sh --uninstall
 test ! -e /usr/local/bin/forgedeck-runner; test ! -e /etc/systemd/system/forgedeck-runner.service; test -f /etc/forgedeck-runner/runner.env
@@ -88,6 +113,84 @@ echo ALL-OK
 	}
 	if strings.Contains(out, credential) {
 		t.Errorf("the credential appears in the installer's output")
+	}
+}
+
+func TestInstallSetsUpRootlessDockerAndStartsTheRunner(t *testing.T) {
+	dockertest.Require(t)
+	binary := buildRunner(t)
+	script := `
+set -e
+echo "someone:100000:65536" | tee /etc/subuid > /etc/subgid
+bash /installer/install.sh --binary /runner --url https://forgedeck.example.com
+echo "--- subuid:"; cat /etc/subuid; echo "--- subgid:"; cat /etc/subgid
+echo "--- log:"; cat /tmp/stub.log
+: > /tmp/stub.log
+echo "--- second run does not set Docker up again:"
+bash /installer/install.sh --binary /runner
+cat /tmp/stub.log
+echo ALL-OK
+`
+	out, err := run(t, []string{"FORGEDECK_RUNNER_CREDENTIAL=" + credential}, script, binary)
+	if err != nil || !strings.Contains(out, "ALL-OK") {
+		t.Fatalf("installer: %v\n%s", err, out)
+	}
+	first, second, _ := strings.Cut(out, "--- second run")
+	for _, want := range []string{
+		"forgedeck-runner:165536:65536", // after the range that "someone" holds
+		"apt-get install -y docker-ce-rootless-extras uidmap",
+		"loginctl enable-linger forgedeck-runner",
+		"setuptool as forgedeck-runner in /run/user/",
+		"systemctl enable forgedeck-runner",
+		"systemctl restart forgedeck-runner",
+		"the Runner is running",
+	} {
+		if !strings.Contains(first, want) {
+			t.Errorf("first run lacks %q:\n%s", want, first)
+		}
+	}
+	if strings.Count(first, "forgedeck-runner:165536:65536") != 2 {
+		t.Errorf("the user should get one range in subuid and one in subgid:\n%s", first)
+	}
+	if strings.Contains(second, "apt-get") || strings.Contains(second, "setuptool") || !strings.Contains(second, "systemctl restart") {
+		t.Errorf("a second run set Docker up again or did not restart:\n%s", second)
+	}
+}
+
+func TestInstallCanSkipDockerSetup(t *testing.T) {
+	dockertest.Require(t)
+	binary := buildRunner(t)
+	script := `
+set -e
+bash /installer/install.sh --binary /runner --url https://x --no-docker-setup
+grep -c -e apt-get -e loginctl -e setuptool /tmp/stub.log || true
+grep -c 'systemctl restart forgedeck-runner' /tmp/stub.log
+echo ALL-OK
+`
+	out, err := run(t, []string{"FORGEDECK_RUNNER_CREDENTIAL=" + credential}, script, binary)
+	if err != nil || !strings.Contains(out, "ALL-OK") || strings.Contains(out, "rootless Docker") {
+		t.Fatalf("installer: %v\n%s", err, out)
+	}
+}
+
+func TestInstallReportsAFailedDockerSetupAndAnUnhealthyRunner(t *testing.T) {
+	dockertest.Require(t)
+	binary := buildRunner(t)
+	cases := map[string]struct {
+		env  string
+		want string
+	}{
+		"apt-get fails":           {"APT_FAIL=1", "Could not set up rootless Docker"},
+		"the Runner does not run": {"FAIL_ACTIVE=1", "did not stay up"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			out, err := run(t, []string{"FORGEDECK_RUNNER_CREDENTIAL=" + credential, tc.env},
+				"bash /installer/install.sh --binary /runner --url https://x; echo \"exit=$?\"; test -f /etc/forgedeck-runner/runner.env && echo CONFIG-SAVED", binary)
+			if err != nil || !strings.Contains(out, tc.want) || strings.Contains(out, "exit=0") || !strings.Contains(out, "CONFIG-SAVED") {
+				t.Fatalf("%v\n%s", err, out)
+			}
+		})
 	}
 }
 
