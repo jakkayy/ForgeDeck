@@ -34,14 +34,13 @@ How to move a running ForgeDeck to a newer version without losing data or leavin
 With the supported Compose setup ([deploy/compose](../deploy/compose/README.md)):
 
 ```sh
-cd ForgeDeck
-git fetch --tags
-git checkout <the version you are upgrading to>
-cd deploy/compose
-FORGEDECK_VERSION=$(git describe --tags --always) docker compose up -d --build
+cd ForgeDeck/deploy/compose
+# set FORGEDECK_VERSION=<the release you are upgrading to> in .env, then:
+docker compose pull
+docker compose up -d
 ```
 
-This builds the new image, restarts the Control Plane on it, and leaves PostgreSQL and the proxy running. On start the Control Plane **applies pending migrations before it serves any request**. Each migration runs in its own transaction: if one fails, it is rolled back, the Control Plane exits with the reason, and it does not serve. Fix the cause (or go back) rather than forcing it.
+If you build the image from the repository instead (`COMPOSE_FILE` includes `docker-compose.build.yml`), check out the new version (`git fetch --tags && git checkout <version>`) and use `docker compose up -d --build`. Either way this restarts the Control Plane on the new image, and leaves PostgreSQL and the proxy running. On start the Control Plane **applies pending migrations before it serves any request**. Each migration runs in its own transaction: if one fails, it is rolled back, the Control Plane exits with the reason, and it does not serve. Fix the cause (or go back) rather than forcing it.
 
 Watch it come up:
 
@@ -92,7 +91,7 @@ To go back after a migration has been applied:
 
 1. Stop the Control Plane (`docker compose stop api`).
 2. Restore the backup you took before upgrading, into the database ([16](16-backup-restore.md#restoring)), with the same `FORGEDECK_SECRET_KEYS`.
-3. Check out the previous version and `docker compose up -d --build`.
+3. Set `FORGEDECK_VERSION` back to the previous release and `docker compose pull && docker compose up -d` (building from source: check out the previous version and use `up -d --build`).
 
 You lose whatever happened after the backup (deployments, job history, audit events). If the old version never applied a migration (the new one failed on the first), you can simply start the old version again: `migrate status` tells you.
 
