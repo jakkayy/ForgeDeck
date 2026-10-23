@@ -77,6 +77,10 @@ var Rules = map[string]Rule{
 	"POST " + api + "/releases/{releaseID}/rollback": {Action: "release.rollback", TargetType: "release", Kind: KindRelease, Param: "releaseID", TargetIDParam: "releaseID"},
 	"POST " + api + "/jobs/{jobID}/cancel":           {Action: "job.cancel", TargetType: "job", Kind: KindJob, Param: "jobID", TargetIDParam: "jobID"},
 
+	// Runners belong to the installation, not to a project: these events have no project.
+	"POST " + api + "/runners":              {Action: "runner.create", TargetType: "runner", FromResponse: true},
+	"DELETE " + api + "/runners/{runnerID}": {Action: "runner.delete", TargetType: "runner", TargetIDParam: "runnerID"},
+
 	"POST " + api + "/agent/rotate-credential": {Action: "server.credential_rotate", TargetType: "server", Actor: ActorAgent, ResponseServer: true},
 
 	"POST " + api + "/agent/enroll": {Action: "server.enroll", TargetType: "server", Actor: ActorAgent, ResponseServer: true},
