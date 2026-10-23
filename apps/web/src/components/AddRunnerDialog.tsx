@@ -10,8 +10,8 @@ import { CopyField } from "./CopyField";
 const INSTALLER_URL =
   "https://github.com/jakkayy/ForgeDeck/releases/latest/download/install-runner.sh";
 
-function installCommand(origin: string) {
-  return `curl -fsSL ${INSTALLER_URL} -o install-runner.sh && sudo bash install-runner.sh --url ${origin}`;
+function installCommand(origin: string, credential: string) {
+  return `curl -fsSL ${INSTALLER_URL} -o install-runner.sh && sudo FORGEDECK_RUNNER_CREDENTIAL=${credential} bash install-runner.sh --url ${origin}`;
 }
 
 /** Creates a Runner and walks the administrator through installing it on a build host. */
@@ -107,26 +107,20 @@ function InstallSteps({ runner, onDone }: { runner: CreatedRunner; onDone: () =>
         <Modal.Heading>Install the Runner {runner.name}</Modal.Heading>
       </Modal.Header>
       <Modal.Body className="flex flex-col gap-4 text-sm">
-        <ol className="flex list-decimal flex-col gap-4 ps-5 marker:text-[var(--muted)]">
-          <li className="space-y-2">
-            <p>
-              On the build host, download the installer and run it. It fetches the Runner for that
-              machine's CPU and checks it, then asks for the credential: paste it when asked. The
-              credential is not echoed or saved in shell history.
-            </p>
-            <CopyField label="install command" value={installCommand(window.location.origin)} />
-            <CopyField label="Runner credential" value={runner.credential} />
-            <p className="text-xs text-[var(--muted)]">
-              The credential is shown once. If you lose it, delete this Runner and add another.
-            </p>
-          </li>
-          <li className="space-y-2">
-            <p>
-              The installer then prints how to give the Runner its own Docker daemon (recommended,
-              because builds run untrusted code) and the command that starts it.
-            </p>
-          </li>
-        </ol>
+        <div className="space-y-2">
+          <p>
+            Run this on the build host (Debian or Ubuntu with Docker's apt repository). It installs
+            the Runner, gives it its own rootless Docker daemon, and starts it.
+          </p>
+          <CopyField
+            label="install command"
+            value={installCommand(window.location.origin, runner.credential)}
+          />
+          <p className="text-xs text-[var(--muted)]">
+            The command contains the credential, which is shown once and stays in the shell history
+            of that host. If it leaks or is lost, delete this Runner and add another.
+          </p>
+        </div>
         <div
           role="status"
           className="flex items-center gap-2 rounded-lg border border-[var(--separator)] p-3"
