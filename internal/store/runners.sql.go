@@ -12,6 +12,25 @@ import (
 	"github.com/google/uuid"
 )
 
+const countRunnersByLiveness = `-- name: CountRunnersByLiveness :one
+SELECT count(*) AS total,
+       count(*) FILTER (WHERE last_seen_at >= $1::timestamptz) AS online
+FROM runners
+`
+
+type CountRunnersByLivenessRow struct {
+	Total  int64
+	Online int64
+}
+
+// Online means a heartbeat since the cutoff the caller passes.
+func (q *Queries) CountRunnersByLiveness(ctx context.Context, onlineAfter time.Time) (CountRunnersByLivenessRow, error) {
+	row := q.db.QueryRow(ctx, countRunnersByLiveness, onlineAfter)
+	var i CountRunnersByLivenessRow
+	err := row.Scan(&i.Total, &i.Online)
+	return i, err
+}
+
 const createRunner = `-- name: CreateRunner :one
 INSERT INTO runners (name, credential_hash) VALUES ($1, $2) RETURNING id, name, credential_hash, version, last_seen_at, created_at
 `
@@ -35,6 +54,18 @@ func (q *Queries) CreateRunner(ctx context.Context, arg CreateRunnerParams) (Run
 	return i, err
 }
 
+const deleteRunnerByID = `-- name: DeleteRunnerByID :execrows
+DELETE FROM runners WHERE id = $1
+`
+
+func (q *Queries) DeleteRunnerByID(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRunnerByID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteRunnerByName = `-- name: DeleteRunnerByName :execrows
 DELETE FROM runners WHERE name = $1
 `
@@ -45,6 +76,24 @@ func (q *Queries) DeleteRunnerByName(ctx context.Context, name string) (int64, e
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getRunner = `-- name: GetRunner :one
+SELECT id, name, credential_hash, version, last_seen_at, created_at FROM runners WHERE id = $1
+`
+
+func (q *Queries) GetRunner(ctx context.Context, id uuid.UUID) (Runner, error) {
+	row := q.db.QueryRow(ctx, getRunner, id)
+	var i Runner
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CredentialHash,
+		&i.Version,
+		&i.LastSeenAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getRunnerByCredentialHash = `-- name: GetRunnerByCredentialHash :one
@@ -63,6 +112,37 @@ func (q *Queries) GetRunnerByCredentialHash(ctx context.Context, credentialHash 
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listRunners = `-- name: ListRunners :many
+SELECT id, name, credential_hash, version, last_seen_at, created_at FROM runners ORDER BY name
+`
+
+func (q *Queries) ListRunners(ctx context.Context) ([]Runner, error) {
+	rows, err := q.db.Query(ctx, listRunners)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Runner{}
+	for rows.Next() {
+		var i Runner
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CredentialHash,
+			&i.Version,
+			&i.LastSeenAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const recordRunnerHeartbeat = `-- name: RecordRunnerHeartbeat :exec

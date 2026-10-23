@@ -45,5 +45,5 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, NewS
 	if err != nil {
 		return User{}, NewSession{}, err
 	}
-	return User{ID: record.ID, Email: record.Email}, session, nil
+	return User{ID: record.ID, Email: record.Email, IsAdmin: record.IsAdmin}, session, nil
 }

@@ -33,6 +33,7 @@ var strictUserLimits = map[string]struct {
 	"POST " + "/api/v1/projects/{projectID}/git-connections/gitlab":    {10, 6 * time.Second},
 	"POST " + "/api/v1/projects/{projectID}/git-connections/github":    {10, 6 * time.Second},
 	"POST " + "/api/v1/projects":                                       {10, 6 * time.Second},
+	"POST " + "/api/v1/runners":                                        {10, 6 * time.Second},
 	"POST " + "/api/v1/applications/{applicationID}/builds":            {30, 2 * time.Second},
 	"PUT " + "/api/v1/projects/{projectID}/secrets/{name}":             {30, 2 * time.Second},
 }

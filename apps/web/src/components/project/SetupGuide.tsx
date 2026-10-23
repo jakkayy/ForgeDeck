@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { applicationsQuery } from "../../api/applications";
 import { environmentsQuery, releasesQuery } from "../../api/environments";
 import { gitConnectionsQuery } from "../../api/git";
+import { overviewQuery } from "../../api/overview";
 import { registriesQuery } from "../../api/registries";
 import { serversQuery } from "../../api/servers";
 import { useHasRole } from "../../lib/useHasRole";
@@ -22,6 +23,7 @@ type Step = {
 type Destination =
   | { kind: "tab"; tab: "git" | "registries" | "applications" }
   | { kind: "servers" }
+  | { kind: "runners" }
   | { kind: "application"; id: string };
 
 /** Checklist from an empty project to a healthy deployment; hidden once a release runs or for non-admins. */
@@ -30,6 +32,7 @@ export function SetupGuide({ projectId }: { projectId: string }) {
   const git = useQuery(gitConnectionsQuery(projectId));
   const registries = useQuery(registriesQuery(projectId));
   const servers = useQuery(serversQuery);
+  const overview = useQuery(overviewQuery);
   const applications = useQuery(applicationsQuery(projectId));
 
   const apps = (applications.data?.items ?? []).slice(0, INSPECTED_APPLICATIONS);
@@ -37,7 +40,7 @@ export function SetupGuide({ projectId }: { projectId: string }) {
   const environmentIds = environments.flatMap((q) => q.data ?? []).map((e) => e.id);
   const releases = useQueries({ queries: environmentIds.map((id) => releasesQuery(id, 1)) });
 
-  const loading = [git, registries, servers, applications].some((q) => q.isPending);
+  const loading = [git, registries, servers, overview, applications].some((q) => q.isPending);
   if (!canSetUp || loading) {
     return null;
   }
@@ -65,6 +68,16 @@ export function SetupGuide({ projectId }: { projectId: string }) {
       action: {
         label: projectServers.length > 0 ? "Check the Agent" : "Add server",
         to: { kind: "servers" },
+      },
+    },
+    {
+      title: "Add a Runner",
+      detail:
+        "The build host that turns your repository into an image. Without one, a build waits forever.",
+      done: (overview.data?.runners.online ?? 0) > 0,
+      action: {
+        label: (overview.data?.runners.total ?? 0) > 0 ? "Check the Runner" : "Add Runner",
+        to: { kind: "runners" },
       },
     },
     {
@@ -184,6 +197,13 @@ function StepLink({
   if (to.kind === "servers") {
     return (
       <Link to="/servers" className={linkClass(primary)}>
+        {label}
+      </Link>
+    );
+  }
+  if (to.kind === "runners") {
+    return (
+      <Link to="/runners" className={linkClass(primary)}>
         {label}
       </Link>
     );

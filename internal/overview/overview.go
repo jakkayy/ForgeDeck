@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/jakkayy/ForgeDeck/internal/runners"
 	"github.com/jakkayy/ForgeDeck/internal/servers"
 	"github.com/jakkayy/ForgeDeck/internal/store"
 )
@@ -20,6 +21,7 @@ const (
 type Overview struct {
 	Servers      ServerCounts `json:"servers"`
 	Environments EnvCounts    `json:"environments"`
+	Runners      RunnerCounts `json:"runners"`
 	Recent       []Deployment `json:"recent_deployments"`
 	Failures     []Deployment `json:"failing_deployments"`
 	GeneratedAt  time.Time    `json:"generated_at"`
@@ -31,6 +33,12 @@ type ServerCounts struct {
 	Unreachable int64 `json:"unreachable"`
 	Offline     int64 `json:"offline"`
 	Pending     int64 `json:"pending"`
+}
+
+// RunnerCounts is how many build Runners exist and how many are online.
+type RunnerCounts struct {
+	Total  int64 `json:"total"`
+	Online int64 `json:"online"`
 }
 
 type EnvCounts struct {
@@ -78,6 +86,10 @@ func (s *Service) Get(ctx context.Context, userID uuid.UUID) (Overview, error) {
 	if err != nil {
 		return Overview{}, fmt.Errorf("count environments: %w", err)
 	}
+	runnerRow, err := s.queries.CountRunnersByLiveness(ctx, runners.OnlineAfter(now))
+	if err != nil {
+		return Overview{}, fmt.Errorf("count runners: %w", err)
+	}
 	recent, err := s.deployments(ctx, userID, false, recentLimit)
 	if err != nil {
 		return Overview{}, err
@@ -92,6 +104,7 @@ func (s *Service) Get(ctx context.Context, userID uuid.UUID) (Overview, error) {
 			Offline: serverRow.Offline, Pending: serverRow.Pending,
 		},
 		Environments: EnvCounts(envRow),
+		Runners:      RunnerCounts{Total: runnerRow.Total, Online: runnerRow.Online},
 		Recent:       recent,
 		Failures:     failing,
 		GeneratedAt:  now,

@@ -47,13 +47,25 @@ func newCredentials(email, password string) (cleanEmail, hash string, err error)
 	return email, hash, nil
 }
 
+// UserOption changes how CreateUser makes the account.
+type UserOption func(*userOptions)
+
+type userOptions struct{ admin bool }
+
+// AsAdmin makes the new account an administrator; the first account of an installation is one anyway.
+func AsAdmin() UserOption { return func(o *userOptions) { o.admin = true } }
+
 // CreateUser validates the input, hashes the password, and stores the user
-func (s *Service) CreateUser(ctx context.Context, email, password string) (store.User, error) {
+func (s *Service) CreateUser(ctx context.Context, email, password string, options ...UserOption) (store.User, error) {
+	var opts userOptions
+	for _, option := range options {
+		option(&opts)
+	}
 	email, hash, err := newCredentials(email, password)
 	if err != nil {
 		return store.User{}, err
 	}
-	user, err := s.queries.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: hash})
+	user, err := s.queries.CreateUser(ctx, store.CreateUserParams{Email: email, PasswordHash: hash, IsAdmin: opts.admin})
 	if database.IsUniqueViolation(err) {
 		return store.User{}, ErrEmailTaken
 	}

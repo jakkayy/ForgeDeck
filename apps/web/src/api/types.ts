@@ -4,7 +4,7 @@ export type Role = "owner" | "admin" | "developer" | "viewer";
 
 export type List<T> = { items: T[]; next_cursor: string | null };
 
-export type User = { id: string; email: string };
+export type User = { id: string; email: string; is_admin: boolean };
 
 export type Project = {
   id: string;

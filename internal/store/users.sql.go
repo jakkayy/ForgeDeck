@@ -15,11 +15,11 @@ const createFirstUser = `-- name: CreateFirstUser :one
 WITH claim AS (
     INSERT INTO setup_claim DEFAULT VALUES ON CONFLICT DO NOTHING RETURNING singleton
 )
-INSERT INTO users (email, password_hash)
-SELECT $1::citext, $2::text
+INSERT INTO users (email, password_hash, is_admin)
+SELECT $1::citext, $2::text, true
 FROM claim
 WHERE NOT EXISTS (SELECT 1 FROM users)
-RETURNING id, email, password_hash, created_at, updated_at
+RETURNING id, email, password_hash, created_at, updated_at, is_admin
 `
 
 type CreateFirstUserParams struct {
@@ -37,23 +37,26 @@ func (q *Queries) CreateFirstUser(ctx context.Context, arg CreateFirstUserParams
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash)
-VALUES ($1, $2)
-RETURNING id, email, password_hash, created_at, updated_at
+INSERT INTO users (email, password_hash, is_admin)
+VALUES ($1, $2, $3::boolean OR NOT EXISTS (SELECT 1 FROM users))
+RETURNING id, email, password_hash, created_at, updated_at, is_admin
 `
 
 type CreateUserParams struct {
 	Email        string
 	PasswordHash string
+	IsAdmin      bool
 }
 
+// The first account of an installation is always its administrator.
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash)
+	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash, arg.IsAdmin)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -61,12 +64,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, created_at, updated_at FROM users WHERE email = $1
+SELECT id, email, password_hash, created_at, updated_at, is_admin FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -78,12 +82,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, created_at, updated_at FROM users WHERE id = $1
+SELECT id, email, password_hash, created_at, updated_at, is_admin FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -95,6 +100,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsAdmin,
 	)
 	return i, err
 }

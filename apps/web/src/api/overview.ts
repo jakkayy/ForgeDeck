@@ -27,6 +27,7 @@ export type Overview = {
     in_progress: number;
     not_deployed: number;
   };
+  runners: { total: number; online: number };
   recent_deployments: OverviewDeployment[];
   failing_deployments: OverviewDeployment[];
   generated_at: string;

@@ -360,3 +360,30 @@ Added during Phase 6 (each shipped inside the commit of the item it supports, ex
 | 6.5b | ตรวจแล้วว่าออกจากหน้าปิด stream อยู่แล้ว สิ่งที่แก้คือ tab ที่ซ่อนนานเกิน 1 นาที (resume ด้วย `?after=`) | 6.5 |
 | 6.6b | Skip link, title และ focus ตามหน้า, token สีที่ผ่าน contrast, งบ CSS 20 → 22 KB | 6.6 |
 | 6.7b | `scripts/bench` (seed + ตัวยิงโหลด), query ของ `/jobs` และ `/overview` ที่เคยอ่านทั้งตาราง, บีบอัด dashboard ใน Control Plane | `perf(api): speed up job history and overview queries and compress the dashboard` |
+
+---
+
+## Phase 7 — Ease of use
+
+เป้าหมาย: คนที่มีเครื่อง Linux เครื่องเดียวรัน **คำสั่งเดียว** แล้วเปิด URL สร้างบัญชี กดเชื่อม GitHub เลือก repo ที่มี Dockerfile และกด Deploy ได้ **โดยไม่แตะ `.env` ไม่ต้องสร้าง token ของ registry และไม่ต้องติดตั้ง Agent/Runner เอง** (Phase 0–6 ทำให้ระบบถูกต้องและปลอดภัย แต่การติดตั้งยังต้องทำหลายขั้นด้วยมือ ซึ่งเจอจริงตอนใช้ครั้งแรกบน home server)
+
+Acceptance: สคริปต์ทดสอบบนเครื่องสะอาดที่รันคำสั่งติดตั้งคำสั่งเดียวแล้ว deploy repo ตัวอย่างจนได้ release ที่ healthy สำเร็จ โดยไม่แก้ไฟล์ตั้งค่าด้วยมือ
+
+| # | งาน | Commit |
+|---|---|---|
+| 7.1 | ผู้ดูแลระบบ (instance admin) และ Runner ที่สร้าง/ดู/ลบได้จากเว็บ พร้อมขั้น Runner ใน getting-started guide (ติดตั้ง Runner ด้วยคำสั่งเดียวจาก release) | `feat(api): add an administrator flag to accounts`, `feat(api): add Runner management for administrators`, `feat(runner): download and verify the release in the installer`, `feat(web): add Runners and a guide step` |
+| 7.2 | ค่าเริ่มต้นและการตรวจก่อนกด: เติมชื่อ image, เตือนเมื่อ repo ไม่มี Dockerfile, แนะนำพอร์ตที่ว่าง, เตือนเมื่อ namespace ของ image ไม่ตรงกับ registry | `feat(web): suggest defaults and check forms early` |
+| 7.3 🚧 | Registry ในตัว (spike ก่อน: image reference ที่ Runner push กับที่ Agent pull ต้องเป็น address เดียวกันได้) | `feat: add a bundled registry` |
+| 7.4 🚧 | โหมด all-in-one: Runner และ Agent มากับชุดติดตั้ง (build รันใน Docker daemon แยก ไม่ใช่ socket ของเครื่อง) | `feat(compose): add a single-host profile` |
+| 7.5 | ตัวช่วย "Deploy repo นี้": ตรวจ Dockerfile เดาพอร์ตจาก `EXPOSE` สร้าง Application + Environment แล้ว build + deploy ในขั้นเดียว | `feat(web): add a one-page deploy flow` |
+| 7.6 | สคริปต์ติดตั้ง Control Plane คำสั่งเดียวที่สร้าง `.env` ให้เอง | `feat: add a one-command installer` |
+| 7.7 | เชื่อม GitHub คลิกเดียวด้วย GitHub App manifest flow | `feat(api): create the GitHub App from a manifest` |
+| 7.8 | โดเมนและ HTTPS ต่อแอป | `feat: route a domain to an application` |
+| 7.9 | สร้าง Dockerfile ให้เองตามภาษา (repo ที่ไม่มี Dockerfile) | `feat(runner): build without a Dockerfile` |
+
+**ข้อตัดสินใจที่ตั้งไว้ก่อนเริ่ม (แก้ได้ถ้าพบปัญหา)**
+
+- **Instance admin:** Runner เป็นของทั้งระบบ (รับ build ของทุก project) จึงสร้างได้เฉพาะผู้ดูแลระบบ ไม่ใช่ owner ของ project ผู้ดูแลระบบ = บัญชีแรกที่สร้างผ่านหน้าเว็บหรือ `create-user --admin` และบัญชีที่เก่าที่สุดของระบบที่มีอยู่แล้ว (migration)
+- **all-in-one (7.4):** build ที่รันบนเครื่องเดียวกับของจริงคือความเสี่ยง จึงต้องรันใน Docker daemon ของตัวเองใน container (ไม่ mount `docker.sock` ของเครื่อง) ซึ่งต้องใช้สิทธิ์สูงใน container นั้น เป็นข้อแลกเปลี่ยนที่ต้องเขียนใน docs/07 ให้ชัด: ใช้กับ repo ของตัวเองเท่านั้น
+- **Registry ในตัว (7.3):** ยังไม่ตัดสินวิธี ต้องทำ spike ก่อนว่า image reference แบบไหนที่ทั้ง Runner (push) และ Agent (pull บนเครื่องเดียวกันหรือเครื่องอื่น) ใช้ได้ และเรื่อง TLS/auth
+- ลำดับ: 7.1 → 7.2 ก่อน (ได้ผลทันทีและเสี่ยงน้อย) แล้ว 7.3–7.5 (ปิดงาน "ไม่ต้องมี registry/เครื่อง build แยก") ตามด้วย 7.6, 7.7 และ 7.8–7.9 เป็นส่วนสุดท้าย (ใหญ่)

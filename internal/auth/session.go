@@ -29,6 +29,8 @@ var ErrInvalidSession = errors.New("invalid session")
 type User struct {
 	ID    uuid.UUID `json:"id"`
 	Email string    `json:"email"`
+	// IsAdmin may manage what belongs to the whole installation, such as build Runners.
+	IsAdmin bool `json:"is_admin"`
 }
 
 // NewSession is a started session
@@ -77,7 +79,7 @@ func (s *Service) Authenticate(ctx context.Context, token string) (User, error) 
 			return User{}, fmt.Errorf("touch session: %w", err)
 		}
 	}
-	return User{ID: session.UserID, Email: session.Email}, nil
+	return User{ID: session.UserID, Email: session.Email, IsAdmin: session.IsAdmin}, nil
 }
 
 // EndSession deletes the session for token

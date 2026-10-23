@@ -22,8 +22,12 @@ const CredentialPrefix = "fdr_"
 var (
 	// ErrInvalidCredential means the credential is unknown or was revoked.
 	ErrInvalidCredential = errors.New("invalid runner credential")
-	// ErrNotFound means no Runner has the given name.
+	// ErrNotFound means no Runner matches.
 	ErrNotFound = errors.New("runner not found")
+	// ErrInvalidName means the name is not lowercase letters, digits and hyphens.
+	ErrInvalidName = errors.New("runner name must be lowercase letters, digits and hyphens, e.g. build-01")
+	// ErrNameTaken means a Runner already has the name.
+	ErrNameTaken = errors.New("a runner with this name already exists")
 
 	validName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 )
@@ -48,12 +52,12 @@ func NewService(queries *store.Queries, now func() time.Time) *Service {
 // Create registers a Runner and returns its credential
 func (s *Service) Create(ctx context.Context, name string) (Identity, string, error) {
 	if !validName.MatchString(name) {
-		return Identity{}, "", errors.New("runner name must be lowercase letters, digits and hyphens, e.g. build-01")
+		return Identity{}, "", ErrInvalidName
 	}
 	credential, hash := securetoken.New(CredentialPrefix)
 	row, err := s.queries.CreateRunner(ctx, store.CreateRunnerParams{Name: name, CredentialHash: hash})
 	if database.IsUniqueViolation(err) {
-		return Identity{}, "", fmt.Errorf("a runner named %q already exists", name)
+		return Identity{}, "", fmt.Errorf("%w: %q", ErrNameTaken, name)
 	}
 	if err != nil {
 		return Identity{}, "", fmt.Errorf("create runner: %w", err)

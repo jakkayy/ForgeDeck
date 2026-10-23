@@ -35,7 +35,7 @@ Do not expose stack traces, credentials, or internal host details in user-facing
 |---|---|---|
 | POST | `/auth/login` | Start a session |
 | POST | `/auth/logout` | End a session |
-| GET | `/auth/me` | Return current user |
+| GET | `/auth/me` | Return current user (`id`, `email`, `is_admin`) |
 | GET | `/auth/setup` | Public. `{"required": true}` while no account exists, so the sign-in page can offer creating the first one |
 | POST | `/auth/setup` | Public, only while no account exists: `{email, password}` creates the first account, starts its session (`201`, same body as login). `409 setup_done` once any account exists, however it was made; `404` if `FORGEDECK_DISABLE_WEB_SETUP=true`; rate limited per address like login |
 
@@ -209,6 +209,7 @@ Follow it like any job (`GET /jobs/{jobID}`, `/events`). A succeeded build's `re
 {
   "servers": { "total": 4, "online": 2, "unreachable": 1, "offline": 1, "pending": 0 },
   "environments": { "total": 5, "succeeded": 3, "failed": 1, "in_progress": 1, "not_deployed": 0 },
+  "runners": { "total": 1, "online": 1 },
   "recent_deployments": [ { "id": "uuid", "environment_id": "uuid", "environment_name": "staging", "application_id": "uuid", "application_name": "API", "project_name": "Shop", "commit_sha": "0123…", "status": "failed", "error_code": "health_check_failed", "created_at": "…", "finished_at": null } ],
   "failing_deployments": [ "…same shape…" ],
   "generated_at": "…"
@@ -216,6 +217,18 @@ Follow it like any job (`GET /jobs/{jobID}`, `/events`). A succeeded build's `re
 ```
 
 Server counts use the same heartbeat windows as a server's `status`. Environments are grouped by how their **newest** deployment ended (`not_deployed`: none yet, or only cancelled), so `succeeded` means the last deployment passed its health check, not that the service is healthy right now. `recent_deployments` is the eight newest across projects; `failing_deployments` holds up to five environments whose newest deployment failed, so a later success removes an entry.
+
+## 7a. Runners
+
+Build Runners belong to the whole installation (a Runner takes builds of every project), so these endpoints are for an **installation administrator** (`is_admin` in `GET /auth/me`) only: `403` for anyone else, `401` without a session.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/runners` | List Runners: `id`, `name`, `version`, `status` (`pending`, `online`, `offline`), `last_seen_at`, `created_at`. Never a credential |
+| POST | `/runners` | Create one from `{ "name": "build-01" }` (lowercase letters, digits, hyphens; `422` otherwise, `409 runner_name_taken`). `201` with the Runner and its `credential` (`fdr_…`), **shown once** and not stored in a readable form; the response is `no-store` |
+| DELETE | `/runners/{runnerID}` | Remove it and revoke its credential at once (`404` if unknown) |
+
+`GET /overview` also reports `runners: { total, online }` to every signed-in user, so the getting-started guide can tell whether anything can build. Creating and deleting are audited as `runner.create` and `runner.delete`; the events belong to no project, and never hold the credential.
 
 ## 8. Webhooks
 

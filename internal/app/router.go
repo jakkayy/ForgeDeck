@@ -71,8 +71,9 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 	registryService := registries.NewService(store.New(pool), authorizer, cfg.Keyring)
 	secretService := secrets.NewService(store.New(pool), authorizer, cfg.Keyring)
 	jobService.SetLogRedactor(secrets.NewRedactor(secretService))
+	runnerService := runners.NewService(store.New(pool), time.Now)
 	runnerHandler := runnerapi.NewHandler(runnerapi.Deps{
-		Shutdown: ctx, Runners: runners.NewService(store.New(pool), time.Now), Jobs: jobService, Notifier: notifier,
+		Shutdown: ctx, Runners: runnerService, Jobs: jobService, Notifier: notifier,
 		Credentials: builds.NewCredentials(store.New(pool), gitService, registryService), Logger: logger,
 	})
 	appHandler := applications.NewHandler(applications.NewService(store.New(pool), authorizer, gitService, registryService))
@@ -117,6 +118,7 @@ func NewRouter(ctx context.Context, cfg config.Config, pool *pgxpool.Pool, logge
 			signedIn.Use(authHandler.RequireUser, limits.userMutations, auditRecorder.Middleware)
 			projectHandler.Routes(signedIn)
 			serverHandler.Routes(signedIn)
+			runners.NewHandler(runnerService).Routes(signedIn)
 			overview.NewHandler(overview.NewService(store.New(pool), time.Now)).Routes(signedIn)
 			jobs.NewHandler(ctx, jobService, notifier).Routes(signedIn)
 			gitHandler.Routes(signedIn)

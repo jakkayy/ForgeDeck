@@ -30,6 +30,8 @@ jobs:
           done
           cp deploy/agent/install.sh dist/install-agent.sh
           cp deploy/agent/forgedeck-agent.service dist/
+          cp deploy/runner/install.sh dist/install-runner.sh
+          cp deploy/runner/forgedeck-runner.service dist/
           (cd dist && sha256sum * > SHA256SUMS)
       - name: Publish the release
         env:
