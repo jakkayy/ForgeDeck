@@ -77,7 +77,7 @@ make create-runner NAME=build-01          # แสดง credential (fdr_...) �
 FORGEDECK_RUNNER_CREDENTIAL=fdr_... make run-runner URL=http://localhost:8080
 ```
 
-`make run-runner` ใช้ Docker daemon ของเครื่องคุณโดยตรง เหมาะกับทดลองเท่านั้น การติดตั้งจริงบน build host ให้ดู [deploy/runner/README.md](deploy/runner/README.md) และ [docs/14-runner.md](docs/14-runner.md) เพราะ Runner รันโค้ดที่ไม่น่าไว้ใจ จึงควรอยู่บนเครื่องแยกที่ไม่มีอย่างอื่นสำคัญ
+`make run-runner` ใช้ Docker daemon ของเครื่องคุณโดยตรง เหมาะกับทดลองเท่านั้น การติดตั้งจริงบน build host ใช้คำสั่งเดียวจากหน้า Runners → Add Runner (ติดตั้ง rootless Docker และเริ่มบริการให้เอง) ดู [deploy/runner/README.md](deploy/runner/README.md) และ [docs/14-runner.md](docs/14-runner.md) เพราะ Runner รันโค้ดที่ไม่น่าไว้ใจ จึงควรอยู่บนเครื่องแยกที่ไม่มีอย่างอื่นสำคัญ
 
 ## ลอง build ครั้งแรก
 
