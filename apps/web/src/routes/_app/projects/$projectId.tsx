@@ -9,12 +9,21 @@ import { GitSection } from "../../../components/project/GitSection";
 import { MembersSection } from "../../../components/project/MembersSection";
 import { RegistriesSection } from "../../../components/project/RegistriesSection";
 import { SecretsSection } from "../../../components/project/SecretsSection";
+import { SettingsSection } from "../../../components/project/SettingsSection";
 import { SetupGuide } from "../../../components/project/SetupGuide";
 import { StaleNotice, waitingFor } from "../../../components/QueryBoundary";
 import { RoleChip } from "../../../components/RoleChip";
 import { useHasRole } from "../../../lib/useHasRole";
 
-const tabs = ["applications", "git", "registries", "secrets", "members", "audit"] as const;
+const tabs = [
+  "applications",
+  "git",
+  "registries",
+  "secrets",
+  "members",
+  "audit",
+  "settings",
+] as const;
 type Tab = (typeof tabs)[number];
 
 const gitErrors: Record<string, string> = {
@@ -42,9 +51,9 @@ function ProjectPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const project = useQuery(projectQuery(projectId));
   const canSeeAudit = useHasRole(projectId, "admin");
-  // The audit log is for admins; anyone else asking for it lands on the default tab.
-  const tab =
-    search.tab === "audit" && !canSeeAudit ? "applications" : (search.tab ?? "applications");
+  // The audit log and settings are for admins; anyone else asking for them lands on the default tab.
+  const adminOnly = search.tab === "audit" || search.tab === "settings";
+  const tab = adminOnly && !canSeeAudit ? "applications" : (search.tab ?? "applications");
 
   useEffect(() => {
     if (!search.git && !search.git_error) {
@@ -110,6 +119,12 @@ function ProjectPage() {
                 <Tabs.Indicator />
               </Tabs.Tab>
             )}
+            {canSeeAudit && (
+              <Tabs.Tab id="settings">
+                Settings
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            )}
           </Tabs.List>
         </Tabs.ListContainer>
         <Tabs.Panel id="applications" className="pt-4">
@@ -130,6 +145,11 @@ function ProjectPage() {
         {canSeeAudit && (
           <Tabs.Panel id="audit" className="pt-4">
             <AuditSection projectId={projectId} />
+          </Tabs.Panel>
+        )}
+        {canSeeAudit && (
+          <Tabs.Panel id="settings" className="pt-4">
+            <SettingsSection project={project.data} />
           </Tabs.Panel>
         )}
       </Tabs>

@@ -35,3 +35,12 @@ export function addMember(projectId: string, email: string, role: Role) {
 export function removeMember(projectId: string, userId: string) {
   return api<void>(`/projects/${projectId}/members/${userId}`, { method: "DELETE" });
 }
+
+export function renameProject(projectId: string, name: string) {
+  return api<Project>(`/projects/${projectId}`, { method: "PATCH", body: { name } });
+}
+
+/** Deletes the project and everything in it; confirm must be the project's slug. */
+export function deleteProject(projectId: string, confirm: string) {
+  return api<void>(`/projects/${projectId}`, { method: "DELETE", body: { confirm } });
+}
