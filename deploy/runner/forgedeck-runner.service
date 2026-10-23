@@ -25,7 +25,8 @@ StateDirectoryMode=0700
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
+# read-only, not true: true hides /run/user, where the rootless Docker socket is
+ProtectHome=read-only
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true

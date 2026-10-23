@@ -59,6 +59,6 @@ the build host's Docker daemon, not by the Runner.
 ## Hardening already in the unit
 
 A dedicated unprivileged user, `NoNewPrivileges`, a read-only filesystem except
-`/var/lib/forgedeck-runner`, a private `/tmp`, no access to home directories,
+`/var/lib/forgedeck-runner`, a private `/tmp`, read-only home directories (the rootless Docker socket lives under `/run/user`),
 and a credential readable only by root and the Runner's group.
 Build commands run with a minimal environment and never see the Runner's credential.
