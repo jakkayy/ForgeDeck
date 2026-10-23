@@ -123,6 +123,7 @@ func TestInstallSetsUpRootlessDockerAndStartsTheRunner(t *testing.T) {
 set -e
 echo "someone:100000:65536" | tee /etc/subuid > /etc/subgid
 bash /installer/install.sh --binary /runner --url https://forgedeck.example.com
+echo "--- socket:"; grep '^DOCKER_HOST=unix:///run/user/'$(id -u forgedeck-runner)'/docker.sock$' /etc/forgedeck-runner/runner.env
 echo "--- subuid:"; cat /etc/subuid; echo "--- subgid:"; cat /etc/subgid
 echo "--- log:"; cat /tmp/stub.log
 : > /tmp/stub.log
@@ -143,6 +144,7 @@ echo ALL-OK
 		"setuptool as forgedeck-runner in /run/user/",
 		"systemctl enable forgedeck-runner",
 		"systemctl restart forgedeck-runner",
+		"DOCKER_HOST=unix:///run/user/",
 		"the Runner is running",
 	} {
 		if !strings.Contains(first, want) {

@@ -179,6 +179,10 @@ else
   fi
 fi
 
+if [ -n "$docker_setup" ] && [ -z "$dry" ] && ! grep -q '^DOCKER_HOST=' "$env_file"; then
+  echo "DOCKER_HOST=unix:///run/user/$(id -u "$user")/docker.sock" >> "$env_file"
+fi
+
 ensure_subid() { # ensure_subid FILE: give the user a 65536-id range that overlaps no other
   [ -f "$1" ] || : > "$1"
   if ! grep -q "^$user:" "$1"; then

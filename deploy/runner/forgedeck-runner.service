@@ -8,8 +8,7 @@ Wants=network-online.target
 User=forgedeck-runner
 Group=forgedeck-runner
 EnvironmentFile=/etc/forgedeck-runner/runner.env
-# Rootless Docker; with the system daemon, remove this line (it gives the Runner root-equivalent access)
-Environment=DOCKER_HOST=unix:///run/user/%U/docker.sock
+# install.sh adds DOCKER_HOST (the user's rootless Docker socket) to runner.env
 ExecStart=/usr/local/bin/forgedeck-runner run \
     --url ${FORGEDECK_URL} \
     --work-dir /var/lib/forgedeck-runner \
