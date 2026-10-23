@@ -33,13 +33,12 @@ The Runner drives Docker through the `docker` CLI. Adding its user to the
 `docker` group would give anything that escapes a build root on the host.
 **Rootless Docker** for the `forgedeck-runner` user means container root maps
 to an unprivileged user, so even a breakout from a build step stays unprivileged.
-The unit points `DOCKER_HOST` at that user's socket. Rootless mode cannot
+The installer sets `DOCKER_HOST` in `runner.env` to that user's socket. Rootless mode cannot
 publish privileged ports, which builds do not need.
 
 If the installer cannot set it up (a distribution without Docker's apt repository), install
 rootless Docker for the user by hand (`dockerd-rootless-setuptool.sh install` with `loginctl enable-linger`)
-and run `sudo systemctl enable --now forgedeck-runner`. If you must use the system daemon, remove
-the `DOCKER_HOST` line from the unit and understand that the Runner then has root-equivalent access to the host.
+and run `sudo systemctl enable --now forgedeck-runner`. If you provide the daemon yourself, use `--no-docker-setup` and set `DOCKER_HOST` in `runner.env`; giving the Runner the system daemon (adding it to the `docker` group) is root-equivalent access to the host.
 
 ## 4. Check
 
