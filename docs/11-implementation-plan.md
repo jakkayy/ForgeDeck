@@ -371,7 +371,7 @@ Acceptance: สคริปต์ทดสอบบนเครื่องส�
 
 | # | งาน | Commit |
 |---|---|---|
-| 7.1 | ผู้ดูแลระบบ (instance admin) และ Runner ที่สร้าง/ดู/ลบได้จากเว็บ พร้อมขั้น Runner ใน getting-started guide | `feat(api): add instance admin and runner endpoints` / `feat(web): add runners and a guide step` |
+| 7.1 | ผู้ดูแลระบบ (instance admin) และ Runner ที่สร้าง/ดู/ลบได้จากเว็บ พร้อมขั้น Runner ใน getting-started guide (ติดตั้ง Runner ด้วยคำสั่งเดียวจาก release) | `feat(api): add an administrator flag to accounts`, `feat(api): add Runner management for administrators`, `feat(runner): download and verify the release in the installer`, `feat(web): add Runners and a guide step` |
 | 7.2 | ค่าเริ่มต้นและการตรวจก่อนกด: เติมชื่อ image, เตือนเมื่อ repo ไม่มี Dockerfile, แนะนำพอร์ตที่ว่าง, เตือนเมื่อ namespace ของ image ไม่ตรงกับ registry | `feat(web): suggest defaults and check forms early` |
 | 7.3 🚧 | Registry ในตัว (spike ก่อน: image reference ที่ Runner push กับที่ Agent pull ต้องเป็น address เดียวกันได้) | `feat: add a bundled registry` |
 | 7.4 🚧 | โหมด all-in-one: Runner และ Agent มากับชุดติดตั้ง (build รันใน Docker daemon แยก ไม่ใช่ socket ของเครื่อง) | `feat(compose): add a single-host profile` |

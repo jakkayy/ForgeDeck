@@ -21,8 +21,13 @@ const navItems = [
   { to: "/jobs", label: "Jobs" },
 ] as const;
 
+/** Runners belong to the whole installation: only an administrator is shown the way in. */
+const adminNavItems = [{ to: "/runners", label: "Runners" }] as const;
+
 function AppShell() {
   usePageAnnouncer("main");
+  const { data: me } = useSuspenseQuery(meQuery);
+  const items = me.is_admin ? [...navItems, ...adminNavItems] : navItems;
   return (
     <div className="min-h-dvh">
       <a
@@ -37,7 +42,7 @@ function AppShell() {
             ForgeDeck
           </Link>
           <nav aria-label="Main" className="flex flex-1 gap-1">
-            {navItems.map((item) => (
+            {items.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
