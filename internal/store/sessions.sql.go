@@ -60,7 +60,8 @@ SELECT
     sessions.created_at,
     sessions.last_seen_at,
     sessions.expires_at,
-    users.email
+    users.email,
+    users.is_admin
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = $1
@@ -79,6 +80,7 @@ type GetActiveSessionRow struct {
 	LastSeenAt time.Time
 	ExpiresAt  time.Time
 	Email      string
+	IsAdmin    bool
 }
 
 func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (GetActiveSessionRow, error) {
@@ -91,6 +93,7 @@ func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionPara
 		&i.LastSeenAt,
 		&i.ExpiresAt,
 		&i.Email,
+		&i.IsAdmin,
 	)
 	return i, err
 }

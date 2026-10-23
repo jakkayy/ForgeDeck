@@ -68,6 +68,7 @@ projects ──< audit_logs
 - `id UUID PRIMARY KEY`
 - `email TEXT UNIQUE NOT NULL`
 - `password_hash TEXT NOT NULL`
+- `is_admin BOOLEAN NOT NULL DEFAULT false`: an **installation administrator**, who manages what belongs to the whole installation (build Runners) rather than to one project. The first account of an installation always is one (from the web or `create-user`); `create-user --admin` makes more. Migration `00023` made the oldest account of an existing installation its administrator.
 - `created_at TIMESTAMPTZ NOT NULL`
 - `updated_at TIMESTAMPTZ NOT NULL`
 

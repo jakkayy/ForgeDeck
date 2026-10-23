@@ -91,6 +91,9 @@ func TestDataSurvivesUpgradingFromAnOlderSchema(t *testing.T) {
 	if got := count(`SELECT count(*) FROM agents WHERE credential_rotated_at IS NOT NULL AND rotation_requested_at IS NULL AND previous_credential_hash IS NULL`); got != 1 {
 		t.Errorf("the existing Agent did not get usable rotation defaults")
 	}
+	if got := count(`SELECT count(*) FROM users WHERE is_admin`); got != 1 {
+		t.Errorf("the existing account did not become the administrator")
+	}
 	if got := count(`SELECT count(*) FROM jobs WHERE logs_expired_at IS NULL`); got != 1 {
 		t.Errorf("an existing job's logs were marked expired by the upgrade")
 	}

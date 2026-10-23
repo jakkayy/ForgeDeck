@@ -10,7 +10,8 @@ SELECT
     sessions.created_at,
     sessions.last_seen_at,
     sessions.expires_at,
-    users.email
+    users.email,
+    users.is_admin
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = @token_hash

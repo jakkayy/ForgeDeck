@@ -1,6 +1,7 @@
 -- name: CreateUser :one
-INSERT INTO users (email, password_hash)
-VALUES ($1, $2)
+-- The first account of an installation is always its administrator.
+INSERT INTO users (email, password_hash, is_admin)
+VALUES (@email, @password_hash, @is_admin::boolean OR NOT EXISTS (SELECT 1 FROM users))
 RETURNING *;
 
 -- name: GetUserByEmail :one
@@ -17,8 +18,8 @@ SELECT EXISTS (SELECT 1 FROM users);
 WITH claim AS (
     INSERT INTO setup_claim DEFAULT VALUES ON CONFLICT DO NOTHING RETURNING singleton
 )
-INSERT INTO users (email, password_hash)
-SELECT @email::citext, @password_hash::text
+INSERT INTO users (email, password_hash, is_admin)
+SELECT @email::citext, @password_hash::text, true
 FROM claim
 WHERE NOT EXISTS (SELECT 1 FROM users)
 RETURNING *;

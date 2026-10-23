@@ -24,6 +24,7 @@ import (
 func createUser(ctx context.Context, args []string, cfg config.Config, logger *slog.Logger) error {
 	flags := flag.NewFlagSet("create-user", flag.ContinueOnError)
 	email := flags.String("email", "", "email address of the new user")
+	admin := flags.Bool("admin", false, "make the user an administrator (the first user always is)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -45,7 +46,7 @@ func createUser(ctx context.Context, args []string, cfg config.Config, logger *s
 	}
 	defer pool.Close()
 
-	user, err := auth.NewService(store.New(pool), time.Now).CreateUser(ctx, *email, password)
+	user, err := auth.NewService(store.New(pool), time.Now).CreateUser(ctx, *email, password, adminOption(*admin)...)
 	if err != nil {
 		return err
 	}
@@ -85,4 +86,11 @@ func promptHidden(fd int, prompt io.Writer, label string) (string, error) {
 		return "", fmt.Errorf("read password: %w", err)
 	}
 	return string(b), nil
+}
+
+func adminOption(admin bool) []auth.UserOption {
+	if admin {
+		return []auth.UserOption{auth.AsAdmin()}
+	}
+	return nil
 }
