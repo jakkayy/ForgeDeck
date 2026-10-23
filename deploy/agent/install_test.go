@@ -2,10 +2,14 @@
 package agent_test
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -131,7 +135,7 @@ func TestInstallChecksWhatItNeeds(t *testing.T) {
 	cases := map[string]struct {
 		script, want string
 	}{
-		"no binary given":         {"bash /installer/install.sh --url http://x --allow-insecure", "give --binary"},
+		"no binary and no curl":   {"bash /installer/install.sh --url http://x --allow-insecure", "curl or wget is needed"},
 		"binary is missing":       {"bash /installer/install.sh --binary /nowhere --url http://x", "no such file"},
 		"not enrolled and no url": {"bash /installer/install.sh --binary /agent", "give --url"},
 		"no compose plugin":       {"rm /stub/docker; printf '#!/bin/sh\\nexit 1\\n' > /stub/docker; chmod +x /stub/docker; bash /installer/install.sh --binary /agent --url http://x", "Docker Compose plugin is required"},
@@ -180,5 +184,91 @@ func TestUnitIsValidAndHardened(t *testing.T) {
 				t.Errorf("systemd-analyze: %s", line)
 			}
 		}
+	}
+}
+
+// releaseDir lays out what a GitHub release offers for this CPU and serves it.
+func releaseDir(t *testing.T, binary string) (url string, dir string) {
+	t.Helper()
+	dir = t.TempDir()
+	unit, err := os.ReadFile("forgedeck-agent.service")
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent, err := os.ReadFile(binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "forgedeck-agent-linux-" + runtime.GOARCH
+	var sums strings.Builder
+	for file, content := range map[string][]byte{name: agent, "forgedeck-agent.service": unit} {
+		if err := os.WriteFile(filepath.Join(dir, file), content, 0o644); err != nil { //nolint:gosec // test files
+			t.Fatal(err)
+		}
+		fmt.Fprintf(&sums, "%x  %s\n", sha256.Sum256(content), file)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SHA256SUMS"), []byte(sums.String()), 0o644); err != nil { //nolint:gosec // test file
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	t.Cleanup(server.Close)
+	return server.URL, dir
+}
+
+// curlSetup copies the installer to a lone directory (as a download would) and adds curl to the image.
+const curlSetup = `
+apt-get update -qq >/dev/null && apt-get install -y -qq curl ca-certificates >/dev/null
+mkdir /solo && cp /installer/install.sh /solo/install.sh
+`
+
+func TestInstallDownloadsAndVerifiesTheRelease(t *testing.T) {
+	dockertest.Require(t)
+	env := apitest.New(t)
+	owner, _ := env.NewUser("owner@example.com")
+	projectID := owner.CreateProject("Infra")
+	token := owner.IssueEnrollmentToken(projectID, "prod-02")
+	binary := buildAgent(t)
+	base, _ := releaseDir(t, binary)
+
+	script := curlSetup + `
+set -e
+bash /solo/install.sh --url ` + env.Server.URL + ` --allow-insecure
+test -x /usr/local/bin/forgedeck-agent
+test -f /etc/systemd/system/forgedeck-agent.service
+echo ALL-OK
+`
+	out, err := run(t, []string{"FORGEDECK_ENROLLMENT_TOKEN=" + token, "FORGEDECK_RELEASE_BASE=" + base}, script, binary)
+	if err != nil || !strings.Contains(out, "ALL-OK") || !strings.Contains(out, "checksum verified") {
+		t.Fatalf("installer: %v\n%s", err, out)
+	}
+	var list struct{ Items []servers.Server }
+	owner.Do(http.MethodGet, "/api/v1/projects/"+projectID.String()+"/servers", nil).RequireStatus(http.StatusOK).Decode(&list)
+	if len(list.Items) != 1 || list.Items[0].Name != "prod-02" {
+		t.Fatalf("servers after a downloaded install: %+v", list.Items)
+	}
+}
+
+func TestInstallRefusesADownloadThatDoesNotMatchItsChecksum(t *testing.T) {
+	dockertest.Require(t)
+	env := apitest.New(t)
+	binary := buildAgent(t)
+	base, dir := releaseDir(t, binary)
+	if err := os.WriteFile(filepath.Join(dir, "forgedeck-agent-linux-"+runtime.GOARCH), []byte("not the agent"), 0o644); err != nil { //nolint:gosec // test file
+		t.Fatal(err)
+	}
+
+	script := curlSetup + `
+bash /solo/install.sh --url ` + env.Server.URL + ` --allow-insecure
+echo "exit=$?"
+test ! -e /usr/local/bin/forgedeck-agent && echo NOTHING-INSTALLED
+`
+	out, _ := run(t, []string{"FORGEDECK_ENROLLMENT_TOKEN=x", "FORGEDECK_RELEASE_BASE=" + base}, script, binary)
+	for _, want := range []string{"checksum mismatch", "refusing to install", "NOTHING-INSTALLED"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "exit=0") {
+		t.Errorf("the installer succeeded with a corrupted download:\n%s", out)
 	}
 }

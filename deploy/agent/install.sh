@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Installs, upgrades, or removes the ForgeDeck Agent on a Docker host (run as root).
 #
+#   install.sh --url https://forgedeck.example.com                       # downloads the latest release
 #   install.sh --url https://forgedeck.example.com --binary ./forgedeck-agent
-#   install.sh --binary ./forgedeck-agent                  # upgrade (already enrolled)
+#   install.sh                                                           # upgrade (already enrolled)
 #   install.sh --uninstall [--purge]
 #
 # Options:
 #   --url URL         the Control Plane (needed the first time, to enroll)
-#   --binary PATH     the forgedeck-agent binary to install (make build-agent)
+#   --binary PATH     install this forgedeck-agent binary instead of downloading one
+#   --version TAG     the release to download, such as v0.1.0 (default: the latest)
 #   --allow-insecure  accept a non-HTTPS URL (only on a network you trust)
 #   --uninstall       stop and remove the service and the binary; keeps the
 #                     identity and the user unless --purge is given
@@ -17,6 +19,11 @@
 # The enrollment token (from the dashboard: Servers > Add server) is read from
 # FORGEDECK_ENROLLMENT_TOKEN or typed at a hidden prompt. It is never taken as
 # an argument, so it does not end up in shell history or process listings.
+#
+# Without --binary it downloads the binary for this CPU from the project's GitHub
+# release and checks it against the release's SHA256SUMS. That protects against a
+# corrupted download, not against a compromised release: the checksums come from
+# the same place. FORGEDECK_RELEASE_BASE overrides the download address (mirrors).
 #
 # Running it again is safe: it upgrades the binary and the unit and restarts
 # the service, and it does not enroll a second time.
@@ -28,8 +35,10 @@ state_dir=/var/lib/forgedeck-agent
 binary_dest=/usr/local/bin/forgedeck-agent
 unit_dest=/etc/systemd/system/forgedeck-agent.service
 
+release_repo=jakkayy/ForgeDeck
 url=""
 binary=""
+version=""
 insecure=""
 uninstall=""
 purge=""
@@ -45,11 +54,12 @@ while [ $# -gt 0 ]; do
   case $1 in
     --url) url=${2:?--url needs a value}; shift 2 ;;
     --binary) binary=${2:?--binary needs a value}; shift 2 ;;
+    --version) version=${2:?--version needs a value}; shift 2 ;;
     --allow-insecure) insecure=--allow-insecure; shift ;;
     --uninstall) uninstall=1; shift ;;
     --purge) purge=1; shift ;;
     --dry-run) dry=1; shift ;;
-    -h | --help) sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown option $1 (see --help)" ;;
   esac
 done
@@ -76,8 +86,55 @@ if [ -n "$uninstall" ]; then
   exit 0
 fi
 
-[ -n "$binary" ] || die "give --binary PATH (build it with: make build-agent)"
-[ -f "$binary" ] || die "no such file: $binary"
+workdir=""
+cleanup() { [ -z "$workdir" ] || rm -rf "$workdir"; }
+trap cleanup EXIT
+
+fetch() { # fetch URL DEST
+  if command -v curl >/dev/null; then
+    curl -fsSL --retry 3 -o "$2" "$1" || die "could not download $1"
+  elif command -v wget >/dev/null; then
+    wget -q -O "$2" "$1" || die "could not download $1"
+  else
+    die "curl or wget is needed to download the Agent (or pass --binary PATH)"
+  fi
+}
+
+unit_src="$here/forgedeck-agent.service"
+if [ -z "$binary" ]; then
+  case "$(uname -m)" in
+    x86_64 | amd64) arch=amd64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *) die "no prebuilt Agent for $(uname -m); build one and pass --binary PATH" ;;
+  esac
+  if [ -n "${FORGEDECK_RELEASE_BASE:-}" ]; then
+    base=${FORGEDECK_RELEASE_BASE%/}
+  elif [ -n "$version" ]; then
+    base="https://github.com/$release_repo/releases/download/$version"
+  else
+    base="https://github.com/$release_repo/releases/latest/download"
+  fi
+  name="forgedeck-agent-linux-$arch"
+  if [ -n "$dry" ]; then
+    echo "[dry-run] download $base/$name and $base/SHA256SUMS, verify, install"
+    binary=/dry-run/$name
+  else
+    command -v sha256sum >/dev/null || die "sha256sum is needed to verify the download"
+    workdir=$(mktemp -d)
+    say "downloading $name from $base"
+    fetch "$base/$name" "$workdir/$name"
+    fetch "$base/SHA256SUMS" "$workdir/SHA256SUMS"
+    [ -f "$unit_src" ] || { fetch "$base/forgedeck-agent.service" "$workdir/forgedeck-agent.service"; unit_src="$workdir/forgedeck-agent.service"; }
+    for f in "$name" forgedeck-agent.service; do
+      [ -f "$workdir/$f" ] || continue
+      (cd "$workdir" && grep -F " $f" SHA256SUMS | sha256sum -c --quiet -) || die "checksum mismatch for $f: refusing to install it"
+    done
+    chmod +x "$workdir/$name"
+    binary="$workdir/$name"
+    say "checksum verified"
+  fi
+fi
+[ -n "$dry" ] || [ -f "$binary" ] || die "no such file: $binary"
 if [ -z "$dry" ]; then
   command -v docker >/dev/null || die "Docker is not installed on this host"
   docker compose version >/dev/null 2>&1 || die "the Docker Compose plugin is required (docker compose version failed)"
@@ -99,7 +156,7 @@ act usermod -aG docker "$user"
 
 say "installing the binary and the service"
 act install -m 0755 "$binary" "$binary_dest"
-act install -m 0644 "$here/forgedeck-agent.service" "$unit_dest"
+act install -m 0644 "$unit_src" "$unit_dest"
 act systemctl daemon-reload
 # systemd creates StateDirectory= only at first start; enrolling needs it earlier
 act install -d -m 0700 -o "$user" -g "$user" "$state_dir"

@@ -7,12 +7,14 @@ import {
   FieldError,
   Input,
   Label,
+  ListBox,
   Modal,
+  Select,
   TextField,
   toast,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 import { isApiError } from "../../api/client";
 import {
   createRegistry,
@@ -24,6 +26,51 @@ import {
 import { useHasRole } from "../../lib/useHasRole";
 import { ApiForm } from "../ApiForm";
 import { QueryBoundary } from "../QueryBoundary";
+
+type Preset = {
+  id: string;
+  label: string;
+  /** null: the person types the host. */
+  host: string | null;
+  name: string;
+  usernameHint: string;
+  tokenHint: string;
+};
+
+const presets: Preset[] = [
+  {
+    id: "ghcr",
+    label: "GitHub Container Registry (ghcr.io)",
+    host: "ghcr.io",
+    name: "GitHub Packages",
+    usernameHint: "Your GitHub username.",
+    tokenHint: "A personal access token (classic) with the write:packages scope.",
+  },
+  {
+    id: "dockerhub",
+    label: "Docker Hub (docker.io)",
+    host: "docker.io",
+    name: "Docker Hub",
+    usernameHint: "Your Docker Hub username.",
+    tokenHint: "An access token with Read & Write permission.",
+  },
+  {
+    id: "gitlab",
+    label: "GitLab Container Registry (registry.gitlab.com)",
+    host: "registry.gitlab.com",
+    name: "GitLab Registry",
+    usernameHint: "Your GitLab username, or the deploy token's username.",
+    tokenHint: "A personal or deploy token with read_registry and write_registry.",
+  },
+  {
+    id: "other",
+    label: "Other registry",
+    host: null,
+    name: "",
+    usernameHint: "",
+    tokenHint: "Needs permission to push.",
+  },
+];
 
 export function RegistriesSection({ projectId }: { projectId: string }) {
   const registries = useQuery(registriesQuery(projectId));
@@ -74,6 +121,8 @@ export function RegistriesSection({ projectId }: { projectId: string }) {
 
 function AddRegistryDialog({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
+  const [presetId, setPresetId] = useState("ghcr");
+  const preset = presets.find((p) => p.id === presetId) ?? presets[0];
   const add = useMutation({
     mutationFn: (input: NewRegistry) => createRegistry(projectId, input),
     onSuccess: (registry) => {
@@ -83,7 +132,14 @@ function AddRegistryDialog({ projectId }: { projectId: string }) {
   });
 
   return (
-    <Modal onOpenChange={(open) => !open && add.reset()}>
+    <Modal
+      onOpenChange={(open) => {
+        if (!open) {
+          add.reset();
+          setPresetId("ghcr");
+        }
+      }}
+    >
       <Button variant="primary">Add registry</Button>
       <Modal.Backdrop>
         <Modal.Container size="sm">
@@ -96,7 +152,7 @@ function AddRegistryDialog({ projectId }: { projectId: string }) {
                 add.mutate(
                   {
                     name: text("name").trim(),
-                    host: text("host").trim(),
+                    host: preset?.host ?? text("host").trim(),
                     username: text("username").trim(),
                     password: text("password"),
                   },
@@ -109,28 +165,56 @@ function AddRegistryDialog({ projectId }: { projectId: string }) {
                     <Modal.Heading>Add registry</Modal.Heading>
                   </Modal.Header>
                   <Modal.Body className="flex flex-col gap-4">
-                    <TextField name="name" isRequired autoFocus>
+                    <Select
+                      selectedKey={presetId}
+                      onSelectionChange={(key) => setPresetId(String(key))}
+                    >
+                      <Label>Registry</Label>
+                      <Select.Trigger>
+                        <Select.Value />
+                        <Select.Indicator />
+                      </Select.Trigger>
+                      <Select.Popover>
+                        <ListBox>
+                          {presets.map((p) => (
+                            <ListBox.Item key={p.id} id={p.id} textValue={p.label}>
+                              {p.label}
+                              <ListBox.ItemIndicator />
+                            </ListBox.Item>
+                          ))}
+                        </ListBox>
+                      </Select.Popover>
+                    </Select>
+                    {preset?.host === null && (
+                      <TextField name="host" isRequired>
+                        <Label>Registry host</Label>
+                        <Input placeholder="registry.example.com:5000" />
+                        <Description>The address Docker uses; add :port if needed.</Description>
+                        <FieldError />
+                      </TextField>
+                    )}
+                    <TextField
+                      key={`name-${presetId}`}
+                      name="name"
+                      defaultValue={preset?.name}
+                      isRequired
+                    >
                       <Label>Name</Label>
-                      <Input placeholder="GitHub Packages" />
-                      <FieldError />
-                    </TextField>
-                    <TextField name="host" isRequired>
-                      <Label>Registry host</Label>
-                      <Input placeholder="ghcr.io" />
-                      <Description>docker.io for Docker Hub; add :port if needed.</Description>
+                      <Input placeholder="How you will recognise it" />
                       <FieldError />
                     </TextField>
                     <TextField name="username" isRequired autoComplete="off">
                       <Label>Username</Label>
                       <Input />
+                      {preset?.usernameHint && <Description>{preset.usernameHint}</Description>}
                       <FieldError />
                     </TextField>
                     <TextField name="password" type="password" isRequired autoComplete="off">
                       <Label>Password or access token</Label>
                       <Input />
                       <Description>
-                        Needs permission to push. Stored encrypted and never shown again; the first
-                        build checks it.
+                        {preset?.tokenHint} Stored encrypted and never shown again; the first build
+                        checks it.
                       </Description>
                       <FieldError />
                     </TextField>

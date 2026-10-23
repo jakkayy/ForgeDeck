@@ -36,9 +36,12 @@ Edit `.env`:
 **Copy `FORGEDECK_SECRET_KEYS` somewhere safe now, away from this host.** It encrypts stored Git tokens, registry passwords and project secrets, and it is neither in the database nor in backups: without it those values are unreadable after a restore ([16](../../docs/16-backup-restore.md)).
 
 ```sh
-docker compose up -d --build        # builds the image from this repository, starts everything
+docker compose pull                 # downloads the Control Plane image of the latest release
+docker compose up -d                # starts everything
 docker compose ps                   # wait for api and postgres to be "healthy"
 ```
+
+To run a specific release, set `FORGEDECK_VERSION=v0.1.0` in `.env`. To **build the image from this repository** instead (before a release exists, or to run your own changes), add `COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml` to `.env` and use `docker compose up -d --build` in place of the two commands above.
 
 Open `https://<your domain>`: a new installation shows **Create the first account**. Register there, straight away; that account owns the installation and the page closes for good once it exists. The first start also applies the database migrations.
 
@@ -67,7 +70,7 @@ docker compose restart api
 
 - **Back up** the database on a schedule and **check** that the backups restore: [16](../../docs/16-backup-restore.md). Here the database container is `forgedeck-prod-postgres-1`:
   `FORGEDECK_PG_CONTAINER=forgedeck-prod-postgres-1 ../backup/backup.sh -d /var/backups/forgedeck`
-- **Upgrade:** back up and verify first, then check out the new version and run `docker compose up -d --build`; migrations run on start. The order, what happens to work in progress, and how to go back are in [17](../../docs/17-upgrade-guide.md).
+- **Upgrade:** back up and verify first, then set `FORGEDECK_VERSION` to the new release in `.env`, run `docker compose pull && docker compose up -d`; migrations run on start (building from source: check out the new version and use `up -d --build`). The order, what happens to work in progress, and how to go back are in [17](../../docs/17-upgrade-guide.md).
 - **The GitHub App and other optional settings** go in `.env` (see the commented lines in `.env.example`); then `docker compose up -d`.
 
 ## Connecting machines

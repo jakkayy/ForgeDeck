@@ -20,12 +20,8 @@ services:
       retries: 10
 
   api:
-    build:
-      context: ../..
-      dockerfile: deploy/Dockerfile
-      args:
-        VERSION: ${FORGEDECK_VERSION:-dev}
-    image: forgedeck-api:${FORGEDECK_VERSION:-dev}
+    # pulled from the release; docker-compose.build.yml builds it from this checkout instead
+    image: ghcr.io/jakkayy/forgedeck-api:${FORGEDECK_VERSION:-latest}
     restart: unless-stopped
     depends_on:
       postgres:

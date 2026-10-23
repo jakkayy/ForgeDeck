@@ -1,0 +1,10 @@
+# Builds the Control Plane from this checkout instead of pulling the release image:
+# set COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml in .env, then use `up -d --build`.
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile
+      args:
+        VERSION: ${FORGEDECK_VERSION:-dev}
+    image: forgedeck-api:${FORGEDECK_VERSION:-dev}

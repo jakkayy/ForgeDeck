@@ -10,15 +10,17 @@ The Agent runs on each Docker host that ForgeDeck manages. It connects **outward
 
 ## Install
 
-1. In the dashboard open **Servers → Add server**, name the server, and copy the **enrollment token**. It is valid for a short time and works once.
-2. Get the binary onto the host (`make build-agent` produces `bin/forgedeck-agent`; copy it, along with this directory, to the server).
-3. Run the installer:
+1. In the dashboard open **Servers → Add server**, name the server and copy the **enrollment token**. It is valid for a short time and works once.
+2. On the server, download the installer from the latest release and run it (replace the URL with your ForgeDeck's address):
 
 ```sh
-sudo FORGEDECK_ENROLLMENT_TOKEN=<token> ./install.sh --url https://forgedeck.example.com --binary ./forgedeck-agent
+curl -fsSL https://github.com/jakkayy/ForgeDeck/releases/latest/download/install-agent.sh -o install-agent.sh
+sudo bash install-agent.sh --url https://forgedeck.example.com
 ```
 
-Or leave out the token and the installer asks for it at a hidden prompt. The token is never taken as an argument, so it does not land in shell history or `ps`.
+It downloads the Agent for this CPU (amd64 or arm64) from the same release, checks it against the release's `SHA256SUMS`, and asks for the token at a hidden prompt. The checksums come from the same place as the binary, so this catches a corrupted download, not a compromised release. Read the script before you run it if you want to be sure what it does.
+
+To install a specific version, add `--version v0.1.0`. To install a binary you built yourself (`make build-agent` produces `bin/forgedeck-agent`), add `--binary ./forgedeck-agent` instead; the token can also be given as `FORGEDECK_ENROLLMENT_TOKEN=<token>` in the environment. The token is never taken as an argument, so it does not land in shell history or `ps`.
 
 The installer creates a `forgedeck-agent` user (member of the `docker` group), installs the binary to `/usr/local/bin`, installs and starts the `forgedeck-agent` systemd service, and enrolls. The server shows as **online** in the dashboard within a minute. Check it with:
 
@@ -29,10 +31,10 @@ journalctl -u forgedeck-agent -f
 
 ## Upgrade
 
-Run the installer again with the new binary. It replaces the binary and the unit and restarts the service; it recognizes the existing identity and does not enroll again.
+Run the installer again (it downloads the latest release unless you pass `--version` or `--binary`). It replaces the binary and the unit and restarts the service; it recognizes the existing identity and does not enroll again.
 
 ```sh
-sudo ./install.sh --binary ./forgedeck-agent
+sudo bash install-agent.sh
 ```
 
 A deployment running during the restart is picked up again by the Control Plane after its lease expires (about a minute).
@@ -40,8 +42,8 @@ A deployment running during the restart is picked up again by the Control Plane 
 ## Remove
 
 ```sh
-sudo ./install.sh --uninstall            # stop and remove the service and binary; keeps the identity and user
-sudo ./install.sh --uninstall --purge    # also delete the identity and the user
+sudo bash install-agent.sh --uninstall            # stop and remove the service and binary; keeps the identity and user
+sudo bash install-agent.sh --uninstall --purge    # also delete the identity and the user
 ```
 
 Containers that ForgeDeck deployed keep running; nothing here stops them. Remove the server in the dashboard too: that revokes the Agent's credential.

@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Require skips the test unless Docker tests are enabled
@@ -89,18 +91,28 @@ func StartPostgres(t testing.TB) Postgres {
 		_ = exec.CommandContext(context.Background(), "docker", "rm", "--force", name).Run() //nolint:gosec // see above
 	})
 
+	// The image starts a temporary server on its unix socket while it initializes, then restarts it
+	// on TCP: a check inside the container passes too early. Wait on the published port instead.
+	url := fmt.Sprintf("postgres://forgedeck:backup-test@127.0.0.1:%d/forgedeck?sslmode=disable", port)
 	deadline := time.Now().Add(60 * time.Second)
-	for {
-		ready := exec.CommandContext(context.Background(), "docker", "exec", name, "pg_isready", "-U", "forgedeck", "-d", "forgedeck").Run() //nolint:gosec // see above
-		if ready == nil {
-			if exec.CommandContext(context.Background(), "docker", "exec", name, "psql", "-U", "forgedeck", "-d", "forgedeck", "-tAc", "SELECT 1").Run() == nil { //nolint:gosec // see above
-				break
-			}
-		}
+	for !acceptsQueries(url) {
 		if time.Now().After(deadline) {
 			t.Fatal("postgres did not start")
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
-	return Postgres{Container: name, URL: fmt.Sprintf("postgres://forgedeck:backup-test@127.0.0.1:%d/forgedeck?sslmode=disable", port)}
+	return Postgres{Container: name, URL: url}
+}
+
+// acceptsQueries reports whether the server at url answers a query over TCP.
+func acceptsQueries(url string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, url)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = conn.Close(context.Background()) }()
+	var one int
+	return conn.QueryRow(ctx, "SELECT 1").Scan(&one) == nil
 }

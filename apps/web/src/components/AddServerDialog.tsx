@@ -92,7 +92,14 @@ function ServerForm({ onSubmit, onCancel, isPending, error, onClearError }: Serv
           </Alert>
         ) : (
           <>
-            <Select name="project" placeholder="Choose a project" isRequired>
+            {/* With one project there is nothing to choose; the key re-applies the default once the list arrives. */}
+            <Select
+              key={manageable.map((p) => p.id).join(",")}
+              name="project"
+              placeholder="Choose a project"
+              defaultSelectedKey={manageable.length === 1 ? manageable[0]?.id : undefined}
+              isRequired
+            >
               <Label>Project</Label>
               <Select.Trigger>
                 <Select.Value />
@@ -138,6 +145,16 @@ function ServerForm({ onSubmit, onCancel, isPending, error, onClearError }: Serv
   );
 }
 
+/** Where the installer comes from: the project's latest GitHub release. */
+const INSTALLER_URL =
+  "https://github.com/jakkayy/ForgeDeck/releases/latest/download/install-agent.sh";
+
+function installCommand(origin: string) {
+  // The installer refuses a plain-HTTP address unless told it is a trusted network (development).
+  const insecure = origin.startsWith("http:") ? " --allow-insecure" : "";
+  return `curl -fsSL ${INSTALLER_URL} -o install-agent.sh && sudo bash install-agent.sh --url ${origin}${insecure}`;
+}
+
 type InstallStepsProps = { token: EnrollmentToken; projectId: string; onDone: () => void };
 
 function InstallSteps({ token, projectId, onDone }: InstallStepsProps) {
@@ -157,22 +174,25 @@ function InstallSteps({ token, projectId, onDone }: InstallStepsProps) {
         <ol className="flex list-decimal flex-col gap-4 ps-5 marker:text-[var(--muted)]">
           <li className="space-y-2">
             <p>
-              Copy the <code className="font-mono">forgedeck-agent</code> binary to the server, then
-              enroll it. Paste the token below when asked; it is not echoed or saved in shell
-              history.
+              On the server, download the installer and run it. It fetches the Agent for the
+              server's CPU and checks it, then asks for the token: paste it when asked. The token is
+              not echoed or saved in shell history.
             </p>
-            <CopyField
-              label="enroll command"
-              value={`sudo forgedeck-agent enroll --url ${origin}`}
-            />
+            <CopyField label="install command" value={installCommand(origin)} />
             <CopyField label="enrollment token" value={token.token} />
             <p className="text-xs text-[var(--muted)]">
-              Shown once. Single use, expires at {new Date(token.expires_at).toLocaleTimeString()}.
+              The token is shown once. Single use, expires at{" "}
+              {new Date(token.expires_at).toLocaleTimeString()}.
             </p>
           </li>
           <li className="space-y-2">
-            <p>Start the Agent. It connects out over HTTPS; no inbound port is needed.</p>
-            <CopyField label="run command" value="sudo forgedeck-agent run" />
+            <p>
+              That is all: the installer starts the Agent as a service. It connects out over HTTPS;
+              no inbound port is needed. This page updates when the server comes online.
+            </p>
+            <p className="text-xs text-[var(--muted)]">
+              Prefer to build the Agent yourself? See deploy/agent/README.md in the repository.
+            </p>
           </li>
         </ol>
         <div

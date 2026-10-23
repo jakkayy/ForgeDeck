@@ -50,8 +50,8 @@ Use CSRF protection appropriate to the chosen cookie/session approach. Cookies s
 | GET | `/projects` | List accessible projects |
 | POST | `/projects` | Create project |
 | GET | `/projects/{projectID}` | Get project |
-| PATCH | `/projects/{projectID}` | Update project |
-| DELETE | `/projects/{projectID}` | Delete project after safeguards |
+| PATCH | `/projects/{projectID}` | Update `name` or `slug` (admin) |
+| DELETE | `/projects/{projectID}` | Delete the project and everything in it (owner): body `{"confirm": "<slug>"}` (`422` if it differs), `409 project_has_servers` while servers remain |
 | GET | `/projects/{projectID}/members` | List members |
 | POST | `/projects/{projectID}/members` | Add an existing user by email with a role |
 | DELETE | `/projects/{projectID}/members/{userID}` | Remove member (cannot remove a higher role or the last owner) |
