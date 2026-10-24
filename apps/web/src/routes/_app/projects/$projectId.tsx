@@ -84,7 +84,7 @@ function ProjectPage() {
           <RoleChip role={project.data.role} />
         </div>
       </div>
-      <SetupGuide projectId={projectId} />
+      {tab === "applications" && <SetupGuide projectId={projectId} />}
       {/* isolate keeps the tab indicator's z-index from rising above dialogs */}
       <Tabs
         className="isolate"
@@ -127,28 +127,28 @@ function ProjectPage() {
             )}
           </Tabs.List>
         </Tabs.ListContainer>
-        <Tabs.Panel id="applications" className="pt-4">
+        <Tabs.Panel id="applications" className="p-0 pt-4">
           <ApplicationsSection projectId={projectId} />
         </Tabs.Panel>
-        <Tabs.Panel id="git" className="pt-4">
+        <Tabs.Panel id="git" className="p-0 pt-4">
           <GitSection projectId={projectId} />
         </Tabs.Panel>
-        <Tabs.Panel id="registries" className="pt-4">
+        <Tabs.Panel id="registries" className="p-0 pt-4">
           <RegistriesSection projectId={projectId} />
         </Tabs.Panel>
-        <Tabs.Panel id="secrets" className="pt-4">
+        <Tabs.Panel id="secrets" className="p-0 pt-4">
           <SecretsSection projectId={projectId} />
         </Tabs.Panel>
-        <Tabs.Panel id="members" className="pt-4">
+        <Tabs.Panel id="members" className="p-0 pt-4">
           <MembersSection projectId={projectId} />
         </Tabs.Panel>
         {canSeeAudit && (
-          <Tabs.Panel id="audit" className="pt-4">
+          <Tabs.Panel id="audit" className="p-0 pt-4">
             <AuditSection projectId={projectId} />
           </Tabs.Panel>
         )}
         {canSeeAudit && (
-          <Tabs.Panel id="settings" className="pt-4">
+          <Tabs.Panel id="settings" className="p-0 pt-4">
             <SettingsSection project={project.data} />
           </Tabs.Panel>
         )}

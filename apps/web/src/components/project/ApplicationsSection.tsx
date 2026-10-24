@@ -11,6 +11,7 @@ import {
 import { loadedItems } from "../../api/paged";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
 import { useHasRole } from "../../lib/useHasRole";
+import { EmptyState } from "../EmptyState";
 import { LoadMore } from "../LoadMore";
 import { QueryBoundary } from "../QueryBoundary";
 import { SearchBox } from "../SearchBox";
@@ -21,28 +22,35 @@ export function ApplicationsSection({ projectId }: { projectId: string }) {
   const q = useDebouncedValue(search.trim()) || undefined;
   const apps = useInfiniteQuery(applicationListQuery(projectId, q));
   const canManage = useHasRole(projectId, "admin");
+  const noneAtAll = !q && apps.data !== undefined && loadedItems(apps.data).length === 0;
 
   return (
     <section aria-label="Applications" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SearchBox
-          label="Search applications"
-          placeholder="Search by name or repository"
-          value={search}
-          onChange={setSearch}
-        />
-        {canManage && <NewApplicationDialog projectId={projectId} />}
-      </div>
+      {!noneAtAll && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SearchBox
+            label="Search applications"
+            placeholder="Search by name or repository"
+            value={search}
+            onChange={setSearch}
+          />
+          {canManage && <NewApplicationDialog projectId={projectId} />}
+        </div>
+      )}
       <QueryBoundary
         query={apps}
         label="applications"
         isEmpty={(data) => loadedItems(data).length === 0}
         empty={
-          <Card className="px-6 py-10 text-center text-sm text-[var(--muted)]">
-            {q
-              ? "No applications match."
-              : "No applications yet. An application builds a Docker image from one repository and branch on every push, and pushes it to a registry."}
-          </Card>
+          q ? (
+            <EmptyState title="No applications match" description="Try a different name." />
+          ) : (
+            <EmptyState
+              title="No applications yet"
+              description="An application builds a Docker image from one repository and branch on every push, and pushes it to a registry."
+              action={canManage ? <NewApplicationDialog projectId={projectId} /> : undefined}
+            />
+          )
         }
       >
         {(data) => (
