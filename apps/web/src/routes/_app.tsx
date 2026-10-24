@@ -38,10 +38,13 @@ function AppShell() {
       </a>
       <header className="border-b border-[var(--separator)] bg-[var(--surface)]">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link to="/" className="font-semibold tracking-tight">
+          <Link to="/" className="order-1 font-semibold tracking-tight">
             ForgeDeck
           </Link>
-          <nav aria-label="Main" className="flex flex-1 gap-1">
+          <nav
+            aria-label="Main"
+            className="order-3 flex w-full gap-1 overflow-x-auto sm:order-2 sm:w-auto sm:flex-1"
+          >
             {items.map((item) => (
               <Link
                 key={item.to}
@@ -78,7 +81,7 @@ function UserMenu() {
   });
 
   return (
-    <div className="flex items-center gap-3 text-sm">
+    <div className="order-2 ms-auto flex items-center gap-3 text-sm sm:order-3 sm:ms-0">
       <span className="hidden text-[var(--muted)] sm:inline">{user.email}</span>
       <Button
         size="sm"
