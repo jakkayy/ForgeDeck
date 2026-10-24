@@ -8,6 +8,8 @@ ForgeDeck manages applications, Docker servers, Git repositories and CI/CD from 
 
 ## Status
 
+> **Early software.** The installers and the Agent/Runner systemd units have been exercised in containers and on one home server, not yet by an end-to-end test on a real systemd host in CI. Do not rely on it for anything you cannot afford to lose. Security reports: [SECURITY.md](SECURITY.md).
+
 | Phase | Scope | Status |
 |---|---|---|
 | 0–1 | Project skeleton, auth, projects, servers + Agent, container management | Done |
