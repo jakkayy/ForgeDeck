@@ -1,6 +1,7 @@
 import { Card } from "@heroui/react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { applicationsQuery } from "../../api/applications";
 import { environmentsQuery, releasesQuery } from "../../api/environments";
 import { gitConnectionsQuery } from "../../api/git";
@@ -18,6 +19,8 @@ type Step = {
   detail: string;
   done: boolean;
   action: { label: string; to: Destination };
+  /** Why this step cannot start yet; the button is replaced by this reason. */
+  blocked?: string;
 };
 
 type Destination =
@@ -90,18 +93,31 @@ export function SetupGuide({ projectId }: { projectId: string }) {
       title: "Add an environment",
       detail: "A server and how the service runs on it: ports, health check, variables.",
       done: environmentIds.length > 0,
-      action: firstApp
-        ? { label: "Add environment", to: { kind: "application", id: firstApp.id } }
-        : { label: "New application", to: { kind: "tab", tab: "applications" } },
+      action: {
+        label: "Add environment",
+        to: firstApp
+          ? { kind: "application", id: firstApp.id }
+          : { kind: "tab", tab: "applications" },
+      },
+      blocked: firstApp ? undefined : "Create an application first.",
     },
     {
       title: "Build and deploy",
       detail:
         "Push to the branch (or press Build), then Deploy. A release is recorded when it is healthy.",
       done: deployed,
-      action: firstApp
-        ? { label: "Open the application", to: { kind: "application", id: firstApp.id } }
-        : { label: "New application", to: { kind: "tab", tab: "applications" } },
+      action: {
+        label: "Open the application",
+        to: firstApp
+          ? { kind: "application", id: firstApp.id }
+          : { kind: "tab", tab: "applications" },
+      },
+      blocked:
+        environmentIds.length > 0
+          ? undefined
+          : firstApp
+            ? "Add an environment first."
+            : "Create an application first.",
     },
   ];
   if (steps.every((s) => s.done)) {
@@ -110,41 +126,108 @@ export function SetupGuide({ projectId }: { projectId: string }) {
   const next = steps.findIndex((s) => !s.done);
   const statusOf = (i: number): StepStatus =>
     steps[i]?.done ? "done" : i === next ? "next" : "todo";
+  return <GuideCard projectId={projectId} steps={steps} next={next} statusOf={statusOf} />;
+}
+
+function GuideCard({
+  projectId,
+  steps,
+  next,
+  statusOf,
+}: {
+  projectId: string;
+  steps: Step[];
+  next: number;
+  statusOf: (i: number) => StepStatus;
+}) {
+  const [open, setOpen] = useState(false);
+  const doneCount = steps.filter((s) => s.done).length;
+  const current = steps[next];
+  const listId = "setup-guide-steps";
 
   return (
     <Card className="flex flex-col gap-3 p-4" aria-label="Getting started">
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h2 className="text-base font-semibold">Get this project running</h2>
         <p className="text-sm text-[var(--muted)]">
-          {steps.filter((s) => s.done).length} of {steps.length} steps done.
+          {doneCount} of {steps.length} steps done
         </p>
       </div>
-      <ol className="flex flex-col gap-2">
-        {steps.map((step, i) => (
-          <li key={step.title} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <StepMarker status={statusOf(i)} number={i + 1} />
-            <div className="min-w-48 flex-1">
-              <p
-                className={
-                  statusOf(i) === "done"
-                    ? "text-sm text-[var(--muted)] line-through"
-                    : "text-sm font-medium"
-                }
-              >
-                {step.title}
-              </p>
+      <div
+        role="progressbar"
+        aria-label="Setup progress"
+        aria-valuemin={0}
+        aria-valuemax={steps.length}
+        aria-valuenow={doneCount}
+        className="h-1.5 overflow-hidden rounded-full bg-[var(--default)]"
+      >
+        <div
+          className="h-full rounded-full bg-[var(--accent)]"
+          style={{ width: `${(doneCount / steps.length) * 100}%` }}
+        />
+      </div>
+      {current && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <StepMarker status="next" number={next + 1} />
+          <div className="min-w-48 flex-1">
+            <p className="text-sm font-medium">Next: {current.title}</p>
+            <p className="text-xs text-[var(--muted)]">{current.detail}</p>
+          </div>
+          <StepAction projectId={projectId} step={current} primary />
+        </div>
+      )}
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen(!open)}
+        className="self-start rounded-md text-sm text-[var(--link)] hover:underline"
+      >
+        {open ? "Hide all steps" : "Show all steps"}
+      </button>
+      {open && (
+        <ol id={listId} className="flex flex-col gap-2 border-t border-[var(--separator)] pt-3">
+          {steps.map((step, i) => (
+            <li key={step.title} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <StepMarker status={statusOf(i)} number={i + 1} />
+              <div className="min-w-48 flex-1">
+                <p
+                  className={
+                    statusOf(i) === "done"
+                      ? "text-sm text-[var(--muted)] line-through"
+                      : "text-sm font-medium"
+                  }
+                >
+                  {step.title}
+                </p>
+                {statusOf(i) !== "done" && (
+                  <p className="text-xs text-[var(--muted)]">{step.detail}</p>
+                )}
+              </div>
               {statusOf(i) !== "done" && (
-                <p className="text-xs text-[var(--muted)]">{step.detail}</p>
+                <StepAction projectId={projectId} step={step} primary={statusOf(i) === "next"} />
               )}
-            </div>
-            {statusOf(i) !== "done" && (
-              <StepLink projectId={projectId} step={step} primary={statusOf(i) === "next"} />
-            )}
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      )}
     </Card>
   );
+}
+
+function StepAction({
+  projectId,
+  step,
+  primary,
+}: {
+  projectId: string;
+  step: Step;
+  primary: boolean;
+}) {
+  if (step.blocked) {
+    return <span className="text-xs text-[var(--muted)]">{step.blocked}</span>;
+  }
+  return <StepLink projectId={projectId} step={step} primary={primary} />;
 }
 
 function StepMarker({ status, number }: { status: StepStatus; number: number }) {

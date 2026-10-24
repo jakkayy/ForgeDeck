@@ -171,7 +171,7 @@ function DeploymentRow({ deployment }: { deployment: Deployment }) {
           </Link>
         )}
       </div>
-      <DeploymentStages deployment={deployment} />
+      {deployment.status !== "succeeded" && <DeploymentStages deployment={deployment} />}
       <DeploymentFailure deployment={deployment} />
     </li>
   );

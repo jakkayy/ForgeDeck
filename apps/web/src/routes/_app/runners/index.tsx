@@ -32,12 +32,13 @@ function RunnersPage() {
 
 function AdminRunners() {
   const runners = useQuery(runnersQuery);
+  const none = runners.data !== undefined && runners.data.length === 0;
   return (
     <>
       <PageHeader
         title="Runners"
         description="Build hosts that turn your repositories into images."
-        actions={<AddRunnerDialog />}
+        actions={none ? undefined : <AddRunnerDialog />}
       />
       <QueryBoundary
         query={runners}
@@ -47,6 +48,7 @@ function AdminRunners() {
           <EmptyState
             title="No Runners yet"
             description="A Runner builds your images. Add one, then install it on a dedicated build host with the command shown."
+            action={<AddRunnerDialog />}
           />
         }
       >

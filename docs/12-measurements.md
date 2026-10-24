@@ -84,7 +84,7 @@ Dashboard bundle (gzip): initial JS 103 KB, CSS 9.3 KB; each page loads its own 
 | Data | 10 projects, 50 servers, 100 applications, 200 environments, 8,000 deployments, 7,000 releases, 20,000 jobs (300,000 log lines on the newest 1,000), 50,000 audit events; database 122 MB |
 | Load | 20 concurrent dashboard users (one session) reading as fast as the server answers, plus 50 simulated Agents, each with a heartbeat every 20 s and a 25 s job long-poll |
 
-Repeat it: migrate an empty database, create `bench@forgedeck.local` with `forgedeck-api create-user`, load [scripts/bench/seed.sql](../scripts/bench/seed.sql) with `psql -v ON_ERROR_STOP=1 -f`, start the Control Plane, and run `go run ./scripts/bench -url http://127.0.0.1:8080`. The browser numbers come from Chrome driven by Playwright (largest-contentful-paint and Event Timing observers); the scripts are not in the repository.
+Repeat it: migrate an empty database, create `bench@forgedeck.local` with `forgedeck-api create-user`, load [scripts/bench/seed.sql](../scripts/bench/seed.sql) with `psql -v ON_ERROR_STOP=1 -f`, start the Control Plane, and run `go run ./scripts/bench -url http://127.0.0.1:8080`. The browser numbers come from Chrome driven by Playwright (largest-contentful-paint and Event Timing observers); the LCP script is [scripts/bench/browser.py](../scripts/bench/browser.py), the interaction script is not in the repository.
 
 ### API latency, under load
 
@@ -155,6 +155,24 @@ Measured separately, as the roadmap asks.
 | Under the load above (about 165 s) | peak 65 MB RSS, about 2.3 cores on average | |
 
 Build-time use is the Docker build's, not the Control Plane's: a cold `docker build --no-cache` of ForgeDeck's own image (a web build with Bun, then a Go build) took **38 s**, used **89 CPU-seconds (2.4 cores on average)**, and raised the host's memory use by a peak of **401 MB**. This is a whole-host measurement over the build (the work happens in the Docker daemon, outside any ForgeDeck process), so other activity on the host is included; the Runner itself only clones and drives `docker`. A larger application will use more. Builds run on the Runner host, so this load does not land on the Control Plane's host.
+
+### Dashboard LCP after the fonts and UI changes (2026-10-24)
+
+The same profile and seed as above, the Control Plane run directly (HTTP/1.1, no proxy, so API JSON is not compressed as it is behind Caddy: the mobile numbers are pessimistic for the production Compose stack). Cold cache, median of 5 loads, `scripts/bench/browser.py`. "Before" is the build without the self-hosted fonts (commit `aa4d1eb`), "after" is the build with Inter and Noto Sans Thai (`fd0465e`).
+
+| Page | Desktop before | Desktop after | Mobile before | Mobile after |
+|---|---|---|---|---|
+| Overview | 144 ms | 148 ms | 2.08 s | 2.11 s |
+| Servers | 180 ms | 180 ms | 2.80 s | 2.82 s |
+| Projects | 156 ms | 164 ms | 2.52 s | 2.54 s |
+| Jobs | 164 ms | 160 ms | 2.50 s | 2.53 s |
+| Project | 224 ms | 220 ms | 3.32 s | 3.38 s |
+| Application | 164 ms | 160 ms | 2.82 s | 2.82 s |
+| Environment | 184 ms | 204 ms | 2.67 s | 2.61 s |
+| Job log | 168 ms | 168 ms | 2.78 s | 3.03 s |
+
+- Desktop is unchanged within noise. The mobile profile loses 0–60 ms on most pages and **250 ms on the job log**: the Latin font is 48 KB, which on a 1.6 Mbit link is about 240 ms of transfer, and on that page it competes with the log request. Mobile pages over 2.5 s: 6 of 8 before (Jobs is exactly at the limit), 7 of 8 after.
+- The Project page makes about 73 requests on this data (the setup guide looks at the environments and releases of up to five applications); the largest transfers are the main script (76 KB), the font, three more chunks of 20–27 KB and the stylesheet (22 KB). Fewer requests on that page and preloading route chunks are the levers; neither is done.
 
 ### Not covered
 

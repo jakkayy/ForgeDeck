@@ -31,6 +31,9 @@ const phrases: Record<string, (e: AuditEntry) => string> = {
   "job.cancel": (e) => `cancelled a ${e.target_name ?? ""} job`,
   "server.enroll": (e) => `enrolled as ${e.target_name ?? "a server"}`,
   "server.delete": (e) => `removed the server ${e.target_name ?? ""}`,
+  "server.credential_rotation_request": (e) =>
+    `asked ${e.target_name ?? "a server"} to rotate its credential`,
+  "server.credential_rotate": (e) => `rotated the credential of ${e.target_name ?? "a server"}`,
   "enrollment_token.create": (e) =>
     `created an enrollment token for ${e.target_name ?? "a server"}`,
   "container.action": (e) =>

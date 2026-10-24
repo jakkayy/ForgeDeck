@@ -113,6 +113,12 @@ Show:
 
 Avoid querying expensive Docker stats continuously. Make metric freshness visible where useful.
 
+## Typography
+
+- The UI ships its own fonts, served from the same origin because the CSP allows `font-src 'self'`: Inter (Latin) and Noto Sans Thai (Thai), as variable fonts so one file covers every weight.
+- Only the subsets the UI uses are bundled (Latin, Latin Extended, Thai, about 160 kB in total); a browser downloads one only when a page needs its characters, and `font-display: swap` shows text in a system font until it arrives.
+- Weights: 400 for body text, 500 for names in lists, 600 for headings. Small text is 13px, not 12px.
+
 ## 9. Logs
 
 - Use a readable monospace font.

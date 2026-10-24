@@ -32,22 +32,26 @@ function ProjectsPage() {
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim()) || undefined;
   const projects = useInfiniteQuery(projectListQuery(q));
+  const noProjectsAtAll =
+    !q && projects.data !== undefined && loadedItems(projects.data).length === 0;
 
   return (
     <>
       <PageHeader
         title="Projects"
         description="Projects group servers, applications and the people who can manage them."
-        actions={<NewProjectDialog />}
+        actions={noProjectsAtAll ? undefined : <NewProjectDialog />}
       />
-      <div className="mb-4">
-        <SearchBox
-          label="Search projects"
-          placeholder="Search by name"
-          value={search}
-          onChange={setSearch}
-        />
-      </div>
+      {!noProjectsAtAll && (
+        <div className="mb-4">
+          <SearchBox
+            label="Search projects"
+            placeholder="Search by name"
+            value={search}
+            onChange={setSearch}
+          />
+        </div>
+      )}
       <QueryBoundary
         query={projects}
         label="projects"
@@ -59,6 +63,7 @@ function ProjectsPage() {
             <EmptyState
               title="No projects yet"
               description="Create a project first. Servers and applications always belong to a project."
+              action={<NewProjectDialog />}
             />
           )
         }

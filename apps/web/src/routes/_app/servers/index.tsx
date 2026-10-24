@@ -28,43 +28,49 @@ function ServersPage() {
   const q = useDebouncedValue(search.trim()) || undefined;
   const servers = useInfiniteQuery(serverListQuery({ q, status }));
   const filtered = Boolean(q || status);
+  const noServersAtAll =
+    !filtered && servers.data !== undefined && loadedItems(servers.data).length === 0;
 
   return (
     <>
       <PageHeader
         title="Servers"
         description="Docker hosts running the ForgeDeck Agent."
-        actions={<AddServerDialog />}
+        actions={noServersAtAll ? undefined : <AddServerDialog />}
       />
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <SearchBox
-          label="Search servers"
-          placeholder="Search by name"
-          value={search}
-          onChange={setSearch}
-        />
-        <Select
-          aria-label="Filter by status"
-          className="w-44"
-          selectedKey={status ?? "all"}
-          onSelectionChange={(key) => setStatus(key === "all" ? undefined : (key as ServerStatus))}
-        >
-          <Select.Trigger>
-            <Select.Value />
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {statuses.map((value) => (
-                <ListBox.Item key={value} id={value} textValue={value}>
-                  {value === "all" ? "All statuses" : value}
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
-      </div>
+      {!noServersAtAll && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <SearchBox
+            label="Search servers"
+            placeholder="Search by name"
+            value={search}
+            onChange={setSearch}
+          />
+          <Select
+            aria-label="Filter by status"
+            className="w-44"
+            selectedKey={status ?? "all"}
+            onSelectionChange={(key) =>
+              setStatus(key === "all" ? undefined : (key as ServerStatus))
+            }
+          >
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {statuses.map((value) => (
+                  <ListBox.Item key={value} id={value} textValue={value}>
+                    {value === "all" ? "All statuses" : value}
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </div>
+      )}
       <QueryBoundary
         query={servers}
         label="servers"
@@ -76,6 +82,7 @@ function ServersPage() {
             <EmptyState
               title="No servers yet"
               description="Register your first Docker server: install the Agent and it connects to ForgeDeck over HTTPS, with no inbound ports."
+              action={<AddServerDialog />}
             />
           )
         }
