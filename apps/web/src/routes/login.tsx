@@ -47,7 +47,7 @@ function SignIn() {
   const error = signIn.error;
   return (
     <main className="grid min-h-dvh place-items-center px-4">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-sm gap-4 p-6">
         <Card.Header>
           <h1 className="card__title text-xl font-semibold">Sign in to ForgeDeck</h1>
           <Card.Description>Use the account your administrator created for you.</Card.Description>
@@ -122,7 +122,7 @@ function CreateFirstAccount() {
   const error = register.error;
   return (
     <main className="grid min-h-dvh place-items-center px-4">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-sm gap-4 p-6">
         <Card.Header>
           <h1 className="card__title text-xl font-semibold">Welcome to ForgeDeck</h1>
           <Card.Description>

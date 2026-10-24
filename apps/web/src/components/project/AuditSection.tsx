@@ -65,10 +65,9 @@ export function AuditSection({ projectId }: { projectId: string }) {
                   key={entry.id}
                   className="flex flex-col gap-0.5 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-4"
                 >
-                  <p className="min-w-0 flex-1 text-sm">
+                  <p className="min-w-0 flex-1 text-sm" title={entry.action}>
                     <span className="font-medium">{entry.actor}</span> {describeAudit(entry)}
                   </p>
-                  <p className="font-mono text-xs text-[var(--muted)]">{entry.action}</p>
                   <time
                     dateTime={entry.created_at}
                     title={new Date(entry.created_at).toLocaleString()}
