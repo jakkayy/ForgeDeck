@@ -122,6 +122,10 @@ FORGEDECK_RUNNER_CREDENTIAL=fdr_... make run-runner URL=http://localhost:8080
 | `make migrate-status` | ดูสถานะ migration |
 | `make db-down` | หยุด PostgreSQL |
 
+## สัญญาอนุญาต
+
+Apache License 2.0 ดู [LICENSE](LICENSE) ลิขสิทธิ์ 2026 jakkayy
+
 ## เอกสาร
 
 | ไฟล์ | เนื้อหา |

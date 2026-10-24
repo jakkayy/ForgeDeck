@@ -93,6 +93,10 @@ All are listed in [.env.example](.env.example).
 | `FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS` | Allow Git servers on internal networks (off by default, to prevent SSRF) |
 | `FORGEDECK_DISABLE_WEB_SETUP` | Disable the first-account web page |
 
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE). Copyright 2026 jakkayy.
+
 ## Documentation
 
 | File | Contents |
