@@ -10,6 +10,8 @@ ForgeDeck จัดการ Application, Docker server, Git repository แล�
 
 ## สถานะ
 
+> **ซอฟต์แวร์ระยะแรก** ตัวติดตั้งและ unit ของ Agent/Runner ผ่านการทดสอบใน container และบน home server หนึ่งเครื่อง แต่ยังไม่มีเทสต์ end-to-end บน systemd จริงใน CI อย่าใช้กับของที่เสียไม่ได้ แจ้งช่องโหว่ที่ [SECURITY.md](SECURITY.md)
+
 | Phase | เนื้อหา | สถานะ |
 |---|---|---|
 | 0–1 | โครงโปรเจกต์, Auth, Project, Server + Agent, จัดการ container | เสร็จ |
@@ -119,6 +121,10 @@ FORGEDECK_RUNNER_CREDENTIAL=fdr_... make run-runner URL=http://localhost:8080
 | `make generate` | สร้างโค้ด sqlc จาก `internal/store/queries` |
 | `make migrate-status` | ดูสถานะ migration |
 | `make db-down` | หยุด PostgreSQL |
+
+## สัญญาอนุญาต
+
+Apache License 2.0 ดู [LICENSE](LICENSE) ลิขสิทธิ์ 2026 jakkayy
 
 ## เอกสาร
 
