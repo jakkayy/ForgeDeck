@@ -1,134 +1,108 @@
 # ForgeDeck
 
-> Self-hosted DevOps Control Plane สำหรับ Docker: Code → Build → Test → Image → Registry → Deploy
+**English** · [ไทย](README.th.md)
 
-ForgeDeck จัดการ Application, Docker server, Git repository และ CI/CD จาก Dashboard เดียว โดยไม่ต้อง SSH เข้า server ทุกครั้ง เป็น Go binary เดียว (UI ฝังอยู่ข้างใน) ใช้ PostgreSQL เป็นทั้งฐานข้อมูลและคิวงาน
+> Self-hosted DevOps control plane for Docker: Code → Build → Test → Image → Registry → Deploy
 
-ภาพรวมและเหตุผลของการออกแบบอยู่ใน [docs/README.md](docs/README.md)
+ForgeDeck manages applications, Docker servers, Git repositories and CI/CD from one dashboard, so you do not have to SSH into a server for every deployment. It is a single Go binary with the UI embedded, and uses PostgreSQL as both the database and the job queue. The overview and the reasoning behind the design are in [docs/README.md](docs/README.md).
 
-## สถานะ
+## Status
 
-| Phase | เนื้อหา | สถานะ |
+| Phase | Scope | Status |
 |---|---|---|
-| 0–1 | โครงโปรเจกต์, Auth, Project, Server + Agent, จัดการ container | เสร็จ |
-| 2 | Git integration (GitHub/GitLab), webhook, job queue | เสร็จ |
-| 3 | Runner แยกจาก production: checkout → build → test → push | เสร็จ |
-| 4 | Environment, deploy ผ่าน Agent + Compose, health check, release, rollback | เสร็จ |
-| 5 | Secrets, audit log, RBAC, rate limit, retention, backup, production compose, Agent installer, upgrade guide | เสร็จ |
-| 6 | Overview, สถานะหน้า, pagination/filter, virtualized log, accessibility, benchmark | เสร็จ |
+| 0–1 | Project skeleton, auth, projects, servers + Agent, container management | Done |
+| 2 | Git integration (GitHub/GitLab), webhooks, job queue | Done |
+| 3 | Runner separated from production: checkout → build → test → push | Done |
+| 4 | Environments, deployment through the Agent + Compose, health check, releases, rollback | Done |
+| 5 | Secrets, audit log, RBAC, rate limits, retention, backup, production Compose, Agent installer, upgrade guide | Done |
+| 6 | Overview, status pages, pagination/filters, virtualized logs, accessibility, benchmarks | Done |
+| 7 | Ease of use: installation administrator, Runners from the dashboard, one-command Agent and Runner install (more is planned) | In progress |
 
-รายละเอียดของแต่ละข้อดูที่ [docs/11-implementation-plan.md](docs/11-implementation-plan.md)
+Details per item: [docs/11-implementation-plan.md](docs/11-implementation-plan.md).
 
-## ส่วนประกอบ
+## Components
 
-| ส่วน | หน้าที่ | Binary |
+| Component | Role | Binary |
 |---|---|---|
-| Control Plane | API, Web UI, job queue, auth, secrets | `forgedeck-api` |
-| Agent | อยู่บน Docker server ควบคุม container (เชื่อมออกมาหา Control Plane เอง) | `forgedeck-agent` |
-| Runner | อยู่บน build host แยก ทำ checkout → build → test → push | `forgedeck-runner` |
-| PostgreSQL | ข้อมูลและคิวงาน | ผ่าน Docker Compose |
+| Control Plane | API, web UI, job queue, auth, secrets | `forgedeck-api` |
+| Agent | Runs on a Docker server and controls its containers (connects *out* to the Control Plane) | `forgedeck-agent` |
+| Runner | Runs on a separate build host: checkout → build → test → push | `forgedeck-runner` |
+| PostgreSQL | Data and job queue | via Docker Compose |
 
-## สิ่งที่ต้องมี
+## Install (production)
 
-- Go (เวอร์ชันตาม `go.mod`), Docker Engine + Compose plugin, git
-- [Bun](https://bun.sh) (ใช้ตอน build UI เท่านั้น ไม่ต้องใช้ตอนรัน)
-- ตัวเลือก: `golangci-lint` v2.5 (`make lint`), `sqlc` v1.30 (`make generate`)
+Use [deploy/compose](deploy/compose/README.md): the Control Plane (the image `ghcr.io/jakkayy/forgedeck-api` of a release), PostgreSQL and Caddy (automatic TLS) in one Compose project. Only the proxy publishes ports. **Keep `FORGEDECK_SECRET_KEYS` away from that host**: it is not in backups, and without it stored Git tokens and secrets cannot be read ([docs/16-backup-restore.md](docs/16-backup-restore.md)).
 
-## เริ่มใช้งาน (โหมดพัฒนา)
+The first visit shows **Create the first account**; that account owns the installation and the page closes for good once an account exists. If the host is reachable from the internet before you register, set `FORGEDECK_DISABLE_WEB_SETUP=true` and create the account with `forgedeck-api create-user` instead.
+
+### Add a server (Agent)
+
+In the dashboard open **Servers → Add server**. It shows a one-line command that downloads the Agent from the release, verifies its checksum and enrolls it. Run it on a Linux host with systemd, Docker and the Compose plugin. Details and the privileges involved: [deploy/agent](deploy/agent/README.md).
+
+### Add a build host (Runner)
+
+An administrator opens **Runners → Add Runner**, which shows one command to run on a dedicated build host (Debian or Ubuntu with Docker's apt repository). It installs the Runner, gives it its own rootless Docker daemon and starts it. The Runner executes untrusted repository code, so keep it away from production: [deploy/runner](deploy/runner/README.md), [docs/14-runner.md](docs/14-runner.md).
+
+## First build and deploy
+
+1. Create a project, open its **Git** tab and connect GitHub or GitLab (a GitLab token needs the `api` scope; see [docs/13-git-providers.md](docs/13-git-providers.md)).
+2. On **Registries** add a registry (GitHub, GitLab or Docker Hub presets are offered, or any registry such as `localhost:5000`).
+3. On **Applications** create an application: repository, branch, registry and image name. The repository needs a `Dockerfile`.
+4. Open the application and press **Build** (or push to the branch). A build produces an image reference such as `host/image@sha256:…`.
+5. Press **New environment** (server, container port, host port, optional health check), then **Deploy**. A deployment is recorded as a release only when the health check passes; if the new version is not healthy the previous one is restored, and **Roll back** returns to an older release. Data in volumes and databases is not rolled back ([docs/15-deployments.md](docs/15-deployments.md)).
+
+## Development
+
+Requirements: Go (version in `go.mod`), Docker Engine with the Compose plugin, git and [Bun](https://bun.sh) (UI build only). Optional: `golangci-lint` v2.5 (`make lint`), `sqlc` v1.30 (`make generate`).
 
 ```sh
-cp .env.example .env     # ตั้ง POSTGRES_PASSWORD, FORGEDECK_DATABASE_URL, FORGEDECK_SECRET_KEYS
+cp .env.example .env     # set POSTGRES_PASSWORD, FORGEDECK_DATABASE_URL, FORGEDECK_SECRET_KEYS
 make db-up               # PostgreSQL
-make dev-api             # Control Plane ที่ :8080 (migrate database ให้อัตโนมัติ)
-make dev-web             # UI ที่ http://localhost:5173 (hot reload)
+make dev-api             # Control Plane on :8080 (applies migrations)
+make dev-web             # UI on http://localhost:5173 (hot reload)
 ```
 
-เปิด UI ครั้งแรกจะเจอหน้า **สร้างบัญชีแรก** (ใส่อีเมลกับรหัสผ่าน) ผู้ที่สร้างเป็นเจ้าของระบบ และหน้านี้ปิดถาวรทันทีที่มีบัญชีแล้ว (คนอื่นเพิ่มด้วย `make create-user EMAIL=...` แล้วเพิ่มเข้า Project ที่แท็บ Members) ถ้าเซิร์ฟเวอร์เปิดสู่อินเทอร์เน็ตก่อนที่คุณจะสร้างบัญชี ให้ตั้ง `FORGEDECK_DISABLE_WEB_SETUP=true` แล้วสร้างด้วย `create-user` แทน
+Create the encryption key with `openssl rand -base64 32` and set `FORGEDECK_SECRET_KEYS=v1:<value>`. `make build` builds the web UI, API, Agent and Runner into `bin/`.
 
-สร้าง key เข้ารหัส secret ด้วย `openssl rand -base64 32` แล้วใส่เป็น `FORGEDECK_SECRET_KEYS=v1:<ค่าที่ได้>` **เก็บ key นี้ไว้นอก database และสำรองไว้** ถ้าหาย จะอ่าน Git token ที่เก็บไว้ไม่ได้อีก
-
-## รันแบบ binary เดียว
+To try a Runner locally (it uses your own Docker daemon, so for experiments only):
 
 ```sh
-make build               # web + api + agent + runner ลงใน bin/
-bin/forgedeck-api serve  # เปิด http://localhost:8080
-```
-
-## ติดตั้งจริง (production)
-
-ใช้ [deploy/compose](deploy/compose/README.md): Control Plane + PostgreSQL + Caddy (TLS อัตโนมัติ) ในชุดเดียว มีแต่ proxy ที่เปิด port ส่วน database กับ API เข้าถึงจากภายนอกไม่ได้ ใช้โดเมนจริงที่ชี้มาที่เครื่อง และ**เก็บ `FORGEDECK_SECRET_KEYS` ไว้นอกเครื่องนี้** (ไม่อยู่ใน backup) ดู [docs/16-backup-restore.md](docs/16-backup-restore.md)
-
-## ต่อ Agent (จัดการ Docker ของเครื่องอื่น)
-
-ใน UI ไปที่ **Servers > Add server** จะได้ token จากนั้นบนเครื่องปลายทาง (Linux + systemd + Docker + Compose plugin):
-
-```sh
-sudo FORGEDECK_ENROLLMENT_TOKEN=<token> deploy/agent/install.sh --url https://forgedeck.example.com --binary bin/forgedeck-agent
-```
-
-ติดตั้งเป็น service ที่รันด้วย user เฉพาะ อัปเกรดได้โดยรันซ้ำ รายละเอียดและข้อควรระวังเรื่องสิทธิ์ใน [deploy/agent](deploy/agent/README.md)
-
-ทดลองแบบไม่ติดตั้ง service: `bin/forgedeck-agent enroll --url http://localhost:8080 --allow-insecure` แล้ว `bin/forgedeck-agent run` (ถ้า Control Plane ไม่ใช่ HTTPS ต้องเพิ่ม `--allow-insecure`)
-
-## ต่อ Runner (build image)
-
-```sh
-make create-runner NAME=build-01          # แสดง credential (fdr_...) ครั้งเดียว
+make create-runner NAME=build-01          # prints the credential (fdr_...) once
 FORGEDECK_RUNNER_CREDENTIAL=fdr_... make run-runner URL=http://localhost:8080
 ```
 
-`make run-runner` ใช้ Docker daemon ของเครื่องคุณโดยตรง เหมาะกับทดลองเท่านั้น การติดตั้งจริงบน build host ใช้คำสั่งเดียวจากหน้า Runners → Add Runner (ติดตั้ง rootless Docker และเริ่มบริการให้เอง) ดู [deploy/runner/README.md](deploy/runner/README.md) และ [docs/14-runner.md](docs/14-runner.md) เพราะ Runner รันโค้ดที่ไม่น่าไว้ใจ จึงควรอยู่บนเครื่องแยกที่ไม่มีอย่างอื่นสำคัญ
+| Command | What it does |
+|---|---|
+| `make test` | Runs all tests (set `FORGEDECK_TEST_DATABASE_URL`; add `FORGEDECK_TEST_DOCKER=1` for the Docker-based tests) |
+| `make lint` / `make fmt` | Checks / formats the Go code |
+| `make generate` | Generates the sqlc code from `internal/store/queries` |
+| `make migrate-status` | Shows the migration status |
+| `make db-down` | Stops PostgreSQL |
 
-## ลอง build ครั้งแรก
+## Important settings
 
-1. สร้าง Project แล้วไปแท็บ **Git** เพื่อ Connect GitLab (token ต้องมี scope `api`) หรือ GitHub ([docs/13-git-providers.md](docs/13-git-providers.md))
-2. แท็บ **Registries** เพิ่ม registry เช่น `ghcr.io` หรือ registry ในเครื่อง:
-   `docker run -d --name registry -p 127.0.0.1:5000:5000 registry:3` แล้วใช้ host `localhost:5000`
-3. แท็บ **Applications** สร้าง Application: เลือก repo, registry และชื่อ image
-4. เปิดหน้า Application แล้วกด **Build** หรือ push โค้ดเข้า branch นั้น
+All are listed in [.env.example](.env.example).
 
-ผล build คือ image reference แบบ `host/image@sha256:...` ที่ใช้ deploy ต่อ
-
-## Deploy ครั้งแรก
-
-1. เพิ่ม server ที่ **Servers** แล้วติดตั้ง Agent บนเครื่องนั้น (ต้องมี Docker และ Docker Compose plugin)
-2. ในหน้า Application กด **New environment**: เลือก server, ใส่ container port / host port และ health check (ใต้ *Advanced*) เปิด *Deploy every successful build* ถ้าต้องการให้ build ที่สำเร็จขึ้น environment นี้เอง
-3. กด **Deploy** จะเอา build ที่สำเร็จล่าสุดขึ้น ดูความคืบหน้า `Queued → Pulling → Starting → Health check → Healthy` ที่หน้า environment
-4. ถ้าเวอร์ชันใหม่ไม่ healthy ระบบกู้เวอร์ชันก่อนหน้าให้เอง และกด **Roll back** ที่ Release history เพื่อกลับไป release เก่าได้ (**ข้อมูลใน volume และ database ไม่ถูกย้อน** ดู [docs/15-deployments.md](docs/15-deployments.md))
-
-## ตัวแปรสำคัญ
-
-ตัวอย่างทั้งหมดอยู่ใน [.env.example](.env.example)
-
-| ตัวแปร | ความหมาย |
+| Variable | Meaning |
 |---|---|
 | `FORGEDECK_DATABASE_URL` | PostgreSQL connection string |
-| `FORGEDECK_SECRET_KEYS` | key เข้ารหัส secret รูปแบบ `id:base64,id:base64` (ตัวแรกคือ key ที่ใช้เข้ารหัสใหม่) |
-| `FORGEDECK_PUBLIC_URL` | URL ที่ GitHub/GitLab เรียก webhook กลับมา |
-| `FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS` | อนุญาต Git server ใน network ภายใน (ปิดไว้เป็นค่าเริ่มต้นเพื่อกัน SSRF) |
+| `FORGEDECK_SECRET_KEYS` | Secret-encryption keys as `id:base64,id:base64` (the first encrypts new data) |
+| `FORGEDECK_PUBLIC_URL` | The URL GitHub/GitLab call back for webhooks |
+| `FORGEDECK_ALLOW_PRIVATE_GIT_HOSTS` | Allow Git servers on internal networks (off by default, to prevent SSRF) |
+| `FORGEDECK_DISABLE_WEB_SETUP` | Disable the first-account web page |
 
-## คำสั่งที่ใช้บ่อย
+## Documentation
 
-| คำสั่ง | ทำอะไร |
+| File | Contents |
 |---|---|
-| `make test` | รัน test ทั้งหมด (ต้องตั้ง `FORGEDECK_TEST_DATABASE_URL`; เพิ่ม `FORGEDECK_TEST_DOCKER=1` เพื่อรันเทสต์ที่ใช้ Docker) |
-| `make lint` / `make fmt` | ตรวจ/จัดรูปแบบโค้ด Go |
-| `make generate` | สร้างโค้ด sqlc จาก `internal/store/queries` |
-| `make migrate-status` | ดูสถานะ migration |
-| `make db-down` | หยุด PostgreSQL |
-
-## เอกสาร
-
-| ไฟล์ | เนื้อหา |
-|---|---|
-| [01 Product Spec](docs/01-product-spec.md) · [02 Architecture](docs/02-architecture.md) | ขอบเขตและสถาปัตยกรรม |
-| [03 Database](docs/03-database.md) · [04 API](docs/04-api-spec.md) | schema และ REST API |
-| [05 Agent Protocol](docs/05-agent-protocol.md) · [14 Runner](docs/14-runner.md) | protocol ของ Agent และ Runner |
-| [06 CI/CD](docs/06-ci-cd-pipeline.md) · [07 Security](docs/07-security.md) | pipeline และ threat model |
-| [08 Frontend](docs/08-frontend-ux.md) · [09 Development](docs/09-development-guide.md) | UI และคู่มือพัฒนา |
-| [10 Roadmap](docs/10-roadmap.md) · [11 Plan](docs/11-implementation-plan.md) | แผนงาน |
-| [12 Measurements](docs/12-measurements.md) · [13 Git Providers](docs/13-git-providers.md) | ผลวัดและการตั้งค่า provider |
-| [15 Deployments](docs/15-deployments.md) | environment, deployment, release, rollback |
-| [16 Backup and Restore](docs/16-backup-restore.md) | สำรองและกู้ข้อมูล, `FORGEDECK_SECRET_KEYS` ต้องเก็บแยก |
-| [17 Upgrade Guide](docs/17-upgrade-guide.md) | อัปเกรด, ย้อนกลับ, การเปลี่ยนแปลงที่ต้องทำตาม |
-| [AGENTS.md](AGENTS.md) | กฎสำหรับ AI coding agents |
+| [01 Product Spec](docs/01-product-spec.md) · [02 Architecture](docs/02-architecture.md) | Scope and architecture |
+| [03 Database](docs/03-database.md) · [04 API](docs/04-api-spec.md) | Schema and REST API |
+| [05 Agent Protocol](docs/05-agent-protocol.md) · [14 Runner](docs/14-runner.md) | Agent and Runner protocols |
+| [06 CI/CD](docs/06-ci-cd-pipeline.md) · [07 Security](docs/07-security.md) | Pipeline and threat model |
+| [08 Frontend](docs/08-frontend-ux.md) · [09 Development](docs/09-development-guide.md) | UI and development guide |
+| [10 Roadmap](docs/10-roadmap.md) · [11 Plan](docs/11-implementation-plan.md) | Plans |
+| [12 Measurements](docs/12-measurements.md) · [13 Git Providers](docs/13-git-providers.md) | Measurements and provider setup |
+| [15 Deployments](docs/15-deployments.md) | Environments, deployments, releases, rollback |
+| [16 Backup and Restore](docs/16-backup-restore.md) | Backing up and restoring; `FORGEDECK_SECRET_KEYS` is kept separately |
+| [17 Upgrade Guide](docs/17-upgrade-guide.md) | Upgrading, rolling back, changes to follow |
+| [AGENTS.md](AGENTS.md) | Rules for AI coding agents |
