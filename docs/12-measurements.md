@@ -172,7 +172,27 @@ The same profile and seed as above, the Control Plane run directly (HTTP/1.1, no
 | Job log | 168 ms | 168 ms | 2.78 s | 3.03 s |
 
 - Desktop is unchanged within noise. The mobile profile loses 0–60 ms on most pages and **250 ms on the job log**: the Latin font is 48 KB, which on a 1.6 Mbit link is about 240 ms of transfer, and on that page it competes with the log request. Mobile pages over 2.5 s: 6 of 8 before (Jobs is exactly at the limit), 7 of 8 after.
-- The Project page makes about 73 requests on this data (the setup guide looks at the environments and releases of up to five applications); the largest transfers are the main script (76 KB), the font, three more chunks of 20–27 KB and the stylesheet (22 KB). Fewer requests on that page and preloading route chunks are the levers; neither is done.
+- The Project page made about 73 requests on this data: the setup guide looked at the environments and releases of up to five applications, and the dashboard was split into about 66 small files that a slow link fetches a few at a time.
+
+#### What was changed, and the result
+
+Two changes, measured together on the same build and data (mobile profile, median of 5 loads):
+
+1. The setup guide does not look further than a project's first three applications (a project with more is past setup, so the guide is hidden) and sends no requests at all for someone who cannot set a project up.
+2. The build groups React, TanStack and the HeroUI/React Aria code into three shared chunks (`vite.config.ts`), 38 files instead of 66.
+
+| Page | Before (fonts) | After | Requests before → after |
+|---|---|---|---|
+| Overview | 2.11 s | 2.32 s | |
+| Servers | 2.82 s | 2.50 s | |
+| Projects | 2.54 s | 2.35 s | |
+| Jobs | 2.53 s | 2.32 s | |
+| Project | 3.38 s | 2.49 s | 73 → 30 |
+| Application | 2.82 s | 2.36 s | |
+| Environment | 2.61 s | 2.51 s | |
+| Job log | 3.03 s | 3.13 s | |
+
+The mean over the eight pages falls from 2.73 s to 2.50 s, and 6 of 8 pages are now at or under the 2.5 s target (Servers sits at the limit, Environment 8 ms over). Two pages got slower: Overview by 0.2 s and the job log by 0.1 s. The grouped chunks send about 40 KB more script up front, which a 1.6 Mbit link pays for before any page; the job log also streams 58 KB of log events, which are not compressed. On the desktop profile every page is 140–176 ms (the Project page was 220 ms). Not done: deferring the font so it stops competing with the first data request (about 240 ms of transfer on this link), compressing the log event stream, and re-measuring behind Caddy (HTTP/2, compressed JSON).
 
 ### Not covered
 

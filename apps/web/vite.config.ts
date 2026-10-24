@@ -19,6 +19,16 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "dist",
       sourcemap: false,
+      rollupOptions: {
+        output: {
+          // a few shared chunks instead of dozens of tiny ones: fewer round trips on a slow link
+          manualChunks(id: string) {
+            if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "react";
+            if (/node_modules\/@tanstack\//.test(id)) return "tanstack";
+            if (/node_modules\/(@heroui|@react-aria|@react-stately|@react-types|@internationalized|react-aria|react-aria-components|react-stately|tailwind-variants|tailwind-merge)\//.test(id)) return "ui";
+          },
+        },
+      },
     },
   };
 });
