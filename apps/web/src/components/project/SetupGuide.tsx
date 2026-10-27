@@ -10,7 +10,8 @@ import { registriesQuery } from "../../api/registries";
 import { serversQuery } from "../../api/servers";
 import { useHasRole } from "../../lib/useHasRole";
 
-const INSPECTED_APPLICATIONS = 5;
+/** A project with more applications than this is past setup, so the guide does not look further. */
+const INSPECTED_APPLICATIONS = 3;
 
 type StepStatus = "done" | "next" | "todo";
 
@@ -32,19 +33,20 @@ type Destination =
 /** Checklist from an empty project to a healthy deployment; hidden once a release runs or for non-admins. */
 export function SetupGuide({ projectId }: { projectId: string }) {
   const canSetUp = useHasRole(projectId, "admin");
-  const git = useQuery(gitConnectionsQuery(projectId));
-  const registries = useQuery(registriesQuery(projectId));
-  const servers = useQuery(serversQuery);
-  const overview = useQuery(overviewQuery);
-  const applications = useQuery(applicationsQuery(projectId));
+  const git = useQuery({ ...gitConnectionsQuery(projectId), enabled: canSetUp });
+  const registries = useQuery({ ...registriesQuery(projectId), enabled: canSetUp });
+  const servers = useQuery({ ...serversQuery, enabled: canSetUp });
+  const overview = useQuery({ ...overviewQuery, enabled: canSetUp });
+  const applications = useQuery({ ...applicationsQuery(projectId), enabled: canSetUp });
 
-  const apps = (applications.data?.items ?? []).slice(0, INSPECTED_APPLICATIONS);
+  const established = (applications.data?.items.length ?? 0) > INSPECTED_APPLICATIONS;
+  const apps = established ? [] : (applications.data?.items ?? []);
   const environments = useQueries({ queries: apps.map((app) => environmentsQuery(app.id)) });
   const environmentIds = environments.flatMap((q) => q.data ?? []).map((e) => e.id);
   const releases = useQueries({ queries: environmentIds.map((id) => releasesQuery(id, 1)) });
 
   const loading = [git, registries, servers, overview, applications].some((q) => q.isPending);
-  if (!canSetUp || loading) {
+  if (!canSetUp || established || loading) {
     return null;
   }
 
