@@ -8,6 +8,7 @@ const budget = {
   // grows about 1-2 KB per HeroUI component; see docs/08 before raising
   css: 22 * KB,
   routeChunk: 60 * KB, // any lazily loaded chunk
+  sharedChunk: 110 * KB, // the UI-library chunk several routes share (vite.config.ts), loaded once
 };
 
 const dist = "dist";
@@ -39,7 +40,8 @@ check(
   budget.css,
 );
 for (const chunk of assets.filter((f) => f.endsWith(".js") && !initialJs.includes(f))) {
-  check(chunk, gzipSize(chunk), budget.routeChunk);
+  const shared = chunk.startsWith("assets/ui-");
+  check(chunk, gzipSize(chunk), shared ? budget.sharedChunk : budget.routeChunk);
 }
 
 if (failures.length > 0) {
